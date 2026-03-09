@@ -8,12 +8,14 @@ import React from "react";
 import ProfileScreen from "@/screens/shared/ProfileScreen";
 import EmergencyLeaveScreen from "@/screens/worker/EmergencyLeaveScreen";
 import HomeScreen from "@/screens/worker/HomeScreen";
+import TaskListScreen from "@/screens/worker/TaskListScreen";
 
 // ─── Route params ─────────────────────────────────────────────────────────────
 export type RootStackParamList = {
   Home: undefined;
   EmergencyLeave: undefined;
   Profile: undefined;
+  Tasks: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -42,6 +44,7 @@ export default function AppNavigator() {
       <Stack.Screen name="EmergencyLeave" component={EmergencyLeaveScreen} />
       {/* Thêm screen mới vào đây: */}
       <Stack.Screen name="Profile" component={ProfileScreen} />
+      <Stack.Screen name="Tasks" component={TaskListScreen} />
     </Stack.Navigator>
   );
 }
