@@ -1,5 +1,6 @@
-import ProfileScreen from "@/screens/shared/ProfileScreen";
+// app/index.tsx (hoặc App.tsx tùy project)
+import AppNavigator from "@/navigation/AppNavigator";
 
-export default function Profile() {
-  return <ProfileScreen />;
+export default function Home() {
+  return <AppNavigator />;
 }
