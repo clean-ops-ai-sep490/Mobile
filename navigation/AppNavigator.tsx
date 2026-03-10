@@ -9,6 +9,7 @@ import ProfileScreen from "@/screens/shared/ProfileScreen";
 import EmergencyLeaveScreen from "@/screens/worker/EmergencyLeaveScreen";
 import HomeScreen from "@/screens/worker/HomeScreen";
 import IssueReportScreen from "@/screens/worker/IssueReportScreen";
+import RequestEquipmentScreen from "@/screens/worker/RequestEquipmentScreen";
 import TaskListScreen from "@/screens/worker/TaskListScreen";
 
 // ─── Route params ─────────────────────────────────────────────────────────────
@@ -18,6 +19,7 @@ export type RootStackParamList = {
   Profile: undefined;
   Tasks: undefined;
   IssueReport: undefined;
+  RequestEquipment: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -48,6 +50,10 @@ export default function AppNavigator() {
       <Stack.Screen name="Profile" component={ProfileScreen} />
       <Stack.Screen name="Tasks" component={TaskListScreen} />
       <Stack.Screen name="IssueReport" component={IssueReportScreen} />
+      <Stack.Screen
+        name="RequestEquipment"
+        component={RequestEquipmentScreen}
+      />
     </Stack.Navigator>
   );
 }
