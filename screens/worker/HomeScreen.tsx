@@ -1,15 +1,15 @@
 import React, { useEffect, useRef } from "react";
 import {
-    Animated,
-    Dimensions,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Animated,
+  Dimensions,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 const { width } = Dimensions.get("window");
@@ -258,13 +258,13 @@ export default function HomeScreen({
           </View>
           <View style={styles.quickGrid}>
             <QuickCard
-              icon="🏥"
-              label="Emergency Leave"
-              subtitle="Submit quick leave request"
-              iconBg="#EFF6FF"
-              iconColor="#3B82F6"
-              delay={260}
-              onPress={() => onNavigate?.("EmergencyLeave")}
+              icon="🧰"
+              label="Request Equipment"
+              subtitle="Request tools & supplies"
+              iconBg="#FFF7ED"
+              iconColor="#F97316"
+              delay={340}
+              onPress={() => onNavigate?.("RequestEquipment")}
             />
             <QuickCard
               icon="🔄"
@@ -274,6 +274,17 @@ export default function HomeScreen({
               iconColor="#6B7280"
               delay={340}
               onPress={() => onNavigate?.("SwapTask")}
+            />
+          </View>
+          <View style={styles.quickGrid}>
+            <QuickCard
+              icon="🏥"
+              label="Emergency Leave"
+              subtitle="Submit quick leave request"
+              iconBg="#EFF6FF"
+              iconColor="#3B82F6"
+              delay={260}
+              onPress={() => onNavigate?.("EmergencyLeave")}
             />
           </View>
 
