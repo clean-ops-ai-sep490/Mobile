@@ -1,24 +1,24 @@
 import { CameraView, FlashMode, useCameraPermissions } from "expo-camera";
 import React, { useRef, useState } from "react";
 import {
-    Alert,
-    Animated,
-    Dimensions,
-    Image,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  Animated,
+  Dimensions,
+  Image,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import {
-    GestureHandlerRootView,
-    PinchGestureHandler,
-    PinchGestureHandlerGestureEvent,
-    State,
+  GestureHandlerRootView,
+  PinchGestureHandler,
+  PinchGestureHandlerGestureEvent,
+  State,
 } from "react-native-gesture-handler";
 
 const { height } = Dimensions.get("window");
@@ -174,9 +174,9 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
       return;
     }
     onSubmit?.(photos);
-    Alert.alert("Submitted!", "Photos have been submitted for AI review.", [
-      { text: "Done" },
-    ]);
+    // Alert.alert("Submitted!", "Photos have been submitted for AI review.", [
+    //   { text: "Done" },
+    // ]);
   };
 
   // ── UI ─────────────────────────────────────────────────────────────────────
