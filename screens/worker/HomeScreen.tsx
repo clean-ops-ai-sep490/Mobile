@@ -346,8 +346,7 @@ export default function HomeScreen({
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-const CARD_GAP = 12;
-const CARD_WIDTH = (width - 32 - CARD_GAP) / 2;
+
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#F5F6FA" },
@@ -474,8 +473,6 @@ const styles = StyleSheet.create({
   // Quick grid
   quickGrid: {
     flexDirection: "row",
-    gap: CARD_GAP,
-    marginBottom: CARD_GAP,
   },
   quickCard: {
     backgroundColor: "#FFF",
