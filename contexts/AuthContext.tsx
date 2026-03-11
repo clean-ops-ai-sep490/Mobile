@@ -16,19 +16,34 @@ interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  userRole: UserRole | null;
+  isWorker: boolean;
+  isSupervisor: boolean;
   login: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
-// ─── Mock user (xóa khi gắn Auth0 thật) ──────────────────────────────────────
-const MOCK_USER: AuthUser = {
-  id: "CS-8892",
+// ─── Mock users (xóa khi gắn Auth0 thật) ──────────────────────────────────────
+const MOCK_WORKER: AuthUser = {
+  id: "W-8892",
   name: "Jordan Smith",
   email: "jordan@cleanops.com",
-  role: "worker", // đổi "supervisor" để test
+  role: "worker",
   avatar: "JS",
   avatarColor: "#7DD3B0",
 };
+
+const MOCK_SUPERVISOR: AuthUser = {
+  id: "S-5521",
+  name: "Nguyễn Văn A",
+  email: "supervisor@cleanops.com",
+  role: "supervisor",
+  avatar: "NV",
+  avatarColor: "#60A5FA",
+};
+
+// Chọn user để test (đổi MOCK_WORKER ↔ MOCK_SUPERVISOR)
+const MOCK_USER = MOCK_SUPERVISOR;
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -98,7 +113,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, isAuthenticated: !!user, login, logout }}
+      value={{
+        user,
+        isLoading,
+        isAuthenticated: !!user,
+        userRole: user?.role ?? null,
+        isWorker: user?.role === "worker",
+        isSupervisor: user?.role === "supervisor",
+        login,
+        logout,
+      }}
     >
       {children}
     </AuthContext.Provider>
@@ -110,6 +134,22 @@ export function useAuth(): AuthContextType {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
   return ctx;
+}
+
+// ─── Role checking hooks ──────────────────────────────────────────────────────
+export function useIsWorker(): boolean {
+  const { isWorker } = useAuth();
+  return isWorker;
+}
+
+export function useIsSupervisor(): boolean {
+  const { isSupervisor } = useAuth();
+  return isSupervisor;
+}
+
+export function useUserRole(): UserRole | null {
+  const { userRole } = useAuth();
+  return userRole;
 }
 
 // ─── Helper map Auth0 user → AppUser (bỏ comment khi gắn Auth0 thật) ─────────
