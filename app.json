@@ -9,7 +9,10 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "CleanOps cần camera để chụp ảnh kiểm tra trước/sau khi dọn dẹp."
+      }
     },
     "android": {
       "adaptiveIcon": {
