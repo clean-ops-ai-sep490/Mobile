@@ -4,21 +4,26 @@ import {
 } from "@react-navigation/native-stack";
 import React from "react";
 
-// ─── Import screens ───────────────────────────────────────────────────────────
+// ─── Import contexts ──────────────────────────────────────────────────────────
+import { useAuth } from "@/contexts/AuthContext";
+
+// ─── Import shared screens ────────────────────────────────────────────────────
 import ProfileScreen from "@/screens/shared/ProfileScreen";
+
+// ─── Import worker screens ────────────────────────────────────────────────────
 import EmergencyLeaveScreen from "@/screens/worker/EmergencyLeaveScreen";
 import HomeScreen from "@/screens/worker/HomeScreen";
 import IssueReportScreen from "@/screens/worker/IssueReportScreen";
 import RequestEquipmentScreen from "@/screens/worker/RequestEquipmentScreen";
 import TaskListScreen from "@/screens/worker/TaskListScreen";
 
-import { useAuth } from "@/contexts/AuthContext";
-import { SupervisorHomeScreen } from "@/screens/supervisor";
+// ─── Import supervisor screens ────────────────────────────────────────────────
+// TODO: Import supervisor screens khi có sẵn
+// import SupervisorHomeScreen from "@/screens/supervisor/SupervisorHomeScreen";
 
-// ─── Route params ─────────────────────────────────────────────────────────────
-export type RootStackParamList = {
+// ─── Worker Route params ──────────────────────────────────────────────────────
+export type WorkerStackParamList = {
   Home: undefined;
-  SupervisorHome: undefined;
   EmergencyLeave: undefined;
   Profile: undefined;
   Tasks: undefined;
@@ -26,83 +31,81 @@ export type RootStackParamList = {
   RequestEquipment: undefined;
 };
 
-const Stack = createNativeStackNavigator<RootStackParamList>();
+// ─── Supervisor Route params ──────────────────────────────────────────────────
+export type SupervisorStackParamList = {
+  SupervisorHome: undefined;
+  Profile: undefined;
+};
 
-// ─── Home wrapper — bridge onNavigate → navigation.navigate ──────────────────
-type HomeProps = NativeStackScreenProps<RootStackParamList, "Home">;
+// ─── Combined Route params ────────────────────────────────────────────────────
+export type RootStackParamList = WorkerStackParamList &
+  SupervisorStackParamList;
 
-function HomeWrapper({ navigation }: HomeProps) {
+const WorkerStack = createNativeStackNavigator<WorkerStackParamList>();
+const SupervisorStack = createNativeStackNavigator<SupervisorStackParamList>();
+
+// ─── Worker Home wrapper — bridge onNavigate → navigation.navigate ──────────
+type WorkerHomeProps = NativeStackScreenProps<WorkerStackParamList, "Home">;
+
+function WorkerHomeWrapper({ navigation }: WorkerHomeProps) {
   return (
     <HomeScreen
       onNavigate={(screen) => {
-        navigation.navigate(screen as keyof RootStackParamList);
+        navigation.navigate(screen as keyof WorkerStackParamList);
       }}
     />
   );
 }
 
-// ─── Supervisor Home wrapper ──────────────────────────────────────────────────
-type SupervisorHomeProps = NativeStackScreenProps<
-  RootStackParamList,
-  "SupervisorHome"
->;
-
-function SupervisorHomeWrapper({ navigation }: SupervisorHomeProps) {
+// ─── Worker Navigator ─────────────────────────────────────────────────────────
+function WorkerNavigator() {
   return (
-    <SupervisorHomeScreen
-      onNavigate={(screen) => {
-        navigation.navigate(screen as keyof RootStackParamList);
-      }}
-    />
-  );
-}
-
-// ─── Navigator Content (sử dụng useAuth hook) ────────────────────────────────
-function AppNavigatorContent() {
-  const { isWorker, isSupervisor } = useAuth();
-
-  // Xác định initial route dựa trên role
-  const initialRouteName = isSupervisor ? "SupervisorHome" : "Home";
-
-  return (
-    <Stack.Navigator
-      initialRouteName={initialRouteName}
+    <WorkerStack.Navigator
+      initialRouteName="Home"
       screenOptions={{ headerShown: false }}
     >
-      {/* Worker screens */}
-      {isWorker && (
-        <>
-          <Stack.Screen name="Home" component={HomeWrapper} />
-          <Stack.Screen
-            name="EmergencyLeave"
-            component={EmergencyLeaveScreen}
-          />
-          <Stack.Screen name="Tasks" component={TaskListScreen} />
-          <Stack.Screen name="IssueReport" component={IssueReportScreen} />
-          <Stack.Screen
-            name="RequestEquipment"
-            component={RequestEquipmentScreen}
-          />
-        </>
-      )}
-
-      {/* Supervisor screens */}
-      {isSupervisor && (
-        <>
-          <Stack.Screen
-            name="SupervisorHome"
-            component={SupervisorHomeWrapper}
-          />
-        </>
-      )}
-
-      {/* Shared screens */}
-      <Stack.Screen name="Profile" component={ProfileScreen} />
-    </Stack.Navigator>
+      <WorkerStack.Screen name="Home" component={WorkerHomeWrapper} />
+      <WorkerStack.Screen
+        name="EmergencyLeave"
+        component={EmergencyLeaveScreen}
+      />
+      <WorkerStack.Screen name="Profile" component={ProfileScreen} />
+      <WorkerStack.Screen name="Tasks" component={TaskListScreen} />
+      <WorkerStack.Screen name="IssueReport" component={IssueReportScreen} />
+      <WorkerStack.Screen
+        name="RequestEquipment"
+        component={RequestEquipmentScreen}
+      />
+    </WorkerStack.Navigator>
   );
 }
 
-// ─── Main Navigator ───────────────────────────────────────────────────────────
+// ─── Supervisor Navigator ─────────────────────────────────────────────────────
+function SupervisorNavigator() {
+  return (
+    <SupervisorStack.Navigator
+      initialRouteName="SupervisorHome"
+      screenOptions={{ headerShown: false }}
+    >
+      {/* TODO: Thêm SupervisorHomeScreen khi có sẵn */}
+      {/* <SupervisorStack.Screen name="SupervisorHome" component={SupervisorHomeScreen} /> */}
+      <SupervisorStack.Screen name="Profile" component={ProfileScreen} />
+    </SupervisorStack.Navigator>
+  );
+}
+
+// ─── Main Navigator — chọn dựa trên role ──────────────────────────────────────
 export default function AppNavigator() {
-  return <AppNavigatorContent />;
+  const { isWorker, isSupervisor } = useAuth();
+
+  if (isWorker) {
+    return <WorkerNavigator />;
+  }
+
+  if (isSupervisor) {
+    return <SupervisorNavigator />;
+  }
+
+  // Fallback: hiển thị worker navigator nếu role không xác định
+  return <WorkerNavigator />;
 }
