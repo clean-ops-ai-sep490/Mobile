@@ -22,6 +22,7 @@ export default function QuickActionButton({ icon, label, onPress }: Props) {
 
 const styles = StyleSheet.create({
   button: {
+    flex: 1,
     backgroundColor: "#FFF",
     borderRadius: 16,
     padding: 16,

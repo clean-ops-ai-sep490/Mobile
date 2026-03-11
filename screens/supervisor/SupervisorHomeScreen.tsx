@@ -24,7 +24,6 @@ interface Props {
 }
 
 const CARD_GAP = 12;
-const CARD_WIDTH = (width - 32 - CARD_GAP) / 2;
 
 export default function SupervisorHomeScreen({ onNavigate }: Props) {
   const { logout } = useAuth();

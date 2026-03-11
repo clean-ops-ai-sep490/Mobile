@@ -36,6 +36,7 @@ export default function KPICard({
 
 const styles = StyleSheet.create({
   card: {
+    flex: 1,
     backgroundColor: "#FFF",
     borderRadius: 16,
     padding: 16,
