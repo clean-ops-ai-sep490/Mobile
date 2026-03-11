@@ -43,7 +43,7 @@ const MOCK_SUPERVISOR: AuthUser = {
 };
 
 // Chọn user để test (đổi MOCK_WORKER ↔ MOCK_SUPERVISOR)
-const MOCK_USER = MOCK_WORKER;
+const MOCK_USER = MOCK_SUPERVISOR;
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 const AuthContext = createContext<AuthContextType | null>(null);
