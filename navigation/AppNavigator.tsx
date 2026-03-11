@@ -18,8 +18,7 @@ import RequestEquipmentScreen from "@/screens/worker/RequestEquipmentScreen";
 import TaskListScreen from "@/screens/worker/TaskListScreen";
 
 // ─── Import supervisor screens ────────────────────────────────────────────────
-// TODO: Import supervisor screens khi có sẵn
-// import SupervisorHomeScreen from "@/screens/supervisor/SupervisorHomeScreen";
+import SupervisorHomeScreen from "@/screens/supervisor/SupervisorHomeScreen";
 
 // ─── Worker Route params ──────────────────────────────────────────────────────
 export type WorkerStackParamList = {
@@ -87,8 +86,10 @@ function SupervisorNavigator() {
       initialRouteName="SupervisorHome"
       screenOptions={{ headerShown: false }}
     >
-      {/* TODO: Thêm SupervisorHomeScreen khi có sẵn */}
-      {/* <SupervisorStack.Screen name="SupervisorHome" component={SupervisorHomeScreen} /> */}
+      <SupervisorStack.Screen
+        name="SupervisorHome"
+        component={SupervisorHomeScreen}
+      />
       <SupervisorStack.Screen name="Profile" component={ProfileScreen} />
     </SupervisorStack.Navigator>
   );
