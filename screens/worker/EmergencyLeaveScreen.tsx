@@ -1,3 +1,6 @@
+import BottomTabBar, { TabKey } from "@/components/common/BottomTabBar";
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import { Audio } from "expo-av";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -219,19 +222,22 @@ export default function EmergencyLeaveScreen({
   onClose,
   onSubmit,
 }: Props) {
-  const [mode, setMode] = useState<ScreenMode>("voice");
   const [recordState, setRecordState] = useState<RecordState>("idle");
   const [playState, setPlayState] = useState<PlayState>("idle");
   const [recSeconds, setRecSeconds] = useState(0);
   const [playSeconds, setPlaySeconds] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [textReason, setTextReason] = useState("");
   const [recordingUri, setRecordingUri] = useState<string | null>(null);
 
   const recordingRef = useRef<Audio.Recording | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
   const recTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const playTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const navigation = useNavigation();
+
+  const handleNavigate = (screen: TabKey) => {
+    navigation.navigate(screen as never);
+  };
 
   const isRecording = recordState === "recording";
   const isRecorded = recordState === "recorded";
@@ -243,7 +249,6 @@ export default function EmergencyLeaveScreen({
   const recSec = recSeconds % 60;
   const progress = duration > 0 ? playSeconds / duration : 0;
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       recTimerRef.current && clearInterval(recTimerRef.current);
@@ -253,7 +258,6 @@ export default function EmergencyLeaveScreen({
     };
   }, []);
 
-  // ── Recording ──
   const startRecording = async () => {
     try {
       const { granted } = await Audio.requestPermissionsAsync();
@@ -261,7 +265,6 @@ export default function EmergencyLeaveScreen({
         Alert.alert("Permission required", "Microphone permission is needed.");
         return;
       }
-
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
@@ -270,18 +273,16 @@ export default function EmergencyLeaveScreen({
         Audio.RecordingOptionsPresets.HIGH_QUALITY,
       );
       recordingRef.current = recording;
-
       setRecordState("recording");
       setRecSeconds(0);
       setPlayState("idle");
       setPlaySeconds(0);
       setRecordingUri(null);
-
       recTimerRef.current = setInterval(
         () => setRecSeconds((s) => s + 1),
         1000,
       );
-    } catch (e) {
+    } catch {
       Alert.alert("Error", "Could not start recording.");
     }
   };
@@ -290,38 +291,31 @@ export default function EmergencyLeaveScreen({
     try {
       recTimerRef.current && clearInterval(recTimerRef.current);
       if (!recordingRef.current) return;
-
       await recordingRef.current.stopAndUnloadAsync();
       const uri = recordingRef.current.getURI();
       const status = await recordingRef.current.getStatusAsync();
       setRecordingUri(uri ?? null);
       setDuration((status as any).durationMillis / 1000 || recSeconds);
       recordingRef.current = null;
-
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
       setRecordState("recorded");
-    } catch (e) {
+    } catch {
       Alert.alert("Error", "Could not stop recording.");
     }
   };
 
   const handleMicPress = () => {
-    if (recordState === "idle") {
-      startRecording();
-    } else if (recordState === "recording") {
-      stopRecording();
-    }
+    if (recordState === "idle") startRecording();
+    else if (recordState === "recording") stopRecording();
   };
 
   const handleReRecord = async () => {
     try {
       await soundRef.current?.unloadAsync();
       soundRef.current = null;
-
       clearInterval(playTimerRef.current!);
       setPlayState("idle");
       setPlaySeconds(0);
-
       setRecordState("idle");
       setRecSeconds(0);
       setRecordingUri(null);
@@ -329,10 +323,8 @@ export default function EmergencyLeaveScreen({
     } catch {}
   };
 
-  // ── Playback ──
   const handlePlayPause = async () => {
     if (!recordingUri) return;
-
     if (playState === "idle") {
       try {
         const { sound } = await Audio.Sound.createAsync(
@@ -342,7 +334,6 @@ export default function EmergencyLeaveScreen({
         soundRef.current = sound;
         setPlayState("playing");
         setPlaySeconds(0);
-
         playTimerRef.current = setInterval(async () => {
           const status = await sound.getStatusAsync();
           if (!status.isLoaded) return;
@@ -353,7 +344,6 @@ export default function EmergencyLeaveScreen({
             setPlaySeconds(0);
           }
         }, 200);
-
         sound.setOnPlaybackStatusUpdate((status) => {
           if (status.isLoaded && status.didJustFinish) {
             clearInterval(playTimerRef.current!);
@@ -379,23 +369,29 @@ export default function EmergencyLeaveScreen({
     }
   };
 
-  // ── Submit ──
   const handleSubmit = () => {
-    if (mode === "voice" && !isRecorded) {
+    if (!isRecorded) {
       Alert.alert("No Recording", "Please record your reason first.");
       return;
     }
     onSubmit?.({
-      type: mode,
+      type: "voice",
       uri: recordingUri ?? undefined,
       content: "[voice]",
       location,
     });
     Alert.alert(
-      "Submitted ✓",
+      "Submitted",
       "Your emergency leave request has been sent to your manager.",
       [{ text: "OK", onPress: onClose }],
     );
+  };
+
+  // ── Mic button icon ──
+  const micIconName = (): keyof typeof Ionicons.glyphMap => {
+    if (isRecording) return "stop";
+    if (isRecorded) return "refresh";
+    return "mic";
   };
 
   return (
@@ -404,8 +400,11 @@ export default function EmergencyLeaveScreen({
 
       {/* ── Header ── */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-          <Text style={styles.closeBtnText}>✕</Text>
+        <TouchableOpacity
+          style={styles.closeBtn}
+          onPress={() => navigation.navigate("Home")}
+        >
+          <Ionicons name="chevron-back" size={22} color="#ffffff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Emergency Leave Request</Text>
         <View style={{ width: 32 }} />
@@ -417,112 +416,107 @@ export default function EmergencyLeaveScreen({
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <>
-          <Text style={styles.title}>
-            {isRecording
-              ? "Recording..."
-              : isRecorded
-                ? "Recording Complete"
-                : "Tap to Start Recording"}
-          </Text>
+        <Text style={styles.title}>
+          {isRecording
+            ? "Recording..."
+            : isRecorded
+              ? "Recording Complete"
+              : "Tap to Start Recording"}
+        </Text>
 
-          <Text style={styles.subtitle}>
-            {isRecorded
-              ? "Play back your recording or re-record if needed."
-              : "State your reason clearly. Your manager\nwill be notified immediately."}
-          </Text>
+        <Text style={styles.subtitle}>
+          {isRecorded
+            ? "Play back your recording or re-record if needed."
+            : "State your reason clearly. Your manager\nwill be notified immediately."}
+        </Text>
 
-          {/* Mic + Pulse */}
-          <View style={styles.micSection}>
-            <PulseRing isRecording={isRecording} />
-            <TouchableOpacity
-              style={[
-                styles.micBtn,
-                isRecording && styles.micBtnRecording,
-                isRecorded && styles.micBtnRecorded,
-              ]}
-              onPress={isRecorded ? handleReRecord : handleMicPress}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.micIcon}>
-                {isRecording ? "⏹" : isRecorded ? "↺" : "🎙"}
-              </Text>
-            </TouchableOpacity>
+        {/* Mic + Pulse */}
+        <View style={styles.micSection}>
+          <PulseRing isRecording={isRecording} />
+          <TouchableOpacity
+            style={[
+              styles.micBtn,
+              isRecording && styles.micBtnRecording,
+              isRecorded && styles.micBtnRecorded,
+            ]}
+            onPress={isRecorded ? handleReRecord : handleMicPress}
+            activeOpacity={0.85}
+          >
+            <Ionicons name={micIconName()} size={38} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Timer (recording) */}
+        {!isRecorded && (
+          <View style={styles.timerRow}>
+            <View style={styles.timerBox}>
+              <Text style={styles.timerNum}>{pad(recMin)}</Text>
+              <Text style={styles.timerLabel}>MINUTES</Text>
+            </View>
+            <Text style={styles.timerColon}>:</Text>
+            <View style={styles.timerBox}>
+              <Text style={styles.timerNum}>{pad(recSec)}</Text>
+              <Text style={styles.timerLabel}>SECONDS</Text>
+            </View>
           </View>
+        )}
 
-          {/* Timer (recording) */}
-          {!isRecorded && (
-            <View style={styles.timerRow}>
-              <View style={styles.timerBox}>
-                <Text style={styles.timerNum}>{pad(recMin)}</Text>
-                <Text style={styles.timerLabel}>MINUTES</Text>
-              </View>
+        {/* Waveform */}
+        <WaveformBars
+          active={isRecording || isPlaying}
+          color={isPlaying ? "#6366F1" : "#E8365D"}
+        />
 
-              <Text style={styles.timerColon}>:</Text>
-
-              <View style={styles.timerBox}>
-                <Text style={styles.timerNum}>{pad(recSec)}</Text>
-                <Text style={styles.timerLabel}>SECONDS</Text>
+        {/* Playback card */}
+        {isRecorded && (
+          <View style={styles.playbackCard}>
+            <View style={styles.playbackTop}>
+              <TouchableOpacity
+                style={styles.playBtn}
+                onPress={handlePlayPause}
+              >
+                <Ionicons
+                  name={isPlaying ? "pause" : "play"}
+                  size={20}
+                  color="#FFFFFF"
+                />
+              </TouchableOpacity>
+              <View style={styles.playbackInfo}>
+                <Text style={styles.playbackTitle}>Your Recording</Text>
+                <Text style={styles.playbackDuration}>
+                  {pad(Math.floor(playSeconds / 60))}:{pad(playSeconds % 60)}
+                  {" / "}
+                  {pad(Math.floor(duration / 60))}:{pad(duration % 60)}
+                </Text>
               </View>
             </View>
-          )}
+            <ProgressBar progress={progress} />
+            <Text style={styles.playbackHint}>
+              {isPlaying
+                ? "Playing..."
+                : isPaused
+                  ? "Paused"
+                  : "Tap play to listen back"}
+            </Text>
+          </View>
+        )}
 
-          {/* Waveform */}
-          <WaveformBars
-            active={isRecording || isPlaying}
-            color={isPlaying ? "#6366F1" : "#E8365D"}
-          />
-
-          {/* Playback card */}
-          {isRecorded && (
-            <View style={styles.playbackCard}>
-              <View style={styles.playbackTop}>
-                <TouchableOpacity
-                  style={styles.playBtn}
-                  onPress={handlePlayPause}
-                >
-                  <Text style={styles.playBtnIcon}>
-                    {isPlaying ? "⏸" : "▶"}
-                  </Text>
-                </TouchableOpacity>
-
-                <View style={styles.playbackInfo}>
-                  <Text style={styles.playbackTitle}>Your Recording</Text>
-
-                  <Text style={styles.playbackDuration}>
-                    {pad(Math.floor(playSeconds / 60))}:{pad(playSeconds % 60)}
-                    {" / "}
-                    {pad(Math.floor(duration / 60))}:{pad(duration % 60)}
-                  </Text>
-                </View>
-              </View>
-
-              <ProgressBar progress={progress} />
-
-              <Text style={styles.playbackHint}>
-                {isPlaying
-                  ? "Playing..."
-                  : isPaused
-                    ? "Paused"
-                    : "Tap ▶ to listen back"}
-              </Text>
-            </View>
-          )}
-
-          {/* Re-record */}
-          {isRecorded && (
-            <TouchableOpacity
-              onPress={handleReRecord}
-              style={styles.reRecordBtn}
-            >
-              <Text style={styles.reRecordText}>↺ Re-record</Text>
-            </TouchableOpacity>
-          )}
-        </>
+        {/* Re-record */}
+        {isRecorded && (
+          <TouchableOpacity onPress={handleReRecord} style={styles.reRecordBtn}>
+            <Ionicons name="refresh" size={13} color="#6B7280" />
+            <Text style={styles.reRecordText}>Re-record</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Location */}
         <View style={styles.locationRow}>
-          <Text style={styles.locationDot}>📍</Text>
+          <Ionicons
+            name="location-outline"
+            size={15}
+            color="#9CA3AF"
+            style={{ marginTop: 1 }}
+          />
           <Text style={styles.locationText}>
             Location captured:{" "}
             <Text style={styles.locationBold}>{location}</Text>
@@ -538,6 +532,7 @@ export default function EmergencyLeaveScreen({
           <Text style={styles.submitBtnText}>Submit Emergency Request</Text>
         </TouchableOpacity>
       </ScrollView>
+      <BottomTabBar activeTab="EmergencyLeave" onNavigate={handleNavigate} />
     </SafeAreaView>
   );
 }
@@ -561,7 +556,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  closeBtnText: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
   headerTitle: {
     fontSize: 15,
     fontWeight: "700",
@@ -624,7 +618,6 @@ const styles = StyleSheet.create({
   },
   micBtnRecording: { backgroundColor: "#C0143C", shadowOpacity: 0.6 },
   micBtnRecorded: { backgroundColor: "#6366F1", shadowColor: "#6366F1" },
-  micIcon: { fontSize: 34 },
 
   // Timer
   timerRow: {
@@ -697,7 +690,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
-  playBtnIcon: { fontSize: 20, color: "#FFFFFF" },
   playbackInfo: { flex: 1 },
   playbackTitle: {
     fontSize: 14,
@@ -723,7 +715,14 @@ const styles = StyleSheet.create({
   progressFill: { height: "100%", backgroundColor: "#6366F1", borderRadius: 2 },
 
   // Re-record
-  reRecordBtn: { paddingVertical: 6, paddingHorizontal: 16, marginBottom: 12 },
+  reRecordBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
   reRecordText: { fontSize: 13, color: "#6B7280", fontWeight: "600" },
 
   // Location
@@ -740,7 +739,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     gap: 8,
   },
-  locationDot: { fontSize: 14, marginTop: 1 },
   locationText: { fontSize: 13, color: "#6B7280", flex: 1, lineHeight: 20 },
   locationBold: { fontWeight: "700", color: "#374151" },
 
@@ -759,13 +757,4 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   submitBtnText: { color: "#FFFFFF", fontSize: 16, fontWeight: "800" },
-
-  // Mode toggle
-  modeToggle: { paddingVertical: 8 },
-  modeToggleText: {
-    color: "#E8365D",
-    fontSize: 14,
-    fontWeight: "600",
-    textDecorationLine: "underline",
-  },
 });

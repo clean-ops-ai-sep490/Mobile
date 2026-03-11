@@ -1,4 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
+import { Ionicons } from "@expo/vector-icons";
 import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -85,8 +86,10 @@ export default function LoginScreen() {
     try {
       setLoading(true);
       await login();
-    } catch {
-      setErrors({ email: "Đăng nhập thất bại. Vui lòng thử lại." });
+    } catch (e: any) {
+      setErrors({
+        email: e.message ?? "Đăng nhập thất bại. Vui lòng thử lại.",
+      });
     } finally {
       setLoading(false);
     }
@@ -135,7 +138,12 @@ export default function LoginScreen() {
                 touched.email && errors.email ? styles.inputError : null,
               ]}
             >
-              <Text style={styles.inputIcon}>✉</Text>
+              <Ionicons
+                name="mail-outline"
+                size={18}
+                color="#8899AA"
+                style={styles.inputIcon}
+              />
               <TextInput
                 style={styles.input}
                 placeholder="you@company.com"
@@ -167,7 +175,12 @@ export default function LoginScreen() {
                 touched.password && errors.password ? styles.inputError : null,
               ]}
             >
-              <Text style={styles.inputIcon}>🔒</Text>
+              <Ionicons
+                name="lock-closed-outline"
+                size={18}
+                color="#8899AA"
+                style={styles.inputIcon}
+              />
               <TextInput
                 style={styles.input}
                 placeholder="Enter your password"
@@ -186,7 +199,11 @@ export default function LoginScreen() {
                 onPress={() => setShowPassword(!showPassword)}
                 style={styles.eyeButton}
               >
-                <Text style={styles.eyeIcon}>{showPassword ? "🙈" : "👁"}</Text>
+                <Ionicons
+                  name={showPassword ? "eye-off-outline" : "eye-outline"}
+                  size={18}
+                  color="#8899AA"
+                />
               </TouchableOpacity>
             </View>
             {touched.password && errors.password ? (
@@ -322,9 +339,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   inputIcon: {
-    fontSize: 16,
     marginRight: 10,
-    opacity: 0.6,
   },
   input: {
     flex: 1,
@@ -334,9 +349,6 @@ const styles = StyleSheet.create({
   },
   eyeButton: {
     padding: 4,
-  },
-  eyeIcon: {
-    fontSize: 16,
   },
 
   inputError: {
