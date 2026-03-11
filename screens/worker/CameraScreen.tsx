@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { CameraView, FlashMode, useCameraPermissions } from "expo-camera";
 import React, { useRef, useState } from "react";
 import {
@@ -37,7 +38,7 @@ interface Props {
 // ─── Constants ────────────────────────────────────────────────────────────────
 const MIN_ZOOM = 0;
 const MAX_ZOOM = 1;
-const ZOOM_SENSITIVITY = 0.005; // tune this to feel natural
+const ZOOM_SENSITIVITY = 0.005;
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
@@ -48,9 +49,8 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
   const [showPreview, setShowPreview] = useState(false);
   const [capturing, setCapturing] = useState(false);
 
-  // ── Zoom state ──────────────────────────────────────────────────────────────
   const [zoom, setZoom] = useState(MIN_ZOOM);
-  const zoomRef = useRef(MIN_ZOOM); // snapshot at gesture start
+  const zoomRef = useRef(MIN_ZOOM);
   const showZoomBar = useRef(false);
   const [zoomBarVisible, setZoomBarVisible] = useState(false);
   const zoomBarOpacity = useRef(new Animated.Value(0)).current;
@@ -64,7 +64,9 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
   if (!permission.granted) {
     return (
       <View style={styles.permissionScreen}>
-        <Text style={styles.permissionIcon}>📷</Text>
+        <View style={styles.permissionIconWrap}>
+          <Ionicons name="camera-outline" size={52} color="#94A3B8" />
+        </View>
         <Text style={styles.permissionTitle}>Camera Access Required</Text>
         <Text style={styles.permissionText}>
           CleanOps needs camera access to capture inspection photos.
@@ -108,7 +110,6 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
 
   const onPinchGestureEvent = (event: PinchGestureHandlerGestureEvent) => {
     const { scale } = event.nativeEvent;
-    // scale > 1 = zoom in, scale < 1 = zoom out
     const delta = (scale - 1) * ZOOM_SENSITIVITY * 30;
     const newZoom = Math.min(
       MAX_ZOOM,
@@ -122,19 +123,16 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
     event: PinchGestureHandlerGestureEvent,
   ) => {
     if (event.nativeEvent.state === State.BEGAN) {
-      // snapshot current zoom so delta is calculated from here
       zoomRef.current = zoom;
     }
     if (
       event.nativeEvent.state === State.END ||
       event.nativeEvent.state === State.CANCELLED
     ) {
-      // commit final zoom so next gesture starts fresh
       zoomRef.current = zoom;
     }
   };
 
-  // Zoom level label  e.g. 1.0×  2.5×
   const zoomLabel = `${(1 + zoom * 9).toFixed(1)}×`;
 
   // ── Capture ────────────────────────────────────────────────────────────────
@@ -174,9 +172,6 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
       return;
     }
     onSubmit?.(photos);
-    // Alert.alert("Submitted!", "Photos have been submitted for AI review.", [
-    //   { text: "Done" },
-    // ]);
   };
 
   // ── UI ─────────────────────────────────────────────────────────────────────
@@ -192,7 +187,6 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
         onGestureEvent={onPinchGestureEvent}
         onHandlerStateChange={onPinchHandlerStateChange}
       >
-        {/* Animated.View wrapper required by PinchGestureHandler */}
         <Animated.View style={styles.container}>
           <CameraView
             ref={cameraRef}
@@ -234,13 +228,14 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
             {/* ── Top bar ── */}
             <SafeAreaView style={styles.topBar}>
               <TouchableOpacity style={styles.iconBtn} onPress={onClose}>
-                <Text style={styles.iconBtnText}>✕</Text>
+                <Ionicons name="close" size={18} color="#FFF" />
               </TouchableOpacity>
 
               {photos.length > 0 && (
                 <View style={styles.countPill}>
+                  <Ionicons name="camera" size={13} color="#FFF" />
                   <Text style={styles.countPillText}>
-                    📷 {photos.length} photo{photos.length > 1 ? "s" : ""}
+                    {photos.length} photo{photos.length > 1 ? "s" : ""}
                   </Text>
                 </View>
               )}
@@ -250,7 +245,7 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
                   style={styles.iconBtn}
                   onPress={() => setGridVisible((v) => !v)}
                 >
-                  <Text style={styles.iconBtnText}>⊞</Text>
+                  <Ionicons name="grid-outline" size={18} color="#FFF" />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[
@@ -259,7 +254,11 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
                   ]}
                   onPress={() => setFlash((f) => (f === "off" ? "on" : "off"))}
                 >
-                  <Text style={styles.iconBtnText}>⚡</Text>
+                  <Ionicons
+                    name={flash === "on" ? "flash" : "flash-off-outline"}
+                    size={18}
+                    color="#FFF"
+                  />
                 </TouchableOpacity>
               </View>
             </SafeAreaView>
@@ -269,17 +268,12 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
               <Animated.View
                 style={[styles.zoomContainer, { opacity: zoomBarOpacity }]}
               >
-                {/* Level label */}
                 <Text style={styles.zoomLabel}>{zoomLabel}</Text>
-
-                {/* Bar track */}
                 <View style={styles.zoomTrack}>
                   <View
                     style={[styles.zoomFill, { width: `${zoom * 100}%` }]}
                   />
                 </View>
-
-                {/* Tick marks for 1× 2× 5× 10× */}
                 <View style={styles.zoomTicks}>
                   {[0, 0.111, 0.444, 1].map((pos, i) => (
                     <View
@@ -316,7 +310,11 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
                     </View>
                   </>
                 ) : (
-                  <Text style={styles.thumbnailEmpty}>🖼</Text>
+                  <Ionicons
+                    name="images-outline"
+                    size={22}
+                    color="rgba(255,255,255,0.6)"
+                  />
                 )}
               </TouchableOpacity>
 
@@ -343,7 +341,7 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
                 ]}
                 onPress={handleSubmit}
               >
-                <Text style={styles.submitBtnIcon}>✓</Text>
+                <Ionicons name="checkmark" size={26} color="#FFF" />
               </TouchableOpacity>
             </View>
           </CameraView>
@@ -357,7 +355,7 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
           <View style={styles.drawerHeader}>
             <Text style={styles.drawerTitle}>Photos ({photos.length})</Text>
             <TouchableOpacity onPress={() => setShowPreview(false)}>
-              <Text style={styles.drawerClose}>✕</Text>
+              <Ionicons name="close" size={18} color="#64748B" />
             </TouchableOpacity>
           </View>
 
@@ -374,7 +372,7 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
                   style={styles.drawerDelete}
                   onPress={() => handleDelete(i)}
                 >
-                  <Text style={styles.drawerDeleteText}>✕</Text>
+                  <Ionicons name="close" size={10} color="#FFF" />
                 </TouchableOpacity>
               </View>
             ))}
@@ -411,7 +409,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 32,
   },
-  permissionIcon: { fontSize: 52, marginBottom: 16 },
+  permissionIconWrap: { marginBottom: 16 },
   permissionTitle: {
     fontSize: 20,
     fontWeight: "800",
@@ -516,10 +514,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  iconBtnText: { color: "#FFF", fontSize: 16, fontWeight: "600" },
   iconBtnFlashOn: { backgroundColor: "rgba(251,191,36,0.75)" },
   topRight: { flexDirection: "row", gap: 10 },
   countPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     backgroundColor: "rgba(0,0,0,0.5)",
     paddingHorizontal: 14,
     paddingVertical: 7,
@@ -529,7 +529,7 @@ const styles = StyleSheet.create({
   },
   countPillText: { color: "#FFF", fontSize: 13, fontWeight: "700" },
 
-  // ── Zoom indicator ──────────────────────────────────────────────────────────
+  // Zoom indicator
   zoomContainer: {
     position: "absolute",
     bottom: Platform.OS === "ios" ? 148 : 130,
@@ -553,11 +553,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.25)",
     overflow: "hidden",
   },
-  zoomFill: {
-    height: "100%",
-    backgroundColor: "#FACC15",
-    borderRadius: 2,
-  },
+  zoomFill: { height: "100%", backgroundColor: "#FACC15", borderRadius: 2 },
   zoomTicks: {
     width: "70%",
     flexDirection: "row",
@@ -603,7 +599,6 @@ const styles = StyleSheet.create({
     overflow: "visible",
   },
   thumbnailImg: { width: 54, height: 54, borderRadius: 10 },
-  thumbnailEmpty: { fontSize: 22 },
   thumbnailBadge: {
     position: "absolute",
     top: -7,
@@ -656,24 +651,6 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 6,
   },
-  submitBtnIcon: { color: "#FFF", fontSize: 24, fontWeight: "800" },
-
-  // Task label
-  taskLabelWrap: {
-    position: "absolute",
-    bottom: Platform.OS === "ios" ? 108 : 92,
-    alignSelf: "center",
-    backgroundColor: "rgba(0,0,0,0.45)",
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 20,
-    maxWidth: "80%",
-  },
-  taskLabelText: {
-    color: "rgba(255,255,255,0.85)",
-    fontSize: 12,
-    fontWeight: "600",
-  },
 
   // Drawer
   drawer: {
@@ -703,7 +680,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   drawerTitle: { fontSize: 16, fontWeight: "800", color: "#FFF" },
-  drawerClose: { color: "#64748B", fontSize: 16, fontWeight: "600" },
   drawerScroll: { marginBottom: 16 },
   drawerItem: { marginRight: 10, position: "relative" },
   drawerImg: {
@@ -729,7 +705,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  drawerDeleteText: { color: "#FFF", fontSize: 10, fontWeight: "700" },
   drawerSubmit: {
     backgroundColor: "#1E293B",
     borderRadius: 14,
