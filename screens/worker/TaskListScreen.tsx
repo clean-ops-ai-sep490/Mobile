@@ -1,4 +1,6 @@
+import AppButton from "@/components/common/AppButton";
 import BottomTabBar, { TabKey } from "@/components/common/BottomTabBar";
+import Header from "@/components/common/Header";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import React, { useState } from "react";
@@ -206,24 +208,34 @@ const TaskCard = ({ task }: { task: Task }) => {
       <View style={styles.cardActions}>
         {isInProgress && (
           <>
-            <TouchableOpacity style={styles.btnPrimary}>
-              <Ionicons name="play" size={13} color="#FFF" />
-              <Text style={styles.btnPrimaryText}>Continue</Text>
-            </TouchableOpacity>
+            <AppButton
+              label="Continue"
+              onPress={() => {}}
+              iconLeft="play"
+              size="md"
+              style={{ flex: 1, marginBottom: 0 }}
+            />
             <TouchableOpacity style={styles.btnCamera}>
               <Ionicons name="camera-outline" size={20} color="#F59E0B" />
             </TouchableOpacity>
           </>
         )}
         {isUpcoming && (
-          <TouchableOpacity style={styles.btnSecondary}>
-            <Text style={styles.btnSecondaryText}>Start Task</Text>
-          </TouchableOpacity>
+          <AppButton
+            label="Start Task"
+            onPress={() => {}}
+            size="md"
+            style={{ flex: 1, marginBottom: 0 }}
+          />
         )}
         {isCompleted && (
-          <TouchableOpacity style={styles.btnGhost}>
-            <Text style={styles.btnGhostText}>View Status</Text>
-          </TouchableOpacity>
+          <AppButton
+            label="View Status"
+            onPress={() => {}}
+            variant="secondary"
+            size="md"
+            style={{ flex: 1, marginBottom: 0 }}
+          />
         )}
       </View>
     </View>
@@ -268,7 +280,11 @@ export default function TaskListScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
-
+      <Header
+        title="My Tasks"
+        onBack={() => handleNavigate("Home")}
+        style={{ backgroundColor: "#F5F6FA" }}
+      />
       {/* ── Day Selector ── */}
       <View style={styles.dayRow}>
         {days.map((d) => {
@@ -568,28 +584,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
   },
-
-  // ── Buttons ──────────────────────────────────────────────
-  btnPrimary: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    backgroundColor: "#2563EB",
-    borderRadius: 12,
-    paddingVertical: 13,
-    shadowColor: "#2563EB",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  btnPrimaryText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "700",
-  },
   btnCamera: {
     width: 46,
     height: 46,
@@ -599,32 +593,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1.5,
     borderColor: "#FDE68A",
-  },
-  btnSecondary: {
-    flex: 1,
-    backgroundColor: "#2563EB",
-    borderRadius: 12,
-    paddingVertical: 13,
-    alignItems: "center",
-  },
-  btnSecondaryText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  btnGhost: {
-    flex: 1,
-    backgroundColor: "#F1F5F9",
-    borderRadius: 12,
-    paddingVertical: 13,
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: "#E2E8F0",
-  },
-  btnGhostText: {
-    color: "#64748B",
-    fontSize: 14,
-    fontWeight: "600",
   },
 
   // ── Status Badge ─────────────────────────────────────────
@@ -679,61 +647,5 @@ const styles = StyleSheet.create({
     color: "#94A3B8",
     textAlign: "center",
     paddingHorizontal: 32,
-  },
-
-  // ── FAB ──────────────────────────────────────────────────
-  fab: {
-    position: "absolute",
-    right: 20,
-    bottom: 90,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: "#EF4444",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#EF4444",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-
-  // ── Bottom Tab ───────────────────────────────────────────
-  bottomTab: {
-    flexDirection: "row",
-    backgroundColor: "#FFFFFF",
-    borderTopWidth: 1,
-    borderTopColor: "#F1F5F9",
-    paddingBottom: 8,
-    paddingTop: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  tabItem: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 4,
-    position: "relative",
-  },
-  tabLabel: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: "#94A3B8",
-    marginTop: 3,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  tabLabelActive: { color: "#2563EB" },
-  tabActiveBar: {
-    position: "absolute",
-    bottom: -8,
-    width: 24,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: "#2563EB",
   },
 });

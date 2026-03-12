@@ -1,3 +1,6 @@
+import AppButton from "@/components/common/AppButton";
+import { TabKey } from "@/components/common/BottomTabBar";
+import Header from "@/components/common/Header";
 import { useAuth } from "@/contexts/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -258,7 +261,12 @@ export default function ProfileScreen() {
   const [shareLocation, setShareLocation] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
   const [selectedArea, setSelectedArea] = useState("Downtown");
+  const [submitting, setSubmitting] = useState(false);
   const navigation = useNavigation();
+
+  const handleNavigate = (screen: TabKey) => {
+    navigation.navigate(screen as never);
+  };
 
   const MOCK_USER: UserData =
     authUser?.role === "supervisor" ? MOCK_SUPERVISOR : MOCK_WORKER;
@@ -284,19 +292,11 @@ export default function ProfileScreen() {
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* ── Header ── */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.headerBtn}
-          onPress={() => navigation.navigate("Home")}
-        >
-          <Ionicons name="chevron-back" size={22} color="#1E293B" />
-        </TouchableOpacity>
-
-        <Text style={styles.headerTitle}>Profile</Text>
-        <TouchableOpacity style={styles.headerBtn}>
-          <Ionicons name="create-outline" size={20} color="#2563EB" />
-        </TouchableOpacity>
-      </View>
+      <Header
+        title="My Profile"
+        onBack={() => handleNavigate("Home")}
+        style={{ backgroundColor: "#F5F6FA" }}
+      />
 
       <ScrollView
         style={styles.scroll}
@@ -387,10 +387,19 @@ export default function ProfileScreen() {
         </View>
 
         {/* ── Logout ── */}
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={18} color="#EF4444" />
-          <Text style={styles.logoutText}>Log Out</Text>
-        </TouchableOpacity>
+        <AppButton
+          label="Log Out"
+          onPress={handleLogout}
+          loading={submitting}
+          loadingLabel="Logging out..."
+          iconLeft="log-out"
+          style={{
+            width: "90%",
+            alignSelf: "center",
+            marginTop: 30,
+            backgroundColor: "#db0614",
+          }}
+        />
 
         <Text style={styles.version}>Version {APP_VERSION}</Text>
       </ScrollView>
@@ -400,7 +409,7 @@ export default function ProfileScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#FFFFFF" },
+  safe: { flex: 1, backgroundColor: "#F5F6FA" },
 
   // Header
   header: {
@@ -606,22 +615,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#E2E8F0",
     marginHorizontal: 16,
   },
-
-  // Logout
-  logoutBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginHorizontal: 20,
-    marginTop: 20,
-    paddingVertical: 15,
-    borderRadius: 14,
-    backgroundColor: "#FFF1F2",
-    borderWidth: 1.5,
-    borderColor: "#FECDD3",
-    gap: 8,
-  },
-  logoutText: { fontSize: 15, fontWeight: "700", color: "#EF4444" },
 
   // Version
   version: {

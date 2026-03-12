@@ -1,4 +1,6 @@
+import AppButton from "@/components/common/AppButton";
 import BottomTabBar, { TabKey } from "@/components/common/BottomTabBar";
+import Header from "@/components/common/Header";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { Audio } from "expo-av";
@@ -233,6 +235,7 @@ export default function EmergencyLeaveScreen({
   const soundRef = useRef<Audio.Sound | null>(null);
   const recTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const playTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const navigation = useNavigation();
 
   const handleNavigate = (screen: TabKey) => {
@@ -396,19 +399,15 @@ export default function EmergencyLeaveScreen({
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor="#E8365D" />
+      <StatusBar barStyle="light-content" backgroundColor="#db0614" />
 
       {/* ── Header ── */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.closeBtn}
-          onPress={() => navigation.navigate("Home")}
-        >
-          <Ionicons name="chevron-back" size={22} color="#ffffff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Emergency Leave Request</Text>
-        <View style={{ width: 32 }} />
-      </View>
+      <Header
+        title="Emergency Leave"
+        onBack={() => handleNavigate("Home")}
+        style={{ backgroundColor: "#db0614" }}
+        titleStyle={{ color: "#FFFFFF" }}
+      />
 
       <ScrollView
         style={styles.scroll}
@@ -524,13 +523,14 @@ export default function EmergencyLeaveScreen({
         </View>
 
         {/* Submit */}
-        <TouchableOpacity
-          style={styles.submitBtn}
+        <AppButton
+          label="Submit Emergency Request"
           onPress={handleSubmit}
-          activeOpacity={0.88}
-        >
-          <Text style={styles.submitBtnText}>Submit Emergency Request</Text>
-        </TouchableOpacity>
+          loading={submitting}
+          loadingLabel="Submitting..."
+          iconLeft="send"
+          style={{ backgroundColor: "#db0614" }}
+        />
       </ScrollView>
       <BottomTabBar activeTab="EmergencyLeave" onNavigate={handleNavigate} />
     </SafeAreaView>
@@ -539,30 +539,7 @@ export default function EmergencyLeaveScreen({
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#FFFFFF" },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#E8365D",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#FFFFFF",
-    flex: 1,
-    textAlign: "center",
-  },
+  safe: { flex: 1, backgroundColor: "#F5F6FA" },
 
   scroll: { flex: 1 },
   scrollContent: {
@@ -741,20 +718,4 @@ const styles = StyleSheet.create({
   },
   locationText: { fontSize: 13, color: "#6B7280", flex: 1, lineHeight: 20 },
   locationBold: { fontWeight: "700", color: "#374151" },
-
-  // Submit
-  submitBtn: {
-    width: "100%",
-    backgroundColor: "#E8365D",
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: "center",
-    shadowColor: "#E8365D",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 6,
-    marginBottom: 16,
-  },
-  submitBtnText: { color: "#FFFFFF", fontSize: 16, fontWeight: "800" },
 });

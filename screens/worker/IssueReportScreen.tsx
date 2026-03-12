@@ -1,4 +1,6 @@
+import AppButton from "@/components/common/AppButton";
 import BottomTabBar, { TabKey } from "@/components/common/BottomTabBar";
+import Header from "@/components/common/Header";
 import CameraScreen from "@/screens/worker/CameraScreen";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -167,23 +169,11 @@ export default function IssueReportScreen({
       <StatusBar barStyle="dark-content" backgroundColor="#F5F6FA" />
       <SafeAreaView style={styles.safe}>
         {/* ── Header ── */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.headerBtn}
-            onPress={handleBack}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="chevron-back" size={20} color="#1E293B" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Report an Issue</Text>
-          <TouchableOpacity
-            style={styles.headerBtn}
-            onPress={handleBack}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="close" size={18} color="#64748B" />
-          </TouchableOpacity>
-        </View>
+        <Header
+          title="Report an Issue"
+          onBack={handleBack}
+          style={{ backgroundColor: "#f5f6fa" }}
+        />
 
         <KeyboardAvoidingView
           style={{ flex: 1 }}
@@ -340,23 +330,14 @@ export default function IssueReportScreen({
           </ScrollView>
 
           {/* ── Submit Button ── */}
-          <View style={styles.footer}>
-            <TouchableOpacity
-              style={[styles.submitBtn, submitting && styles.submitBtnBusy]}
-              onPress={handleSubmit}
-              activeOpacity={0.85}
-              disabled={submitting}
-            >
-              {submitting ? (
-                <Text style={styles.submitBtnText}>Submitting...</Text>
-              ) : (
-                <>
-                  <Ionicons name="send" size={16} color="#FFF" />
-                  <Text style={styles.submitBtnText}>Submit Report</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
+          <AppButton
+            label="Submit Issue Report"
+            onPress={handleSubmit}
+            loading={submitting}
+            loadingLabel="Submitting..."
+            iconLeft="send"
+            style={{ width: "90%", alignSelf: "center" }}
+          />
         </KeyboardAvoidingView>
         <BottomTabBar onNavigate={handleNavigate} />
       </SafeAreaView>
@@ -370,33 +351,6 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 24 },
-
-  // Header
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === "android" ? 12 : 4,
-    paddingBottom: 14,
-    backgroundColor: "#F5F6FA",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
-  },
-  headerBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#FFF",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  headerTitle: { fontSize: 17, fontWeight: "700", color: "#1E293B" },
 
   // Task ref
   taskRefCard: {
@@ -571,21 +525,4 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#F1F5F9",
   },
-  submitBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: "#2563EB",
-    borderRadius: 16,
-    paddingVertical: 16,
-    shadowColor: "#2563EB",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 6,
-    marginBottom: 12,
-  },
-  submitBtnBusy: { backgroundColor: "#93C5FD" },
-  submitBtnText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
 });
