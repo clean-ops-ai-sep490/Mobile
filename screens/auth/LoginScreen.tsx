@@ -1,4 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
+import { AuthStackParamList } from "@/navigation/AppNavigator";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useRef, useState } from "react";
 import {
@@ -19,7 +20,11 @@ import {
 
 const { width, height } = Dimensions.get("window");
 
-export default function LoginScreen() {
+interface Props {
+  onNavigate: (screen: keyof AuthStackParamList) => void;
+}
+
+export default function LoginScreen({ onNavigate }: Props) {
   const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -211,6 +216,13 @@ export default function LoginScreen() {
             ) : null}
           </View>
 
+          <TouchableOpacity
+            onPress={() => onNavigate("ForgotPassword")}
+            style={styles.forgotBtn}
+          >
+            <Text style={styles.forgotText}>Forgot Password?</Text>
+          </TouchableOpacity>
+
           {/* Login Button */}
           <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
             <TouchableOpacity
@@ -368,12 +380,12 @@ const styles = StyleSheet.create({
   },
   // Login Button
   loginButton: {
-    backgroundColor: "#00E5FF",
+    backgroundColor: "#4F6EF7",
     borderRadius: 12,
     height: 52,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#00E5FF",
+    shadowColor: "#4F6EF7",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 12,
@@ -383,7 +395,7 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   loginButtonText: {
-    color: "#0A0F1E",
+    color: "#ffffff",
     fontSize: 16,
     fontWeight: "800",
     letterSpacing: 0.5,
@@ -406,22 +418,16 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
   },
 
-  // SSO Button
-  ssoButton: {
-    borderRadius: 12,
-    height: 52,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: "#1E2A3A",
-    backgroundColor: "#0D1520",
+  forgotBtn: {
+    alignSelf: "flex-end",
+    marginTop: 6,
+    marginBottom: 12,
   },
-  ssoButtonText: {
-    color: "#8899AA",
-    fontSize: 14,
-    fontWeight: "600",
+  forgotText: {
+    fontSize: 13,
+    color: "#007AFF",
+    fontWeight: "500",
   },
-
   // Footer
   footer: {
     flexDirection: "row",
