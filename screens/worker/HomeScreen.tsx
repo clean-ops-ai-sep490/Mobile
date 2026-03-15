@@ -269,7 +269,7 @@ export default function HomeScreen({
               iconBg="#DCFCE7"
               iconColor="#22C55E"
               delay={180}
-              onPress={() => onNavigate?.("AdHoc")}
+              onPress={() => onNavigate?.("AdhocRequest")}
             />
           </View>
           <View style={styles.quickGrid}>

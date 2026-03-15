@@ -24,6 +24,7 @@ import OTPVerificationScreen from "@/screens/auth/OtpVerificationScreen";
 import ResetPasswordScreen from "@/screens/auth/ResetPasswordScreen";
 import ResetSuccessScreen from "@/screens/auth/ResetSuccessScreen";
 import SupervisorHomeScreen from "@/screens/supervisor/SupervisorHomeScreen";
+import AdhocRequestScreen from "@/screens/worker/AdhocRequestScreen";
 import RequestSwapTaskScreen from "@/screens/worker/RequestSwapTaskScreen";
 // ─── Auth Route params ──────────────────────────────────────────────────────
 export type AuthStackParamList = {
@@ -43,6 +44,7 @@ export type WorkerStackParamList = {
   IssueReport: undefined;
   RequestEquipment: undefined;
   SwapTask: undefined;
+  AdhocRequest: undefined;
 };
 
 // ─── Supervisor Route params ──────────────────────────────────────────────────
@@ -126,6 +128,7 @@ function WorkerNavigator() {
         component={RequestEquipmentScreen}
       />
       <WorkerStack.Screen name="SwapTask" component={RequestSwapTaskScreen} />
+      <WorkerStack.Screen name="AdhocRequest" component={AdhocRequestScreen} />
     </WorkerStack.Navigator>
   );
 }
