@@ -1,4 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
+import { AuthStackParamList } from "@/navigation/AppNavigator";
+import { Ionicons } from "@expo/vector-icons";
 import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -18,7 +20,11 @@ import {
 
 const { width, height } = Dimensions.get("window");
 
-export default function LoginScreen() {
+interface Props {
+  onNavigate: (screen: keyof AuthStackParamList) => void;
+}
+
+export default function LoginScreen({ onNavigate }: Props) {
   const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -85,8 +91,10 @@ export default function LoginScreen() {
     try {
       setLoading(true);
       await login();
-    } catch {
-      setErrors({ email: "Đăng nhập thất bại. Vui lòng thử lại." });
+    } catch (e: any) {
+      setErrors({
+        email: e.message ?? "Đăng nhập thất bại. Vui lòng thử lại.",
+      });
     } finally {
       setLoading(false);
     }
@@ -135,7 +143,12 @@ export default function LoginScreen() {
                 touched.email && errors.email ? styles.inputError : null,
               ]}
             >
-              <Text style={styles.inputIcon}>✉</Text>
+              <Ionicons
+                name="mail-outline"
+                size={18}
+                color="#8899AA"
+                style={styles.inputIcon}
+              />
               <TextInput
                 style={styles.input}
                 placeholder="you@company.com"
@@ -167,7 +180,12 @@ export default function LoginScreen() {
                 touched.password && errors.password ? styles.inputError : null,
               ]}
             >
-              <Text style={styles.inputIcon}>🔒</Text>
+              <Ionicons
+                name="lock-closed-outline"
+                size={18}
+                color="#8899AA"
+                style={styles.inputIcon}
+              />
               <TextInput
                 style={styles.input}
                 placeholder="Enter your password"
@@ -186,13 +204,24 @@ export default function LoginScreen() {
                 onPress={() => setShowPassword(!showPassword)}
                 style={styles.eyeButton}
               >
-                <Text style={styles.eyeIcon}>{showPassword ? "🙈" : "👁"}</Text>
+                <Ionicons
+                  name={showPassword ? "eye-off-outline" : "eye-outline"}
+                  size={18}
+                  color="#8899AA"
+                />
               </TouchableOpacity>
             </View>
             {touched.password && errors.password ? (
               <Text style={styles.errorText}>⚠ {errors.password}</Text>
             ) : null}
           </View>
+
+          <TouchableOpacity
+            onPress={() => onNavigate("ForgotPassword")}
+            style={styles.forgotBtn}
+          >
+            <Text style={styles.forgotText}>Forgot Password?</Text>
+          </TouchableOpacity>
 
           {/* Login Button */}
           <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
@@ -322,9 +351,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   inputIcon: {
-    fontSize: 16,
     marginRight: 10,
-    opacity: 0.6,
   },
   input: {
     flex: 1,
@@ -334,9 +361,6 @@ const styles = StyleSheet.create({
   },
   eyeButton: {
     padding: 4,
-  },
-  eyeIcon: {
-    fontSize: 16,
   },
 
   inputError: {
@@ -356,12 +380,12 @@ const styles = StyleSheet.create({
   },
   // Login Button
   loginButton: {
-    backgroundColor: "#00E5FF",
+    backgroundColor: "#4F6EF7",
     borderRadius: 12,
     height: 52,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#00E5FF",
+    shadowColor: "#4F6EF7",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 12,
@@ -371,7 +395,7 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   loginButtonText: {
-    color: "#0A0F1E",
+    color: "#ffffff",
     fontSize: 16,
     fontWeight: "800",
     letterSpacing: 0.5,
@@ -394,22 +418,16 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
   },
 
-  // SSO Button
-  ssoButton: {
-    borderRadius: 12,
-    height: 52,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: "#1E2A3A",
-    backgroundColor: "#0D1520",
+  forgotBtn: {
+    alignSelf: "flex-end",
+    marginTop: 6,
+    marginBottom: 12,
   },
-  ssoButtonText: {
-    color: "#8899AA",
-    fontSize: 14,
-    fontWeight: "600",
+  forgotText: {
+    fontSize: 13,
+    color: "#007AFF",
+    fontWeight: "500",
   },
-
   // Footer
   footer: {
     flexDirection: "row",

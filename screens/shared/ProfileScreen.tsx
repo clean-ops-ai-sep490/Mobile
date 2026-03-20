@@ -1,15 +1,20 @@
+import AppButton from "@/components/common/AppButton";
+import { TabKey } from "@/components/common/BottomTabBar";
+import Header from "@/components/common/Header";
 import { useAuth } from "@/contexts/AuthContext";
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import React, { useState } from "react";
 import {
-    Alert,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -29,7 +34,7 @@ interface WorkerUser {
     name: string;
     expires: string;
     status: "valid" | "expiring";
-    icon: string;
+    icon: keyof typeof Ionicons.glyphMap;
   }[];
   skills: string[];
 }
@@ -65,14 +70,14 @@ const MOCK_WORKER: WorkerUser = {
       name: "Biohazard Safety",
       expires: "Dec 2024",
       status: "valid",
-      icon: "🛡",
+      icon: "shield-checkmark-outline",
     },
     {
       id: "2",
       name: "Chemical Handling",
       expires: "in 12 days",
       status: "expiring",
-      icon: "⚠️",
+      icon: "warning-outline",
     },
   ],
   skills: ["Deep Cleaning", "Office Sanitation", "Inventory Mgmt"],
@@ -90,10 +95,6 @@ const MOCK_SUPERVISOR: SupervisorUser = {
   email: "m.tran@cleanops.com",
   phone: "+1 (555) 204-1988",
 };
-
-// Change this to test both views: "worker" | "supervisor"
-// const CURRENT_ROLE: UserRole = "worker";
-// const MOCK_USER: UserData = CURRENT_ROLE === "worker" ? MOCK_WORKER : MOCK_SUPERVISOR;
 
 const APP_VERSION = "2.4.1 (Build 882)";
 
@@ -113,13 +114,13 @@ const StatCard = ({
 }: {
   label: string;
   value: string;
-  icon: string;
+  icon: keyof typeof Ionicons.glyphMap;
   iconColor: string;
 }) => (
   <View style={styles.statCard}>
     <View style={styles.statHeader}>
       <Text style={styles.statLabel}>{label}</Text>
-      <Text style={[styles.statIcon, { color: iconColor }]}>{icon}</Text>
+      <Ionicons name={icon} size={16} color={iconColor} />
     </View>
     <Text style={styles.statValue}>{value}</Text>
   </View>
@@ -130,13 +131,13 @@ const InfoRow = ({
   label,
   value,
 }: {
-  icon: string;
+  icon: keyof typeof Ionicons.glyphMap;
   label: string;
   value: string;
 }) => (
   <View style={styles.infoRow}>
     <View style={styles.infoLeft}>
-      <Text style={styles.infoIcon}>{icon}</Text>
+      <Ionicons name={icon} size={16} color="#94A3B8" />
       <Text style={styles.infoLabel}>{label}</Text>
     </View>
     <Text style={styles.infoValue}>{value}</Text>
@@ -167,7 +168,9 @@ const WorkerSections = ({
             ]}
             onPress={() => setSelectedArea(area)}
           >
-            {selectedArea === area && <Text style={styles.chipIcon}>📍</Text>}
+            {selectedArea === area && (
+              <Ionicons name="location" size={12} color="#2563EB" />
+            )}
             <Text
               style={[
                 styles.chipText,
@@ -196,7 +199,11 @@ const WorkerSections = ({
                     : styles.certIconValid,
                 ]}
               >
-                <Text style={styles.certIcon}>{cert.icon}</Text>
+                <Ionicons
+                  name={cert.icon}
+                  size={18}
+                  color={cert.status === "expiring" ? "#F59E0B" : "#22C55E"}
+                />
               </View>
               <View>
                 <Text style={styles.certName}>{cert.name}</Text>
@@ -210,7 +217,7 @@ const WorkerSections = ({
                 </Text>
               </View>
             </View>
-            <Text style={styles.certArrow}>›</Text>
+            <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
           </TouchableOpacity>
         ))}
       </View>
@@ -235,11 +242,15 @@ const SupervisorSections = ({ user }: { user: SupervisorUser }) => (
   <View style={styles.section}>
     <Text style={styles.sectionTitle}>INFORMATION</Text>
     <View style={styles.infoCard}>
-      <InfoRow icon="🏢" label="Department" value={user.department} />
+      <InfoRow
+        icon="business-outline"
+        label="Department"
+        value={user.department}
+      />
       <View style={styles.infoDivider} />
-      <InfoRow icon="✉️" label="Email" value={user.email} />
+      <InfoRow icon="mail-outline" label="Email" value={user.email} />
       <View style={styles.infoDivider} />
-      <InfoRow icon="📞" label="Phone" value={user.phone} />
+      <InfoRow icon="call-outline" label="Phone" value={user.phone} />
     </View>
   </View>
 );
@@ -250,8 +261,13 @@ export default function ProfileScreen() {
   const [shareLocation, setShareLocation] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
   const [selectedArea, setSelectedArea] = useState("Downtown");
+  const [submitting, setSubmitting] = useState(false);
+  const navigation = useNavigation();
 
-  // Dùng role từ AuthContext để chọn đúng mock data
+  const handleNavigate = (screen: TabKey) => {
+    navigation.navigate(screen as never);
+  };
+
   const MOCK_USER: UserData =
     authUser?.role === "supervisor" ? MOCK_SUPERVISOR : MOCK_WORKER;
 
@@ -265,7 +281,7 @@ export default function ProfileScreen() {
         text: "Log Out",
         style: "destructive",
         onPress: async () => {
-          await logout(); // xóa session + tự điều hướng về /login qua RouteGuard
+          await logout();
         },
       },
     ]);
@@ -276,22 +292,18 @@ export default function ProfileScreen() {
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* ── Header ── */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn}>
-          <Text style={styles.backBtnText}>‹</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profile</Text>
-        <TouchableOpacity style={styles.editBtn}>
-          <Text style={styles.editBtnText}>✎</Text>
-        </TouchableOpacity>
-      </View>
+      <Header
+        title="My Profile"
+        onBack={() => handleNavigate("Home")}
+        style={{ backgroundColor: "#F5F6FA" }}
+      />
 
       <ScrollView
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* ── Identity (shared) ── */}
+        {/* ── Identity ── */}
         <View style={styles.identitySection}>
           <Avatar initials={MOCK_USER.avatar} color={MOCK_USER.avatarColor} />
           <Text style={styles.userName}>{MOCK_USER.name}</Text>
@@ -310,13 +322,18 @@ export default function ProfileScreen() {
               isSupervisor && styles.roleBadgeSupervisor,
             ]}
           >
+            <Ionicons
+              name={isWorker ? "construct-outline" : "briefcase-outline"}
+              size={12}
+              color={isSupervisor ? "#7C3AED" : "#2563EB"}
+            />
             <Text
               style={[
                 styles.roleBadgeText,
                 isSupervisor && styles.roleBadgeTextSupervisor,
               ]}
             >
-              {isWorker ? "👷 Worker" : "👔 Supervisor"}
+              {isWorker ? "Worker" : "Supervisor"}
             </Text>
           </View>
         </View>
@@ -333,13 +350,13 @@ export default function ProfileScreen() {
           <SupervisorSections user={MOCK_USER as SupervisorUser} />
         )}
 
-        {/* ── Settings (shared) ── */}
+        {/* ── Settings ── */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>SETTINGS</Text>
           <View style={styles.settingsList}>
             <View style={styles.settingRow}>
               <View style={styles.settingLeft}>
-                <Text style={styles.settingIcon}>◎</Text>
+                <Ionicons name="location-outline" size={18} color="#64748B" />
                 <Text style={styles.settingLabel}>Share Location</Text>
               </View>
               <Switch
@@ -352,7 +369,11 @@ export default function ProfileScreen() {
             <View style={styles.settingDivider} />
             <View style={styles.settingRow}>
               <View style={styles.settingLeft}>
-                <Text style={styles.settingIcon}>🔔</Text>
+                <Ionicons
+                  name="notifications-outline"
+                  size={18}
+                  color="#64748B"
+                />
                 <Text style={styles.settingLabel}>Push Notifications</Text>
               </View>
               <Switch
@@ -365,11 +386,20 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* ── Logout (shared) ── */}
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <Text style={styles.logoutIcon}>⎋</Text>
-          <Text style={styles.logoutText}>Log Out</Text>
-        </TouchableOpacity>
+        {/* ── Logout ── */}
+        <AppButton
+          label="Log Out"
+          onPress={handleLogout}
+          loading={submitting}
+          loadingLabel="Logging out..."
+          iconLeft="log-out"
+          style={{
+            width: "90%",
+            alignSelf: "center",
+            marginTop: 30,
+            backgroundColor: "#db0614",
+          }}
+        />
 
         <Text style={styles.version}>Version {APP_VERSION}</Text>
       </ScrollView>
@@ -379,7 +409,7 @@ export default function ProfileScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#FFFFFF" },
+  safe: { flex: 1, backgroundColor: "#F5F6FA" },
 
   // Header
   header: {
@@ -391,16 +421,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#F1F5F9",
   },
-  backBtn: { width: 32, height: 32, justifyContent: "center" },
-  backBtnText: { fontSize: 28, color: "#1E293B", lineHeight: 32 },
-  headerTitle: { fontSize: 17, fontWeight: "700", color: "#0F172A" },
-  editBtn: {
+  headerBtn: {
     width: 32,
     height: 32,
     justifyContent: "center",
-    alignItems: "flex-end",
+    alignItems: "center",
   },
-  editBtnText: { fontSize: 18, color: "#2563EB" },
+  headerTitle: { fontSize: 17, fontWeight: "700", color: "#0F172A" },
 
   // Scroll
   scroll: { flex: 1, backgroundColor: "#F8FAFC" },
@@ -454,6 +481,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   roleBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 20,
@@ -480,7 +510,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
 
-  // Chips (shared for areas & skills)
+  // Chips
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   areaChip: {
     flexDirection: "row",
@@ -494,7 +524,6 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   areaChipActive: { backgroundColor: "#EFF6FF", borderColor: "#2563EB" },
-  chipIcon: { fontSize: 12 },
   chipText: { fontSize: 13, fontWeight: "600", color: "#64748B" },
   chipTextActive: { color: "#2563EB" },
   skillChip: {
@@ -529,7 +558,6 @@ const styles = StyleSheet.create({
   },
   certIconValid: { backgroundColor: "#DCFCE7" },
   certIconExpiring: { backgroundColor: "#FEF3C7" },
-  certIcon: { fontSize: 18 },
   certName: {
     fontSize: 14,
     fontWeight: "700",
@@ -538,7 +566,6 @@ const styles = StyleSheet.create({
   },
   certExpiry: { fontSize: 12, color: "#64748B", fontWeight: "500" },
   certExpiryWarning: { color: "#F59E0B", fontWeight: "600" },
-  certArrow: { fontSize: 20, color: "#CBD5E1" },
 
   // Info card (Supervisor)
   infoCard: {
@@ -556,7 +583,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   infoLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
-  infoIcon: { fontSize: 16 },
   infoLabel: { fontSize: 14, fontWeight: "600", color: "#64748B" },
   infoValue: {
     fontSize: 14,
@@ -583,30 +609,12 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   settingLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
-  settingIcon: { fontSize: 18 },
   settingLabel: { fontSize: 15, fontWeight: "600", color: "#1E293B" },
   settingDivider: {
     height: 1,
     backgroundColor: "#E2E8F0",
     marginHorizontal: 16,
   },
-
-  // Logout
-  logoutBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginHorizontal: 20,
-    marginTop: 20,
-    paddingVertical: 15,
-    borderRadius: 14,
-    backgroundColor: "#FFF1F2",
-    borderWidth: 1.5,
-    borderColor: "#FECDD3",
-    gap: 8,
-  },
-  logoutIcon: { fontSize: 18, color: "#EF4444" },
-  logoutText: { fontSize: 15, fontWeight: "700", color: "#EF4444" },
 
   // Version
   version: {
@@ -616,4 +624,22 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontWeight: "500",
   },
+
+  // Stat card (kept for completeness)
+  statCard: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  statHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  statLabel: { fontSize: 11, fontWeight: "600", color: "#94A3B8" },
+  statValue: { fontSize: 20, fontWeight: "800", color: "#0F172A" },
 });

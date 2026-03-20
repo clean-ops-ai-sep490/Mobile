@@ -1,20 +1,24 @@
+import AppButton from "@/components/common/AppButton";
+import BottomTabBar, { TabKey } from "@/components/common/BottomTabBar";
+import Header from "@/components/common/Header";
 import CameraScreen from "@/screens/worker/CameraScreen";
+import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import React, { useEffect, useRef, useState } from "react";
 import {
-    Alert,
-    Animated,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Animated,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -33,11 +37,15 @@ interface CapturedPhoto {
   timestamp: string;
 }
 
-const ISSUE_TYPES = [
-  { id: "chemical", label: "Chemical Leak", icon: "⚗️" },
-  { id: "equipment", label: "Equipment Broken", icon: "🔧" },
-  { id: "access", label: "Access Denied", icon: "🔒" },
-  { id: "safety", label: "Safety Hazard", icon: "⚠️" },
+const ISSUE_TYPES: {
+  id: string;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}[] = [
+  { id: "chemical", label: "Chemical Leak", icon: "flask-outline" },
+  { id: "equipment", label: "Equipment Broken", icon: "construct-outline" },
+  { id: "access", label: "Access Denied", icon: "lock-closed-outline" },
+  { id: "safety", label: "Safety Hazard", icon: "warning-outline" },
 ];
 
 const SEVERITY = [
@@ -79,6 +87,10 @@ export default function IssueReportScreen({
 }: Props) {
   const navigation = useNavigation();
 
+  const handleNavigate = (screen: TabKey) => {
+    navigation.navigate(screen as never);
+  };
+
   const [selectedIssue, setSelectedIssue] = useState("chemical");
   const [selectedSeverity, setSelectedSeverity] = useState("high");
   const [description, setDescription] = useState("");
@@ -86,7 +98,6 @@ export default function IssueReportScreen({
   const [submitting, setSubmitting] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
 
-  // Entrance animation
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
@@ -118,7 +129,6 @@ export default function IssueReportScreen({
     setShowCamera(true);
   };
 
-  // Nhận ảnh từ InspectionCameraScreen, chỉ lấy đủ slot còn lại (max 3)
   const handleCameraSubmit = (captured: CapturedPhoto[]) => {
     setShowCamera(false);
     setPhotos((prev) => {
@@ -136,7 +146,6 @@ export default function IssueReportScreen({
       return;
     }
     setSubmitting(true);
-    // Simulate API call
     await new Promise((r) => setTimeout(r, 1200));
     setSubmitting(false);
     Alert.alert(
@@ -146,7 +155,6 @@ export default function IssueReportScreen({
     );
   };
 
-  // ── Camera overlay ─────────────────────────────────────────────────────────
   if (showCamera) {
     return (
       <CameraScreen
@@ -161,23 +169,11 @@ export default function IssueReportScreen({
       <StatusBar barStyle="dark-content" backgroundColor="#F5F6FA" />
       <SafeAreaView style={styles.safe}>
         {/* ── Header ── */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backBtn}
-            onPress={handleBack}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.backIcon}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Report an Issue</Text>
-          <TouchableOpacity
-            style={styles.closeBtn}
-            onPress={handleBack}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.closeIcon}>✕</Text>
-          </TouchableOpacity>
-        </View>
+        <Header
+          title="Report an Issue"
+          onBack={handleBack}
+          style={{ backgroundColor: "#f5f6fa" }}
+        />
 
         <KeyboardAvoidingView
           style={{ flex: 1 }}
@@ -199,7 +195,11 @@ export default function IssueReportScreen({
               {/* ── Task Reference ── */}
               <View style={styles.taskRefCard}>
                 <View style={styles.taskRefIcon}>
-                  <Text style={{ fontSize: 16 }}>📋</Text>
+                  <Ionicons
+                    name="clipboard-outline"
+                    size={18}
+                    color="#3B82F6"
+                  />
                 </View>
                 <View>
                   <Text style={styles.taskRefLabel}>
@@ -228,10 +228,16 @@ export default function IssueReportScreen({
                     >
                       {active && (
                         <View style={styles.issueCheck}>
-                          <Text style={styles.issueCheckText}>✓</Text>
+                          <Ionicons name="checkmark" size={11} color="#FFF" />
                         </View>
                       )}
-                      <Text style={styles.issueIcon}>{item.icon}</Text>
+                      <View style={styles.issueIconWrap}>
+                        <Ionicons
+                          name={item.icon}
+                          size={26}
+                          color={active ? "#2563EB" : "#64748B"}
+                        />
+                      </View>
                       <Text
                         style={[
                           styles.issueLabel,
@@ -303,7 +309,7 @@ export default function IssueReportScreen({
                         setPhotos((prev) => prev.filter((_, idx) => idx !== i))
                       }
                     >
-                      <Text style={styles.photoDeleteText}>✕</Text>
+                      <Ionicons name="close" size={10} color="#FFF" />
                     </TouchableOpacity>
                   </View>
                 ))}
@@ -313,7 +319,7 @@ export default function IssueReportScreen({
                     onPress={handleAddPhoto}
                     activeOpacity={0.75}
                   >
-                    <Text style={styles.photoAddIcon}>+</Text>
+                    <Ionicons name="add" size={24} color="#94A3B8" />
                     <Text style={styles.photoAddLabel}>Add Photo</Text>
                   </TouchableOpacity>
                 )}
@@ -324,24 +330,16 @@ export default function IssueReportScreen({
           </ScrollView>
 
           {/* ── Submit Button ── */}
-          <View style={styles.footer}>
-            <TouchableOpacity
-              style={[styles.submitBtn, submitting && styles.submitBtnBusy]}
-              onPress={handleSubmit}
-              activeOpacity={0.85}
-              disabled={submitting}
-            >
-              {submitting ? (
-                <Text style={styles.submitBtnText}>Submitting...</Text>
-              ) : (
-                <>
-                  <Text style={styles.submitBtnIcon}>➤</Text>
-                  <Text style={styles.submitBtnText}>Submit Report</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
+          <AppButton
+            label="Submit Issue Report"
+            onPress={handleSubmit}
+            loading={submitting}
+            loadingLabel="Submitting..."
+            iconLeft="send"
+            style={{ width: "90%", alignSelf: "center" }}
+          />
         </KeyboardAvoidingView>
+        <BottomTabBar onNavigate={handleNavigate} />
       </SafeAreaView>
     </View>
   );
@@ -353,48 +351,6 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 24 },
-
-  // Header
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === "android" ? 12 : 4,
-    paddingBottom: 14,
-    backgroundColor: "#F5F6FA",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
-  },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#FFF",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  backIcon: { fontSize: 24, color: "#1E293B", lineHeight: 28, marginTop: -2 },
-  headerTitle: { fontSize: 17, fontWeight: "700", color: "#1E293B" },
-  closeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#FFF",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  closeIcon: { fontSize: 13, color: "#64748B", fontWeight: "600" },
 
   // Task ref
   taskRefCard: {
@@ -471,8 +427,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  issueCheckText: { color: "#FFF", fontSize: 11, fontWeight: "800" },
-  issueIcon: { fontSize: 28, marginBottom: 8 },
+  issueIconWrap: {
+    marginBottom: 8,
+  },
   issueLabel: {
     fontSize: 12,
     fontWeight: "600",
@@ -537,7 +494,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#F5F6FA",
   },
-  photoDeleteText: { color: "#FFF", fontSize: 9, fontWeight: "800" },
   photoAdd: {
     width: 80,
     height: 80,
@@ -549,7 +505,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  photoAddIcon: { fontSize: 22, color: "#94A3B8", lineHeight: 26 },
   photoAddLabel: {
     fontSize: 10,
     color: "#94A3B8",
@@ -570,21 +525,4 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#F1F5F9",
   },
-  submitBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: "#2563EB",
-    borderRadius: 16,
-    paddingVertical: 16,
-    shadowColor: "#2563EB",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  submitBtnBusy: { backgroundColor: "#93C5FD" },
-  submitBtnIcon: { color: "#FFF", fontSize: 16 },
-  submitBtnText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
 });

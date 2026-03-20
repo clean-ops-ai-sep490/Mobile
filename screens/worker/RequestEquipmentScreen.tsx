@@ -1,18 +1,22 @@
+import AppButton from "@/components/common/AppButton";
+import BottomTabBar, { TabKey } from "@/components/common/BottomTabBar";
+import Header from "@/components/common/Header";
+import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import React, { useEffect, useRef, useState } from "react";
 import {
-    Alert,
-    Animated,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Animated,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -51,6 +55,10 @@ export default function RequestEquipmentScreen({
 }: Props) {
   const navigation = useNavigation();
 
+  const handleNavigate = (screen: TabKey) => {
+    navigation.navigate(screen as never);
+  };
+
   const [equipmentSearch, setEquipmentSearch] = useState("");
   const [selectedEquipment, setSelectedEquipment] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -59,7 +67,6 @@ export default function RequestEquipmentScreen({
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Entrance animation
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
@@ -116,23 +123,11 @@ export default function RequestEquipmentScreen({
       <StatusBar barStyle="dark-content" backgroundColor="#F5F6FA" />
       <SafeAreaView style={styles.safe}>
         {/* ── Header ── */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backBtn}
-            onPress={handleBack}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.backIcon}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Request Equipment</Text>
-          <TouchableOpacity
-            style={styles.closeBtn}
-            onPress={handleBack}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.closeIcon}>✕</Text>
-          </TouchableOpacity>
-        </View>
+        <Header
+          title="Request Equipment"
+          onBack={handleBack}
+          style={{ backgroundColor: "#f5f6fa" }}
+        />
 
         <KeyboardAvoidingView
           style={{ flex: 1 }}
@@ -155,7 +150,11 @@ export default function RequestEquipmentScreen({
               <Text style={styles.fieldLabel}>RELATED TASK</Text>
               <View style={styles.taskCard}>
                 <View style={styles.taskCardIcon}>
-                  <Text style={{ fontSize: 15 }}>📋</Text>
+                  <Ionicons
+                    name="clipboard-outline"
+                    size={16}
+                    color="#3B82F6"
+                  />
                 </View>
                 <Text style={styles.taskCardText}>{taskName}</Text>
               </View>
@@ -180,14 +179,11 @@ export default function RequestEquipmentScreen({
                     }}
                     onFocus={() => setDropdownOpen(true)}
                   />
-                  <Text
-                    style={[
-                      styles.dropdownChevron,
-                      dropdownOpen && styles.dropdownChevronUp,
-                    ]}
-                  >
-                    ⌄
-                  </Text>
+                  <Ionicons
+                    name={dropdownOpen ? "chevron-up" : "chevron-down"}
+                    size={16}
+                    color="#94A3B8"
+                  />
                 </TouchableOpacity>
 
                 {dropdownOpen && (
@@ -214,7 +210,11 @@ export default function RequestEquipmentScreen({
                             {item}
                           </Text>
                           {selectedEquipment === item && (
-                            <Text style={styles.dropdownItemCheck}>✓</Text>
+                            <Ionicons
+                              name="checkmark"
+                              size={14}
+                              color="#2563EB"
+                            />
                           )}
                         </TouchableOpacity>
                       ))
@@ -243,7 +243,7 @@ export default function RequestEquipmentScreen({
                       onPress={() => setQuantity((q) => Math.max(1, q - 1))}
                       activeOpacity={0.75}
                     >
-                      <Text style={styles.qtyBtnText}>−</Text>
+                      <Ionicons name="remove" size={18} color="#1E293B" />
                     </TouchableOpacity>
                     <Text style={styles.qtyValue}>{quantity}</Text>
                     <TouchableOpacity
@@ -251,7 +251,7 @@ export default function RequestEquipmentScreen({
                       onPress={() => setQuantity((q) => Math.min(99, q + 1))}
                       activeOpacity={0.75}
                     >
-                      <Text style={styles.qtyBtnText}>+</Text>
+                      <Ionicons name="add" size={18} color="#1E293B" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -320,20 +320,19 @@ export default function RequestEquipmentScreen({
           </ScrollView>
 
           {/* ── Submit ── */}
-          <View style={styles.footer}>
-            <TouchableOpacity
-              style={[styles.submitBtn, submitting && styles.submitBtnBusy]}
-              onPress={handleSubmit}
-              activeOpacity={0.85}
-              disabled={submitting}
-            >
-              <Text style={styles.submitBtnText}>
-                {submitting ? "Sending..." : "Send Request"}
-              </Text>
-              {!submitting && <Text style={styles.submitBtnIcon}>➤</Text>}
-            </TouchableOpacity>
-          </View>
+          <AppButton
+            label="Submit Equipment Request"
+            onPress={handleSubmit}
+            loading={submitting}
+            loadingLabel="Submitting..."
+            iconLeft="send"
+            style={{
+              width: "90%",
+              alignSelf: "center",
+            }}
+          />
         </KeyboardAvoidingView>
+        <BottomTabBar onNavigate={handleNavigate} />
       </SafeAreaView>
     </View>
   );
@@ -345,48 +344,6 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 24 },
-
-  // Header
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === "android" ? 12 : 4,
-    paddingBottom: 14,
-    backgroundColor: "#F5F6FA",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
-  },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#FFF",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  backIcon: { fontSize: 24, color: "#1E293B", lineHeight: 28, marginTop: -2 },
-  headerTitle: { fontSize: 17, fontWeight: "700", color: "#1E293B" },
-  closeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#FFF",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  closeIcon: { fontSize: 13, color: "#64748B", fontWeight: "600" },
 
   // Field label
   fieldLabel: {
@@ -457,14 +414,6 @@ const styles = StyleSheet.create({
     color: "#1E293B",
     paddingVertical: 12,
   },
-  dropdownChevron: {
-    fontSize: 18,
-    color: "#94A3B8",
-    fontWeight: "700",
-    marginLeft: 8,
-    marginTop: 2,
-  },
-  dropdownChevronUp: { transform: [{ rotate: "180deg" }] },
   dropdownList: {
     backgroundColor: "#FFF",
     borderWidth: 1.5,
@@ -492,7 +441,6 @@ const styles = StyleSheet.create({
   dropdownItemActive: { backgroundColor: "#EFF6FF" },
   dropdownItemText: { fontSize: 14, color: "#475569" },
   dropdownItemTextActive: { color: "#2563EB", fontWeight: "600" },
-  dropdownItemCheck: { fontSize: 13, color: "#2563EB", fontWeight: "700" },
   dropdownEmpty: { padding: 16, alignItems: "center" },
   dropdownEmptyText: { fontSize: 13, color: "#94A3B8" },
 
@@ -523,12 +471,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#F8FAFC",
   },
   qtyBtnDisabled: { opacity: 0.35 },
-  qtyBtnText: {
-    fontSize: 20,
-    color: "#1E293B",
-    fontWeight: "500",
-    lineHeight: 24,
-  },
   qtyValue: {
     flex: 1,
     textAlign: "center",
@@ -591,21 +533,4 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#F1F5F9",
   },
-  submitBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: "#2563EB",
-    borderRadius: 16,
-    paddingVertical: 16,
-    shadowColor: "#2563EB",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  submitBtnBusy: { backgroundColor: "#93C5FD" },
-  submitBtnText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
-  submitBtnIcon: { color: "#FFF", fontSize: 16 },
 });

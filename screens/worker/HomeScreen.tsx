@@ -1,3 +1,6 @@
+import BottomTabBar, { TabKey } from "@/components/common/BottomTabBar";
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import React, { useEffect, useRef } from "react";
 import {
   Animated,
@@ -27,7 +30,7 @@ interface Props {
 
 // ─── Quick Action Card ────────────────────────────────────────────────────────
 interface QuickCardProps {
-  icon: string;
+  icon: keyof typeof Ionicons.glyphMap;
   label: string;
   subtitle: string;
   iconBg: string;
@@ -79,7 +82,7 @@ function QuickCard({
         activeOpacity={0.75}
       >
         <View style={[styles.quickIcon, { backgroundColor: iconBg }]}>
-          <Text style={{ fontSize: 18 }}>{icon}</Text>
+          <Ionicons name={icon} size={20} color={iconColor} />
         </View>
         <Text style={styles.quickLabel}>{label}</Text>
         <Text style={styles.quickSub}>{subtitle}</Text>
@@ -90,21 +93,25 @@ function QuickCard({
 
 // ─── Bottom Tab ───────────────────────────────────────────────────────────────
 interface TabItemProps {
-  icon: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  activeIcon: keyof typeof Ionicons.glyphMap;
   label: string;
   active?: boolean;
   onPress?: () => void;
 }
-function TabItem({ icon, label, active, onPress }: TabItemProps) {
+function TabItem({ icon, activeIcon, label, active, onPress }: TabItemProps) {
   return (
     <TouchableOpacity
       style={styles.tabItem}
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <Text style={[styles.tabIcon, active && styles.tabIconActive]}>
-        {icon}
-      </Text>
+      <Ionicons
+        name={active ? activeIcon : icon}
+        size={22}
+        color={active ? "#2563EB" : "#94A3B8"}
+        style={styles.tabIconIon}
+      />
       <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>
         {label}
       </Text>
@@ -123,15 +130,19 @@ export default function HomeScreen({
   totalTasks = 26,
   onNavigate,
 }: Props) {
-  // Entrance animations
   const headerFade = useRef(new Animated.Value(0)).current;
   const headerSlide = useRef(new Animated.Value(-16)).current;
   const progressWidth = useRef(new Animated.Value(0)).current;
 
   const performance = Math.round((completedTasks / totalTasks) * 100);
 
+  const navigation = useNavigation();
+
+  const handleNavigate = (screen: TabKey) => {
+    navigation.navigate(screen as never);
+  };
+
   useEffect(() => {
-    // Header
     Animated.parallel([
       Animated.timing(headerFade, {
         toValue: 1,
@@ -145,7 +156,6 @@ export default function HomeScreen({
       }),
     ]).start();
 
-    // Progress bar
     Animated.timing(progressWidth, {
       toValue: performance / 100,
       duration: 900,
@@ -160,8 +170,6 @@ export default function HomeScreen({
     day: "numeric",
     year: "numeric",
   });
-
-  const firstName = userName.split(" ")[0];
 
   return (
     <View style={styles.root}>
@@ -183,14 +191,18 @@ export default function HomeScreen({
               style={styles.iconBtn}
               onPress={() => onNavigate?.("Notifications")}
             >
-              <Text style={styles.iconBtnText}>🔔</Text>
+              <Ionicons
+                name="notifications-outline"
+                size={18}
+                color="#334155"
+              />
               <View style={styles.notifDot} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.iconBtn}
               onPress={() => onNavigate?.("Profile")}
             >
-              <Text style={styles.iconBtnText}>👤</Text>
+              <Ionicons name="person-outline" size={18} color="#334155" />
             </TouchableOpacity>
           </View>
         </View>
@@ -221,7 +233,11 @@ export default function HomeScreen({
             >
               <View style={styles.tasksLeft}>
                 <View style={styles.tasksIconWrap}>
-                  <Text style={{ fontSize: 20 }}>📋</Text>
+                  <Ionicons
+                    name="clipboard-outline"
+                    size={22}
+                    color="#3B82F6"
+                  />
                 </View>
                 <View>
                   <Text style={styles.tasksTitle}>My Tasks</Text>
@@ -230,7 +246,7 @@ export default function HomeScreen({
                   </Text>
                 </View>
               </View>
-              <Text style={styles.tasksChevron}>›</Text>
+              <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
             </TouchableOpacity>
           </Animated.View>
 
@@ -238,7 +254,7 @@ export default function HomeScreen({
           <Text style={styles.sectionLabel}>Quick Actions</Text>
           <View style={styles.quickGrid}>
             <QuickCard
-              icon="⚠️"
+              icon="warning-outline"
               label="Issue Report"
               subtitle="Broken equipment, sudden issues"
               iconBg="#FEE2E2"
@@ -247,27 +263,27 @@ export default function HomeScreen({
               onPress={() => onNavigate?.("IssueReport")}
             />
             <QuickCard
-              icon="➕"
+              icon="add-circle-outline"
               label="Ad-hoc Request"
               subtitle="Support, additional supplies"
               iconBg="#DCFCE7"
               iconColor="#22C55E"
               delay={180}
-              onPress={() => onNavigate?.("AdHoc")}
+              onPress={() => onNavigate?.("AdhocRequest")}
             />
           </View>
           <View style={styles.quickGrid}>
             <QuickCard
-              icon="🧰"
+              icon="construct-outline"
               label="Request Equipment"
               subtitle="Request tools & supplies"
               iconBg="#FFF7ED"
               iconColor="#F97316"
-              delay={340}
+              delay={260}
               onPress={() => onNavigate?.("RequestEquipment")}
             />
             <QuickCard
-              icon="🔄"
+              icon="swap-horizontal-outline"
               label="Swap Task"
               subtitle="Request shift swap"
               iconBg="#F3F4F6"
@@ -278,12 +294,12 @@ export default function HomeScreen({
           </View>
           <View style={styles.quickGrid}>
             <QuickCard
-              icon="🏥"
+              icon="medkit-outline"
               label="Emergency Leave"
               subtitle="Submit quick leave request"
               iconBg="#EFF6FF"
               iconColor="#3B82F6"
-              delay={260}
+              delay={420}
               onPress={() => onNavigate?.("EmergencyLeave")}
             />
           </View>
@@ -312,41 +328,17 @@ export default function HomeScreen({
             </Text>
           </Animated.View>
 
-          {/* Spacer for tab bar */}
           <View style={{ height: 20 }} />
         </ScrollView>
 
-        {/* ── Bottom Tab Bar ── */}
-        <View style={styles.tabBar}>
-          <TabItem
-            icon="🏠"
-            label="Home"
-            active
-            onPress={() => onNavigate?.("Home")}
-          />
-          <TabItem
-            icon="📋"
-            label="Tasks"
-            onPress={() => onNavigate?.("Tasks")}
-          />
-          <TabItem
-            icon="🔔"
-            label="Notifications"
-            onPress={() => onNavigate?.("Notifications")}
-          />
-          <TabItem
-            icon="👤"
-            label="Profile"
-            onPress={() => onNavigate?.("Profile")}
-          />
-        </View>
+        <BottomTabBar activeTab="Home" onNavigate={handleNavigate} />
       </SafeAreaView>
     </View>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-
+const CARD_GAP = 12;
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#F5F6FA" },
@@ -396,7 +388,6 @@ const styles = StyleSheet.create({
     elevation: 2,
     position: "relative",
   },
-  iconBtnText: { fontSize: 16 },
   notifDot: {
     position: "absolute",
     top: 7,
@@ -458,7 +449,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginTop: 2,
   },
-  tasksChevron: { fontSize: 22, color: "#CBD5E1", fontWeight: "300" },
 
   // Section label
   sectionLabel: {
@@ -550,8 +540,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   tabItem: { flex: 1, alignItems: "center", position: "relative" },
-  tabIcon: { fontSize: 20, marginBottom: 3, opacity: 0.4 },
-  tabIconActive: { opacity: 1 },
+  tabIconIon: { marginBottom: 3 },
   tabLabel: { fontSize: 10, fontWeight: "600", color: "#94A3B8" },
   tabLabelActive: { color: "#2563EB" },
   tabDot: {

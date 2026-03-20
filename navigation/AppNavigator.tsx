@@ -18,7 +18,22 @@ import RequestEquipmentScreen from "@/screens/worker/RequestEquipmentScreen";
 import TaskListScreen from "@/screens/worker/TaskListScreen";
 
 // ─── Import supervisor screens ────────────────────────────────────────────────
+import ForgotPasswordScreen from "@/screens/auth/ForgotPasswordScreen";
+import LoginScreen from "@/screens/auth/LoginScreen";
+import OTPVerificationScreen from "@/screens/auth/OtpVerificationScreen";
+import ResetPasswordScreen from "@/screens/auth/ResetPasswordScreen";
+import ResetSuccessScreen from "@/screens/auth/ResetSuccessScreen";
 import SupervisorHomeScreen from "@/screens/supervisor/SupervisorHomeScreen";
+import AdhocRequestScreen from "@/screens/worker/AdhocRequestScreen";
+import RequestSwapTaskScreen from "@/screens/worker/RequestSwapTaskScreen";
+// ─── Auth Route params ──────────────────────────────────────────────────────
+export type AuthStackParamList = {
+  Login: undefined;
+  ForgotPassword: undefined;
+  OtpVerification: undefined;
+  ResetPassword: undefined;
+  ResetSuccess: undefined;
+};
 
 // ─── Worker Route params ──────────────────────────────────────────────────────
 export type WorkerStackParamList = {
@@ -28,6 +43,8 @@ export type WorkerStackParamList = {
   Tasks: undefined;
   IssueReport: undefined;
   RequestEquipment: undefined;
+  SwapTask: undefined;
+  AdhocRequest: undefined;
 };
 
 // ─── Supervisor Route params ──────────────────────────────────────────────────
@@ -38,10 +55,24 @@ export type SupervisorStackParamList = {
 
 // ─── Combined Route params ────────────────────────────────────────────────────
 export type RootStackParamList = WorkerStackParamList &
-  SupervisorStackParamList;
+  SupervisorStackParamList &
+  AuthStackParamList;
 
 const WorkerStack = createNativeStackNavigator<WorkerStackParamList>();
 const SupervisorStack = createNativeStackNavigator<SupervisorStackParamList>();
+const AuthStack = createNativeStackNavigator<AuthStackParamList>();
+
+type LoginProps = NativeStackScreenProps<AuthStackParamList, "Login">;
+
+function LoginWrapper({ navigation }: LoginProps) {
+  return (
+    <LoginScreen
+      onNavigate={(screen) => {
+        navigation.navigate(screen as keyof AuthStackParamList);
+      }}
+    />
+  );
+}
 
 // ─── Worker Home wrapper — bridge onNavigate → navigation.navigate ──────────
 type WorkerHomeProps = NativeStackScreenProps<WorkerStackParamList, "Home">;
@@ -53,6 +84,27 @@ function WorkerHomeWrapper({ navigation }: WorkerHomeProps) {
         navigation.navigate(screen as keyof WorkerStackParamList);
       }}
     />
+  );
+}
+
+function AuthNavigator() {
+  return (
+    <AuthStack.Navigator
+      initialRouteName="Login"
+      screenOptions={{ headerShown: false }}
+    >
+      <AuthStack.Screen name="Login" component={LoginWrapper} />
+      <AuthStack.Screen
+        name="ForgotPassword"
+        component={ForgotPasswordScreen}
+      />
+      <AuthStack.Screen
+        name="OtpVerification"
+        component={OTPVerificationScreen}
+      />
+      <AuthStack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+      <AuthStack.Screen name="ResetSuccess" component={ResetSuccessScreen} />
+    </AuthStack.Navigator>
   );
 }
 
@@ -75,6 +127,8 @@ function WorkerNavigator() {
         name="RequestEquipment"
         component={RequestEquipmentScreen}
       />
+      <WorkerStack.Screen name="SwapTask" component={RequestSwapTaskScreen} />
+      <WorkerStack.Screen name="AdhocRequest" component={AdhocRequestScreen} />
     </WorkerStack.Navigator>
   );
 }
@@ -97,7 +151,11 @@ function SupervisorNavigator() {
 
 // ─── Main Navigator — chọn dựa trên role ──────────────────────────────────────
 export default function AppNavigator() {
-  const { isWorker, isSupervisor } = useAuth();
+  const { isAuthenticated, isWorker, isSupervisor } = useAuth();
+
+  if (!isAuthenticated) {
+    return <AuthNavigator />;
+  }
 
   if (isWorker) {
     return <WorkerNavigator />;

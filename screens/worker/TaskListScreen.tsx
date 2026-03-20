@@ -1,22 +1,21 @@
+import AppButton from "@/components/common/AppButton";
+import BottomTabBar, { TabKey } from "@/components/common/BottomTabBar";
+import Header from "@/components/common/Header";
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import React, { useState } from "react";
 import {
-    RefreshControl,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 // ─── Mock Data ───────────────────────────────────────────────────────────────
-const MOCK_USER = {
-  name: "Alex Johnson",
-  role: "Worker",
-  avatar: null,
-};
-
 const TODAY = new Date();
 const getDays = () => {
   return [-2, -1, 0, 1, 2].map((offset) => {
@@ -138,26 +137,16 @@ const STATUS_CONFIG = {
   },
 };
 
-const TAG_CONFIG: Record<string, { color: string; bg: string }> = {
-  Biohazard: { color: "#EF4444", bg: "#FEE2E2" },
-  "High-Traffic": { color: "#8B5CF6", bg: "#EDE9FE" },
-  "High-Rise": { color: "#0EA5E9", bg: "#E0F2FE" },
+const TAG_CONFIG: Record<
+  string,
+  { color: string; bg: string; icon: keyof typeof Ionicons.glyphMap }
+> = {
+  Biohazard: { color: "#EF4444", bg: "#FEE2E2", icon: "warning-outline" },
+  "High-Traffic": { color: "#8B5CF6", bg: "#EDE9FE", icon: "people-outline" },
+  "High-Rise": { color: "#0EA5E9", bg: "#E0F2FE", icon: "arrow-up-outline" },
 };
 
 // ─── Components ───────────────────────────────────────────────────────────────
-const Avatar = ({ name }: { name: string }) => {
-  const initials = name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2);
-  return (
-    <View style={styles.avatarCircle}>
-      <Text style={styles.avatarText}>{initials}</Text>
-    </View>
-  );
-};
-
 const StatusBadge = ({ status }: { status: TaskStatus }) => {
   const cfg = STATUS_CONFIG[status];
   return (
@@ -169,10 +158,15 @@ const StatusBadge = ({ status }: { status: TaskStatus }) => {
 };
 
 const TagBadge = ({ tag }: { tag: string }) => {
-  const cfg = TAG_CONFIG[tag] ?? { color: "#6B7280", bg: "#F3F4F6" };
+  const cfg = TAG_CONFIG[tag] ?? {
+    color: "#6B7280",
+    bg: "#F3F4F6",
+    icon: "pricetag-outline" as keyof typeof Ionicons.glyphMap,
+  };
   return (
     <View style={[styles.tag, { backgroundColor: cfg.bg }]}>
-      <Text style={[styles.tagText, { color: cfg.color }]}>⚠ {tag}</Text>
+      <Ionicons name={cfg.icon} size={10} color={cfg.color} />
+      <Text style={[styles.tagText, { color: cfg.color }]}>{tag}</Text>
     </View>
   );
 };
@@ -204,33 +198,44 @@ const TaskCard = ({ task }: { task: Task }) => {
 
       {/* Location */}
       <View style={styles.cardLocation}>
-        <Text style={styles.locationIcon}>📍</Text>
+        <Ionicons name="location-outline" size={13} color="#94A3B8" />
         <Text style={styles.locationText}>
           {task.location} • {task.sublocation}
         </Text>
       </View>
 
-      {/* Action button */}
+      {/* Action buttons */}
       <View style={styles.cardActions}>
         {isInProgress && (
           <>
-            <TouchableOpacity style={styles.btnPrimary}>
-              <Text style={styles.btnPrimaryText}>▶ Continue</Text>
-            </TouchableOpacity>
+            <AppButton
+              label="Continue"
+              onPress={() => {}}
+              iconLeft="play"
+              size="md"
+              style={{ flex: 1, marginBottom: 0 }}
+            />
             <TouchableOpacity style={styles.btnCamera}>
-              <Text style={styles.btnCameraIcon}>📷</Text>
+              <Ionicons name="camera-outline" size={20} color="#F59E0B" />
             </TouchableOpacity>
           </>
         )}
         {isUpcoming && (
-          <TouchableOpacity style={styles.btnSecondary}>
-            <Text style={styles.btnSecondaryText}>Start Task</Text>
-          </TouchableOpacity>
+          <AppButton
+            label="Start Task"
+            onPress={() => {}}
+            size="md"
+            style={{ flex: 1, marginBottom: 0 }}
+          />
         )}
         {isCompleted && (
-          <TouchableOpacity style={styles.btnGhost}>
-            <Text style={styles.btnGhostText}>View Status</Text>
-          </TouchableOpacity>
+          <AppButton
+            label="View Status"
+            onPress={() => {}}
+            variant="secondary"
+            size="md"
+            style={{ flex: 1, marginBottom: 0 }}
+          />
         )}
       </View>
     </View>
@@ -245,6 +250,11 @@ export default function TaskListScreen() {
   const [filter, setFilter] = useState<FilterType>("all");
   const [refreshing, setRefreshing] = useState(false);
   const days = getDays();
+  const navigation = useNavigation();
+
+  const handleNavigate = (screen: TabKey) => {
+    navigation.navigate(screen as never);
+  };
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -270,7 +280,11 @@ export default function TaskListScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
-
+      <Header
+        title="My Tasks"
+        onBack={() => handleNavigate("Home")}
+        style={{ backgroundColor: "#F5F6FA" }}
+      />
       {/* ── Day Selector ── */}
       <View style={styles.dayRow}>
         {days.map((d) => {
@@ -371,7 +385,9 @@ export default function TaskListScreen() {
         <View style={styles.taskList}>
           {filtered.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyIcon}>📋</Text>
+              <View style={styles.emptyIconWrap}>
+                <Ionicons name="clipboard-outline" size={36} color="#CBD5E1" />
+              </View>
               <Text style={styles.emptyTitle}>No tasks found</Text>
               <Text style={styles.emptyText}>
                 No tasks match this filter for the selected day.
@@ -384,6 +400,7 @@ export default function TaskListScreen() {
 
         <View style={{ height: 100 }} />
       </ScrollView>
+      <BottomTabBar activeTab="Tasks" onNavigate={handleNavigate} />
     </SafeAreaView>
   );
 }
@@ -427,23 +444,17 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
-  dayLabelActive: {
-    color: "#BFDBFE",
-  },
+  dayLabelActive: { color: "#BFDBFE" },
   dayDate: {
     fontSize: 18,
     fontWeight: "800",
     color: "#1E293B",
     marginTop: 2,
   },
-  dayDateActive: {
-    color: "#FFFFFF",
-  },
+  dayDateActive: { color: "#FFFFFF" },
 
   // ── Scroll ───────────────────────────────────────────────
-  scroll: {
-    flex: 1,
-  },
+  scroll: { flex: 1 },
 
   // ── Section Header ────────────────────────────────────────
   sectionHeader: {
@@ -463,9 +474,7 @@ const styles = StyleSheet.create({
   },
 
   // ── Filter Pills ─────────────────────────────────────────
-  filterRow: {
-    marginTop: 12,
-  },
+  filterRow: { marginTop: 12 },
   filterContent: {
     paddingHorizontal: 20,
     gap: 8,
@@ -490,9 +499,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#64748B",
   },
-  filterTextActive: {
-    color: "#FFFFFF",
-  },
+  filterTextActive: { color: "#FFFFFF" },
   filterCount: {
     backgroundColor: "#F1F5F9",
     borderRadius: 10,
@@ -501,17 +508,13 @@ const styles = StyleSheet.create({
     minWidth: 20,
     alignItems: "center",
   },
-  filterCountActive: {
-    backgroundColor: "#1D4ED8",
-  },
+  filterCountActive: { backgroundColor: "#1D4ED8" },
   filterCountText: {
     fontSize: 11,
     fontWeight: "700",
     color: "#64748B",
   },
-  filterCountTextActive: {
-    color: "#BFDBFE",
-  },
+  filterCountTextActive: { color: "#BFDBFE" },
 
   // ── Task List ────────────────────────────────────────────
   taskList: {
@@ -572,9 +575,6 @@ const styles = StyleSheet.create({
     gap: 4,
     marginBottom: 14,
   },
-  locationIcon: {
-    fontSize: 12,
-  },
   locationText: {
     fontSize: 13,
     color: "#64748B",
@@ -583,25 +583,6 @@ const styles = StyleSheet.create({
   cardActions: {
     flexDirection: "row",
     gap: 10,
-  },
-
-  // ── Buttons ──────────────────────────────────────────────
-  btnPrimary: {
-    flex: 1,
-    backgroundColor: "#2563EB",
-    borderRadius: 12,
-    paddingVertical: 13,
-    alignItems: "center",
-    shadowColor: "#2563EB",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  btnPrimaryText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "700",
   },
   btnCamera: {
     width: 46,
@@ -612,35 +593,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1.5,
     borderColor: "#FDE68A",
-  },
-  btnCameraIcon: {
-    fontSize: 18,
-  },
-  btnSecondary: {
-    flex: 1,
-    backgroundColor: "#2563EB",
-    borderRadius: 12,
-    paddingVertical: 13,
-    alignItems: "center",
-  },
-  btnSecondaryText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  btnGhost: {
-    flex: 1,
-    backgroundColor: "#F1F5F9",
-    borderRadius: 12,
-    paddingVertical: 13,
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: "#E2E8F0",
-  },
-  btnGhostText: {
-    color: "#64748B",
-    fontSize: 14,
-    fontWeight: "600",
   },
 
   // ── Status Badge ─────────────────────────────────────────
@@ -664,6 +616,9 @@ const styles = StyleSheet.create({
 
   // ── Tag Badge ────────────────────────────────────────────
   tag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 20,
@@ -678,8 +633,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 48,
   },
-  emptyIcon: {
-    fontSize: 40,
+  emptyIconWrap: {
     marginBottom: 12,
   },
   emptyTitle: {
@@ -693,72 +647,5 @@ const styles = StyleSheet.create({
     color: "#94A3B8",
     textAlign: "center",
     paddingHorizontal: 32,
-  },
-
-  // ── FAB ──────────────────────────────────────────────────
-  fab: {
-    position: "absolute",
-    right: 20,
-    bottom: 90,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: "#EF4444",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#EF4444",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  fabIcon: {
-    color: "#FFFFFF",
-    fontSize: 26,
-    fontWeight: "300",
-    lineHeight: 30,
-  },
-
-  // ── Bottom Tab ───────────────────────────────────────────
-  bottomTab: {
-    flexDirection: "row",
-    backgroundColor: "#FFFFFF",
-    borderTopWidth: 1,
-    borderTopColor: "#F1F5F9",
-    paddingBottom: 8,
-    paddingTop: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  tabItem: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 4,
-    position: "relative",
-  },
-  tabIcon: {
-    fontSize: 20,
-  },
-  tabLabel: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: "#94A3B8",
-    marginTop: 3,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  tabLabelActive: {
-    color: "#2563EB",
-  },
-  tabActiveBar: {
-    position: "absolute",
-    bottom: -8,
-    width: 24,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: "#2563EB",
   },
 });
