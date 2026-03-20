@@ -11,10 +11,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import ProfileScreen from "@/screens/shared/ProfileScreen";
 
 // ─── Import worker screens ────────────────────────────────────────────────────
+import AdhocRequestScreen from "@/screens/worker/AdhocRequestScreen";
 import EmergencyLeaveScreen from "@/screens/worker/EmergencyLeaveScreen";
 import HomeScreen from "@/screens/worker/HomeScreen";
 import IssueReportScreen from "@/screens/worker/IssueReportScreen";
 import RequestEquipmentScreen from "@/screens/worker/RequestEquipmentScreen";
+import RequestSwapTaskScreen from "@/screens/worker/RequestSwapTaskScreen";
 import TaskListScreen from "@/screens/worker/TaskListScreen";
 
 // ─── Import supervisor screens ────────────────────────────────────────────────
@@ -24,8 +26,8 @@ import OTPVerificationScreen from "@/screens/auth/OtpVerificationScreen";
 import ResetPasswordScreen from "@/screens/auth/ResetPasswordScreen";
 import ResetSuccessScreen from "@/screens/auth/ResetSuccessScreen";
 import SupervisorHomeScreen from "@/screens/supervisor/SupervisorHomeScreen";
-import AdhocRequestScreen from "@/screens/worker/AdhocRequestScreen";
-import RequestSwapTaskScreen from "@/screens/worker/RequestSwapTaskScreen";
+
+import CreateEmergencyTaskScreen from "@/screens/supervisor/CreateEmergencyTaskScreen";
 // ─── Auth Route params ──────────────────────────────────────────────────────
 export type AuthStackParamList = {
   Login: undefined;
@@ -50,6 +52,7 @@ export type WorkerStackParamList = {
 // ─── Supervisor Route params ──────────────────────────────────────────────────
 export type SupervisorStackParamList = {
   SupervisorHome: undefined;
+  CreateEmergencyTask: undefined;
   Profile: undefined;
 };
 
@@ -82,6 +85,27 @@ function WorkerHomeWrapper({ navigation }: WorkerHomeProps) {
     <HomeScreen
       onNavigate={(screen) => {
         navigation.navigate(screen as keyof WorkerStackParamList);
+      }}
+    />
+  );
+}
+
+// ─── Supervisor Home wrapper — bridge onNavigate → navigation.navigate ───────
+type SupervisorHomeProps = NativeStackScreenProps<
+  SupervisorStackParamList,
+  "SupervisorHome"
+>;
+
+function SupervisorHomeWrapper({ navigation }: SupervisorHomeProps) {
+  return (
+    <SupervisorHomeScreen
+      onNavigate={(screen) => {
+        if (screen === "create-task") {
+          navigation.navigate("CreateEmergencyTask");
+        } else {
+          // Handle other navigation cases
+          console.log("Navigate to:", screen);
+        }
       }}
     />
   );
@@ -142,7 +166,11 @@ function SupervisorNavigator() {
     >
       <SupervisorStack.Screen
         name="SupervisorHome"
-        component={SupervisorHomeScreen}
+        component={SupervisorHomeWrapper}
+      />
+      <SupervisorStack.Screen
+        name="CreateEmergencyTask"
+        component={CreateEmergencyTaskScreen}
       />
       <SupervisorStack.Screen name="Profile" component={ProfileScreen} />
     </SupervisorStack.Navigator>

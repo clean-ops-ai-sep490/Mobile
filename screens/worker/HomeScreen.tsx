@@ -463,8 +463,6 @@ const styles = StyleSheet.create({
   // Quick grid
   quickGrid: {
     flexDirection: "row",
-    gap: CARD_GAP,
-    marginBottom: CARD_GAP,
   },
   quickCard: {
     backgroundColor: "#FFF",
