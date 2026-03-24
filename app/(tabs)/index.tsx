@@ -1,6 +1,12 @@
-// app/index.tsx (hoặc App.tsx tùy project)
+// App.tsx
+import { AuthProvider } from "@/contexts/AuthContext";
 import AppNavigator from "@/navigation/AppNavigator";
+import React from "react";
 
-export default function Home() {
-  return <AppNavigator />;
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppNavigator />
+    </AuthProvider>
+  );
 }
