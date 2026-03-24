@@ -38,19 +38,20 @@ export default function LoginScreen({ onNavigate }: Props) {
     email?: boolean;
     password?: boolean;
   }>({});
+  const [apiError, setApiError] = useState<string>("");
 
   const buttonScale = useRef(new Animated.Value(1)).current;
 
   const validateEmail = (value: string) => {
-    if (!value.trim()) return "Email không được để trống";
+    if (!value.trim()) return "Email is required";
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(value)) return "Email không đúng định dạng";
+    if (!emailRegex.test(value)) return "Invalid email format";
     return "";
   };
 
   const validatePassword = (value: string) => {
-    if (!value) return "Mật khẩu không được để trống";
-    if (value.length < 6) return "Mật khẩu phải có ít nhất 6 ký tự";
+    if (!value) return "Password is required";
+    if (value.length < 8) return "Password must be at least 8 characters";
     return "";
   };
 
@@ -84,17 +85,23 @@ export default function LoginScreen({ onNavigate }: Props) {
   const handleLogin = async () => {
     const emailErr = validateEmail(email);
     const passwordErr = validatePassword(password);
+    console.log("=== EMAIL ===", email);
+    console.log("=== PASSWORD ===", password);
     setTouched({ email: true, password: true });
     setErrors({ email: emailErr, password: passwordErr });
+    setApiError("");
     if (emailErr || passwordErr) return;
 
     try {
       setLoading(true);
-      await login();
+      await login(email, password);
     } catch (e: any) {
-      setErrors({
-        email: e.message ?? "Đăng nhập thất bại. Vui lòng thử lại.",
-      });
+      console.log("=== CATCH ERROR ===", e?.response?.data);
+      console.log("=== ERROR MESSAGE ===", e?.message);
+      console.log("=== ERROR CODE ===", e?.code);
+      setApiError(
+        e?.response?.data?.message || "Đăng nhập thất bại. Vui lòng thử lại.",
+      );
     } finally {
       setLoading(false);
     }
@@ -156,6 +163,7 @@ export default function LoginScreen({ onNavigate }: Props) {
                 value={email}
                 onChangeText={(v) => {
                   setEmail(v);
+                  setApiError("");
                   if (touched.email)
                     setErrors((e) => ({ ...e, email: validateEmail(v) }));
                 }}
@@ -193,6 +201,7 @@ export default function LoginScreen({ onNavigate }: Props) {
                 value={password}
                 onChangeText={(v) => {
                   setPassword(v);
+                  setApiError("");
                   if (touched.password)
                     setErrors((e) => ({ ...e, password: validatePassword(v) }));
                 }}
@@ -222,6 +231,13 @@ export default function LoginScreen({ onNavigate }: Props) {
           >
             <Text style={styles.forgotText}>Forgot Password?</Text>
           </TouchableOpacity>
+
+          {apiError ? (
+            <View style={styles.apiErrorBox}>
+              <Ionicons name="alert-circle-outline" size={16} color="#FF4D6A" />
+              <Text style={styles.apiErrorText}>{apiError}</Text>
+            </View>
+          ) : null}
 
           {/* Login Button */}
           <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
@@ -377,6 +393,24 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginLeft: 2,
     fontWeight: "500",
+  },
+
+  apiErrorBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(255,77,106,0.1)",
+    borderWidth: 1,
+    borderColor: "#FF4D6A",
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+  },
+  apiErrorText: {
+    color: "#FF4D6A",
+    fontSize: 13,
+    fontWeight: "600",
+    flex: 1,
   },
   // Login Button
   loginButton: {
