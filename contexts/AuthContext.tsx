@@ -20,6 +20,13 @@ interface AuthContextType {
   isSupervisor: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  forgotPassword: (email: string) => Promise<void>;
+  verifyOtp: (email: string, otpCode: string) => Promise<string>;
+  resetPassword: (
+    email: string,
+    token: string,
+    newPassword: string,
+  ) => Promise<void>;
 }
 
 // ─── Context ───────────────────────────────────────────────────
@@ -32,6 +39,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logout: logoutApi,
     getMe,
     loading,
+    forgotPassword: forgotPasswordApi,
+    resetPassword: resetPasswordApi,
+    verifyOtp: verifyOtpApi,
   } = useAuthHook();
 
   const [appUser, setAppUser] = useState<AuthUser | null>(null);
@@ -94,6 +104,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // FORGOT PASSWORD
+  const forgotPassword = async (email: string) => {
+    try {
+      await forgotPasswordApi(email);
+    } catch (e) {
+      throw e;
+    }
+  };
+
+  // VERIFY OTP
+  const verifyOtp = async (email: string, otpCode: string): Promise<string> => {
+    try {
+      const token = await verifyOtpApi(email, otpCode);
+      return token;
+    } catch (e) {
+      throw e;
+    }
+  };
+
+  // RESET PASSWORD
+  const resetPassword = async (
+    email: string,
+    token: string,
+    newPassword: string,
+  ) => {
+    try {
+      await resetPasswordApi(email, token, newPassword);
+    } catch (e) {
+      throw e;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -105,6 +147,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isSupervisor: appUser?.role === "Supervisor",
         login,
         logout,
+        forgotPassword,
+        verifyOtp,
+        resetPassword,
       }}
     >
       {children}

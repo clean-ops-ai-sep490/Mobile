@@ -1,37 +1,52 @@
 import AppButton from "@/components/common/AppButton";
+import { useAuth } from "@/contexts/AuthContext";
 import { AuthStackParamList } from "@/navigation/AppNavigator";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "ForgotPassword">;
 
 export default function ForgotPasswordScreen({ navigation }: Props) {
+  const { forgotPassword } = useAuth();
   const [email, setEmail] = useState("");
   const [touched, setTouched] = useState(false);
-  const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [apiError, setApiError] = useState("");
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const error =
     touched && !emailRegex.test(email) ? "Invalid email format" : "";
 
-  const handleSubmit = () => {
-    // setTouched(true);
-    // if (!emailRegex.test(email)) return;
-    // setSent(true);
-    navigation.navigate("OtpVerification");
+  const handleSubmit = async () => {
+    setTouched(true);
+    if (!emailRegex.test(email)) return;
+
+    try {
+      setLoading(true);
+      setApiError("");
+      await forgotPassword(email);
+      navigation.navigate("OtpVerification", { email });
+    } catch (e: any) {
+      setApiError(
+        e?.response?.data?.message ||
+          "Failed to send reset instructions. Please try again.",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -93,14 +108,9 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
             </View>
             {error ? <Text style={styles.errorText}>⚠ {error}</Text> : null}
 
-            {sent && (
-              <View style={styles.successHint}>
-                <Text style={styles.successHintIcon}>✓</Text>
-                <Text style={styles.successHintText}>
-                  We will send reset instructions to this email.
-                </Text>
-              </View>
-            )}
+            {apiError ? (
+              <Text style={styles.errorText}>⚠ {apiError}</Text>
+            ) : null}
 
             <AppButton
               label="Send"
@@ -111,6 +121,8 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
                 backgroundColor: "#4F6EF7",
                 shadowColor: "#4F6EF7",
               }}
+              loading={loading}
+              loadingLabel="Sending..."
             />
           </View>
 
@@ -243,16 +255,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     fontWeight: "500",
   },
-
-  successHint: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 16,
-    marginTop: 4,
-  },
-  successHintIcon: { color: "#22C55E", fontWeight: "700", fontSize: 14 },
-  successHintText: { color: "#22C55E", fontSize: 13, fontWeight: "500" },
 
   submitBtn: {
     backgroundColor: "#4F6EF7",

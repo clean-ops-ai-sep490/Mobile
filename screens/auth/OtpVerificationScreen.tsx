@@ -1,19 +1,20 @@
 import AppButton from "@/components/common/AppButton";
+import { useAuth } from "@/contexts/AuthContext";
 import { AuthStackParamList } from "@/navigation/AppNavigator";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useEffect, useRef, useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "OtpVerification">;
@@ -29,8 +30,16 @@ const OTPInput = ({
   const digits = Array.from({ length: 6 }, (_, i) => value[i] || "");
 
   const handleChange = (text: string, index: number) => {
+    if (text.length > 1) {
+      const digits = text.replace(/[^0-9]/g, "").slice(0, 6);
+      onChange(digits);
+      const lastIndex = Math.min(digits.length - 1, 5);
+      inputs.current[lastIndex]?.focus();
+      return;
+    }
+
     const clean = text.replace(/[^0-9]/g, "").slice(-1);
-    const arr = digits.slice();
+    const arr = Array.from({ length: 6 }, (_, i) => value[i] || "");
     arr[index] = clean;
     onChange(arr.join(""));
     if (clean && index < 5) inputs.current[index + 1]?.focus();
@@ -53,9 +62,10 @@ const OTPInput = ({
           onChangeText={(t) => handleChange(t, i)}
           onKeyPress={(e) => handleKeyPress(e, i)}
           keyboardType="number-pad"
-          maxLength={1}
+          maxLength={i === 0 ? 6 : 1}
           textAlign="center"
           selectionColor="#4F6EF7"
+          autoComplete={i === 0 ? "one-time-code" : "off"}
         />
       ))}
     </View>
@@ -63,11 +73,16 @@ const OTPInput = ({
 };
 
 export default function OTPVerificationScreen({ route, navigation }: Props) {
-  const email = route.params?.email ?? "you@company.com";
+  const email = route.params?.email;
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
   const [countdown, setCountdown] = useState(59);
   const [canResend, setCanResend] = useState(false);
+  const [verifyLoading, setVerifyLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+
+  const { forgotPassword } = useAuth();
+  const { verifyOtp } = useAuth();
 
   useEffect(() => {
     if (countdown <= 0) {
@@ -78,21 +93,36 @@ export default function OTPVerificationScreen({ route, navigation }: Props) {
     return () => clearTimeout(t);
   }, [countdown]);
 
-  const handleResend = () => {
-    setCountdown(59);
-    setCanResend(false);
-    setOtp("");
-    setError("");
+  const handleResend = async () => {
+    try {
+      setResendLoading(true);
+      await forgotPassword(email);
+      setCountdown(59);
+      setCanResend(false);
+      setOtp("");
+      setError("");
+    } catch (e) {
+      setError("Send email failed. Please try again.");
+    } finally {
+      setResendLoading(false);
+    }
   };
 
-  const handleVerify = () => {
-    // if (otp.length < 6) {
-    //   setError("Please enter all 6 digits");
-    //   return;
-    // }
-    // setError("");
-    navigation.navigate("ResetPassword");
-    // TODO: navigate to reset password screen
+  const handleVerify = async () => {
+    if (otp.length < 6) {
+      setError("Please enter all 6 digits");
+      return;
+    }
+    try {
+      setVerifyLoading(true);
+      setError("");
+      const token = await verifyOtp(email, otp);
+      navigation.navigate("ResetPassword", { email, token });
+    } catch (e: any) {
+      setError(e?.response?.data?.message || "OTP is incorrect or expired");
+    } finally {
+      setVerifyLoading(false);
+    }
   };
 
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -151,6 +181,8 @@ export default function OTPVerificationScreen({ route, navigation }: Props) {
             <AppButton
               label="Verify Code"
               onPress={handleVerify}
+              loading={verifyLoading}
+              loadingLabel="Verifying..."
               disabled={otp.length < 6}
               iconRight="checkmark"
               style={{

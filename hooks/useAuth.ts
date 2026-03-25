@@ -126,6 +126,23 @@ const useAuth = () => {
     }
   };
 
+  const verifyOtp = async (email: string, otpCode: string): Promise<string> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await axiosInstance.post("/Auths/verify-otp", {
+        email,
+        otpCode,
+      });
+      return res.data.token;
+    } catch (err) {
+      setError(err?.response?.data?.message || "OTP is incorrect or expired");
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     user,
     loading,
@@ -137,6 +154,7 @@ const useAuth = () => {
     logout,
     getMe,
     refreshToken,
+    verifyOtp,
   };
 };
 

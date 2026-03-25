@@ -1,19 +1,20 @@
 import AppButton from "@/components/common/AppButton";
+import { useAuth } from "@/contexts/AuthContext";
 import { AuthStackParamList } from "@/navigation/AppNavigator";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "ResetPassword">;
@@ -25,12 +26,17 @@ const Requirement = ({ met, label }: { met: boolean; label: string }) => (
   </View>
 );
 
-export default function ResetPasswordScreen({ navigation }: Props) {
+export default function ResetPasswordScreen({ route, navigation }: Props) {
+  const { resetPassword } = useAuth();
+  const { email, token } = route.params;
+
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [showCf, setShowCf] = useState(false);
   const [touched, setTouched] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [apiError, setApiError] = useState("");
 
   const hasLength = password.length >= 8;
   const hasCase = /[A-Z]/.test(password) && /[a-z]/.test(password);
@@ -38,10 +44,23 @@ export default function ResetPasswordScreen({ navigation }: Props) {
   const allMet = hasLength && hasCase && hasNumber;
   const matchError = touched && !!confirm && password !== confirm;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setTouched(true);
-    // if (!allMet || password !== confirm) return;
-    navigation.navigate("ResetSuccess");
+    if (!allMet || password !== confirm) return;
+
+    try {
+      setLoading(true);
+      setApiError("");
+      await resetPassword(email, token, password);
+      navigation.navigate("ResetSuccess");
+    } catch (e: any) {
+      setApiError(
+        e?.response?.data?.message ||
+          "Failed to reset password. Please try again.",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -131,9 +150,15 @@ export default function ResetPasswordScreen({ navigation }: Props) {
               <Requirement met={hasNumber} label="At least one number" />
             </View>
 
+            {apiError ? (
+              <Text style={styles.errorText}>⚠ {apiError}</Text>
+            ) : null}
+
             <AppButton
               label="Update Password"
               onPress={handleSubmit}
+              loading={loading}
+              loadingLabel="Updating..."
               disabled={!allMet || !confirm}
               iconRight="checkmark-circle-outline"
               style={{
@@ -148,7 +173,6 @@ export default function ResetPasswordScreen({ navigation }: Props) {
     </SafeAreaView>
   );
 }
-
 const BgCircles = () => (
   <>
     <View style={styles.bgCircle1} />
@@ -156,14 +180,19 @@ const BgCircles = () => (
     <View style={styles.bgCircle3} />
   </>
 );
-
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#0A0F1E" },
   inner: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingVertical: 48,
+    paddingTop: 20,
+    paddingBottom: 40,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
     justifyContent: "center",
+    marginBottom: 24,
   },
   bgCircle1: {
     position: "absolute",
@@ -195,94 +224,67 @@ const styles = StyleSheet.create({
     bottom: 200,
     right: 20,
   },
-  backBtn: { marginBottom: 32 },
   iconWrap: {
     width: 72,
     height: 72,
-    borderRadius: 36,
-    backgroundColor: "#111827",
-    borderWidth: 1.5,
-    borderColor: "#1E2A3A",
+    borderRadius: 24,
+    backgroundColor: "rgba(79,110,247,0.15)",
     justifyContent: "center",
     alignItems: "center",
-    alignSelf: "center",
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: "#FFFFFF",
-    textAlign: "center",
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#4A6180",
-    textAlign: "center",
-    lineHeight: 22,
-    marginBottom: 28,
-  },
-  card: {
-    backgroundColor: "#111827",
-    borderRadius: 24,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: "#1E2A3A",
     marginBottom: 24,
   },
-  label: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#6B7E93",
-    letterSpacing: 1,
-    textTransform: "uppercase",
-    marginBottom: 8,
+  title: { fontSize: 26, fontWeight: "800", color: "#FFFFFF", marginBottom: 8 },
+  subtitle: {
+    fontSize: 14,
+    color: "#8899AA",
+    lineHeight: 22,
+    marginBottom: 32,
   },
+  card: {
+    backgroundColor: "#131929",
+    borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: "#1E2D45",
+  },
+  label: { fontSize: 13, fontWeight: "600", color: "#8899AA", marginBottom: 8 },
   inputWrap: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#0D1520",
+    backgroundColor: "#0D1526",
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: "#1E2A3A",
+    borderColor: "#1E2D45",
     paddingHorizontal: 14,
     height: 52,
   },
   inputError: { borderColor: "#FF4D6A" },
   input: { flex: 1, color: "#FFFFFF", fontSize: 15 },
-  errorText: {
-    color: "#FF4D6A",
-    fontSize: 12,
-    marginTop: 6,
-    marginBottom: 4,
-    fontWeight: "500",
-  },
+  errorText: { fontSize: 12, color: "#FF4D6A", marginTop: 6, marginBottom: 8 },
   reqBox: {
-    backgroundColor: "#0D1520",
+    backgroundColor: "#0D1526",
     borderRadius: 12,
-    padding: 16,
-    marginTop: 20,
+    padding: 14,
+    marginTop: 16,
     marginBottom: 20,
-    gap: 10,
+    borderWidth: 1,
+    borderColor: "#1E2D45",
   },
   reqTitle: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "700",
-    color: "#4A6180",
-    letterSpacing: 1,
-    textTransform: "uppercase",
-    marginBottom: 6,
+    color: "#8899AA",
+    marginBottom: 10,
   },
-  reqRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  reqRow: { flexDirection: "row", alignItems: "center", marginBottom: 6 },
   reqDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#1E2A3A",
-    borderWidth: 1.5,
-    borderColor: "#4A6180",
+    backgroundColor: "#1E2D45",
+    marginRight: 10,
   },
-  reqDotMet: { backgroundColor: "#22C55E", borderColor: "#22C55E" },
-  reqText: { fontSize: 13, color: "#4A6180" },
-  reqTextMet: { color: "#22C55E", fontWeight: "600" },
+  reqDotMet: { backgroundColor: "#22C55E" },
+  reqText: { fontSize: 13, color: "#8899AA" },
+  reqTextMet: { color: "#22C55E" },
 });

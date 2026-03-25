@@ -32,8 +32,8 @@ import CreateEmergencyTaskScreen from "@/screens/supervisor/CreateEmergencyTaskS
 export type AuthStackParamList = {
   Login: undefined;
   ForgotPassword: undefined;
-  OtpVerification: undefined;
-  ResetPassword: undefined;
+  OtpVerification: { email: string };
+  ResetPassword: { email: string; token: string };
   ResetSuccess: undefined;
 };
 
