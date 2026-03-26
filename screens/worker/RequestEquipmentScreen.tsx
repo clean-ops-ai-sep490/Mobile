@@ -1,10 +1,12 @@
 import AppButton from "@/components/common/AppButton";
 import BottomTabBar, { TabKey } from "@/components/common/BottomTabBar";
 import Header from "@/components/common/Header";
+import useEquipment, { EquipmentItem } from "@/hooks/useEquipment";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   KeyboardAvoidingView,
@@ -19,58 +21,43 @@ import {
   View,
 } from "react-native";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 interface Props {
+  taskAssignmentId?: string;
   taskName?: string;
   onBack?: () => void;
-  onSubmit?: (data: RequestData) => void;
 }
 
-interface RequestData {
-  equipment: string;
-  quantity: number;
-  priority: "normal" | "urgent";
-  reason: string;
-}
-
-// ─── Equipment list ───────────────────────────────────────────────────────────
-const EQUIPMENT_LIST = [
-  "Floor Scrubber",
-  "Vacuum Cleaner",
-  "Mop & Bucket Set",
-  "Pressure Washer",
-  "Steam Cleaner",
-  "Window Squeegee Kit",
-  "Safety Cones",
-  "Cleaning Cart",
-  "HEPA Air Purifier",
-  "Disinfectant Sprayer",
-];
-
-// ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function RequestEquipmentScreen({
+  taskAssignmentId,
   taskName = "Deep Clean - Room 302",
   onBack,
-  onSubmit,
 }: Props) {
   const navigation = useNavigation();
+  const {
+    equipmentList,
+    loading: equipmentLoading,
+    submitting,
+    fetchEquipments,
+    createEquipmentRequest,
+  } = useEquipment();
 
   const handleNavigate = (screen: TabKey) => {
     navigation.navigate(screen as never);
   };
 
+  // ── Form state ──
   const [equipmentSearch, setEquipmentSearch] = useState("");
-  const [selectedEquipment, setSelectedEquipment] = useState("");
+  const [selectedEquipment, setSelectedEquipment] =
+    useState<EquipmentItem | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [quantity, setQuantity] = useState(1);
-  const [priority, setPriority] = useState<"normal" | "urgent">("normal");
   const [reason, setReason] = useState("");
-  const [submitting, setSubmitting] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
   useEffect(() => {
+    fetchEquipments();
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -90,13 +77,12 @@ export default function RequestEquipmentScreen({
     else navigation.goBack();
   };
 
-  const filteredEquipment = EQUIPMENT_LIST.filter((e) =>
-    e.toLowerCase().includes(equipmentSearch.toLowerCase()),
+  const filteredEquipment = equipmentList.filter((e) =>
+    e.name.toLowerCase().includes(equipmentSearch.toLowerCase()),
   );
 
-  const handleSelectEquipment = (item: string) => {
+  const handleSelectEquipment = (item: EquipmentItem) => {
     setSelectedEquipment(item);
-    setEquipmentSearch(item);
     setDropdownOpen(false);
   };
 
@@ -109,20 +95,32 @@ export default function RequestEquipmentScreen({
       Alert.alert("Missing Info", "Please provide a reason for the request.");
       return;
     }
-    setSubmitting(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    setSubmitting(false);
-    onSubmit?.({ equipment: selectedEquipment, quantity, priority, reason });
-    Alert.alert("Request Sent!", "Your equipment request has been submitted.", [
-      { text: "OK", onPress: handleBack },
-    ]);
+
+    try {
+      await createEquipmentRequest({
+        taskAssignmentId:
+          taskAssignmentId ?? "00000000-0000-0000-0000-000000000000",
+        equipmentId: selectedEquipment.id,
+        quantity,
+        reason,
+      });
+      Alert.alert(
+        "Request Sent!",
+        "Your equipment request has been submitted.",
+        [{ text: "OK", onPress: handleBack }],
+      );
+    } catch (e: any) {
+      Alert.alert(
+        "Error",
+        e?.response?.data?.message || "Failed to submit request.",
+      );
+    }
   };
 
   return (
     <View style={styles.root}>
       <StatusBar barStyle="dark-content" backgroundColor="#F5F6FA" />
       <SafeAreaView style={styles.safe}>
-        {/* ── Header ── */}
         <Header
           title="Request Equipment"
           onBack={handleBack}
@@ -159,82 +157,103 @@ export default function RequestEquipmentScreen({
                 <Text style={styles.taskCardText}>{taskName}</Text>
               </View>
 
-              {/* ── Select Equipment ── */}
-              <Text style={styles.sectionTitle}>Select Equipment</Text>
-              <View style={{ zIndex: 10 }}>
-                <TouchableOpacity
-                  style={[styles.dropdown, dropdownOpen && styles.dropdownOpen]}
-                  onPress={() => setDropdownOpen((v) => !v)}
-                  activeOpacity={0.85}
-                >
-                  <TextInput
-                    style={styles.dropdownInput}
-                    placeholder="Search equipment..."
-                    placeholderTextColor="#CBD5E1"
-                    value={equipmentSearch}
-                    onChangeText={(t) => {
-                      setEquipmentSearch(t);
-                      setSelectedEquipment("");
-                      setDropdownOpen(true);
-                    }}
-                    onFocus={() => setDropdownOpen(true)}
-                  />
-                  <Ionicons
-                    name={dropdownOpen ? "chevron-up" : "chevron-down"}
-                    size={16}
-                    color="#94A3B8"
-                  />
-                </TouchableOpacity>
+              {/* ── Select Equipment + Quantity (inline) ── */}
+              <View style={styles.fieldRow}>
+                <View style={styles.leftCol}>
+                  <Text style={styles.sectionTitle}>Select Equipment</Text>
+                  {equipmentLoading ? (
+                    <ActivityIndicator
+                      color="#2563EB"
+                      style={{ marginBottom: 24 }}
+                    />
+                  ) : (
+                    <View style={{ zIndex: 10 }}>
+                      <TouchableOpacity
+                        style={[
+                          styles.dropdown,
+                          dropdownOpen && styles.dropdownOpen,
+                        ]}
+                        onPress={() => setDropdownOpen((v) => !v)}
+                        activeOpacity={0.85}
+                      >
+                        <TextInput
+                          style={styles.dropdownInput}
+                          placeholder="Search equipment..."
+                          placeholderTextColor="#CBD5E1"
+                          value={
+                            equipmentSearch
+                              ? equipmentSearch
+                              : selectedEquipment?.name || ""
+                          }
+                          onChangeText={(t) => {
+                            setEquipmentSearch(t);
+                            setSelectedEquipment(null);
+                            setDropdownOpen(true);
+                          }}
+                          onFocus={() => setDropdownOpen(true)}
+                        />
+                        <Ionicons
+                          name={dropdownOpen ? "chevron-up" : "chevron-down"}
+                          size={16}
+                          color="#94A3B8"
+                        />
+                      </TouchableOpacity>
 
-                {dropdownOpen && (
-                  <View style={styles.dropdownList}>
-                    {filteredEquipment.length > 0 ? (
-                      filteredEquipment.map((item) => (
-                        <TouchableOpacity
-                          key={item}
-                          style={[
-                            styles.dropdownItem,
-                            selectedEquipment === item &&
-                              styles.dropdownItemActive,
-                          ]}
-                          onPress={() => handleSelectEquipment(item)}
-                          activeOpacity={0.75}
-                        >
-                          <Text
-                            style={[
-                              styles.dropdownItemText,
-                              selectedEquipment === item &&
-                                styles.dropdownItemTextActive,
-                            ]}
-                          >
-                            {item}
-                          </Text>
-                          {selectedEquipment === item && (
-                            <Ionicons
-                              name="checkmark"
-                              size={14}
-                              color="#2563EB"
-                            />
+                      {dropdownOpen && (
+                        <View style={styles.dropdownList}>
+                          {filteredEquipment.length > 0 ? (
+                            filteredEquipment.map((item) => (
+                              <TouchableOpacity
+                                key={item.id}
+                                style={[
+                                  styles.dropdownItem,
+                                  selectedEquipment?.id === item.id &&
+                                    styles.dropdownItemActive,
+                                ]}
+                                onPress={() => handleSelectEquipment(item)}
+                                activeOpacity={0.75}
+                              >
+                                <View>
+                                  <Text
+                                    style={[
+                                      styles.dropdownItemText,
+                                      selectedEquipment?.id === item.id &&
+                                        styles.dropdownItemTextActive,
+                                    ]}
+                                  >
+                                    {item.name}
+                                  </Text>
+                                  {item.description ? (
+                                    <Text style={styles.dropdownItemDesc}>
+                                      {item.description}
+                                    </Text>
+                                  ) : null}
+                                </View>
+                                {selectedEquipment?.id === item.id && (
+                                  <Ionicons
+                                    name="checkmark"
+                                    size={14}
+                                    color="#2563EB"
+                                  />
+                                )}
+                              </TouchableOpacity>
+                            ))
+                          ) : (
+                            <View style={styles.dropdownEmpty}>
+                              <Text style={styles.dropdownEmptyText}>
+                                No equipment found
+                              </Text>
+                            </View>
                           )}
-                        </TouchableOpacity>
-                      ))
-                    ) : (
-                      <View style={styles.dropdownEmpty}>
-                        <Text style={styles.dropdownEmptyText}>
-                          No equipment found
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                )}
-              </View>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </View>
 
-              {/* ── Quantity & Priority ── */}
-              <View style={styles.row}>
-                {/* Quantity */}
-                <View style={styles.halfBlock}>
+                <View style={styles.rightCol}>
                   <Text style={styles.sectionTitle}>Quantity</Text>
-                  <View style={styles.quantityControl}>
+                  <View style={[styles.quantityControl, { marginTop: 0 }]}>
                     <TouchableOpacity
                       style={[
                         styles.qtyBtn,
@@ -255,55 +274,12 @@ export default function RequestEquipmentScreen({
                     </TouchableOpacity>
                   </View>
                 </View>
-
-                {/* Priority */}
-                <View style={styles.halfBlock}>
-                  <Text style={styles.sectionTitle}>Priority</Text>
-                  <View style={styles.priorityRow}>
-                    <TouchableOpacity
-                      style={[
-                        styles.priorityChip,
-                        priority === "normal" &&
-                          styles.priorityChipActiveNormal,
-                      ]}
-                      onPress={() => setPriority("normal")}
-                      activeOpacity={0.75}
-                    >
-                      <Text
-                        style={[
-                          styles.priorityLabel,
-                          priority === "normal" &&
-                            styles.priorityLabelActiveNormal,
-                        ]}
-                      >
-                        Normal
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.priorityChip,
-                        priority === "urgent" &&
-                          styles.priorityChipActiveUrgent,
-                      ]}
-                      onPress={() => setPriority("urgent")}
-                      activeOpacity={0.75}
-                    >
-                      <Text
-                        style={[
-                          styles.priorityLabel,
-                          priority === "urgent" &&
-                            styles.priorityLabelActiveUrgent,
-                        ]}
-                      >
-                        Urgent
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
               </View>
 
               {/* ── Reason ── */}
-              <Text style={styles.sectionTitle}>Reason for Request</Text>
+              <Text style={[styles.sectionTitle, { marginTop: 20 }]}>
+                Reason for Request
+              </Text>
               <TextInput
                 style={styles.textInput}
                 placeholder="Explain why you need this..."
@@ -329,6 +305,8 @@ export default function RequestEquipmentScreen({
             style={{
               width: "90%",
               alignSelf: "center",
+              position: "absolute",
+              bottom: 20,
             }}
           />
         </KeyboardAvoidingView>
@@ -338,14 +316,12 @@ export default function RequestEquipmentScreen({
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#F5F6FA" },
   safe: { flex: 1 },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 24 },
 
-  // Field label
   fieldLabel: {
     fontSize: 10,
     fontWeight: "700",
@@ -354,8 +330,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 20,
   },
-
-  // Related task
   taskCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -378,7 +352,6 @@ const styles = StyleSheet.create({
   },
   taskCardText: { fontSize: 14, fontWeight: "600", color: "#1E40AF" },
 
-  // Section title
   sectionTitle: {
     fontSize: 15,
     fontWeight: "700",
@@ -386,7 +359,19 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
-  // Dropdown
+  fieldRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  leftCol: {
+    flex: 1,
+    marginRight: 12,
+  },
+  rightCol: {
+    width: 120,
+  },
+
   dropdown: {
     flexDirection: "row",
     alignItems: "center",
@@ -441,14 +426,10 @@ const styles = StyleSheet.create({
   dropdownItemActive: { backgroundColor: "#EFF6FF" },
   dropdownItemText: { fontSize: 14, color: "#475569" },
   dropdownItemTextActive: { color: "#2563EB", fontWeight: "600" },
+  dropdownItemDesc: { fontSize: 12, color: "#94A3B8", marginTop: 2 },
   dropdownEmpty: { padding: 16, alignItems: "center" },
   dropdownEmptyText: { fontSize: 13, color: "#94A3B8" },
 
-  // Row layout
-  row: { flexDirection: "row", gap: 16, marginBottom: 8 },
-  halfBlock: { flex: 1 },
-
-  // Quantity
   quantityControl: {
     flexDirection: "row",
     alignItems: "center",
@@ -479,30 +460,6 @@ const styles = StyleSheet.create({
     color: "#1E293B",
   },
 
-  // Priority
-  priorityRow: { flexDirection: "row", gap: 8 },
-  priorityChip: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderWidth: 1.5,
-    borderColor: "#F1F5F9",
-  },
-  priorityChipActiveNormal: {
-    backgroundColor: "#2563EB",
-    borderColor: "#2563EB",
-  },
-  priorityChipActiveUrgent: {
-    backgroundColor: "#EF4444",
-    borderColor: "#EF4444",
-  },
-  priorityLabel: { fontSize: 13, fontWeight: "700", color: "#94A3B8" },
-  priorityLabelActiveNormal: { color: "#FFF" },
-  priorityLabelActiveUrgent: { color: "#FFF" },
-
-  // Text input
   textInput: {
     backgroundColor: "#FFF",
     borderRadius: 14,
@@ -518,19 +475,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 4,
     elevation: 1,
-  },
-
-  // Footer
-  footer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 20,
-    paddingBottom: Platform.OS === "ios" ? 36 : 20,
-    paddingTop: 12,
-    backgroundColor: "#F5F6FA",
-    borderTopWidth: 1,
-    borderTopColor: "#F1F5F9",
   },
 });
