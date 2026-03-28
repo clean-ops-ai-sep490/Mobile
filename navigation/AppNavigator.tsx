@@ -25,9 +25,9 @@ import LoginScreen from "@/screens/auth/LoginScreen";
 import OTPVerificationScreen from "@/screens/auth/OtpVerificationScreen";
 import ResetPasswordScreen from "@/screens/auth/ResetPasswordScreen";
 import ResetSuccessScreen from "@/screens/auth/ResetSuccessScreen";
-import SupervisorHomeScreen from "@/screens/supervisor/SupervisorHomeScreen";
+import SupervisorHomeScreen from "@/screens/supervisor/home/SupervisorHomeScreen";
 
-import CreateEmergencyTaskScreen from "@/screens/supervisor/CreateEmergencyTaskScreen";
+import CreateEmergencyTaskScreen from "@/screens/supervisor/adhoc-task/CreateEmergencyTaskScreen";
 // ─── Auth Route params ──────────────────────────────────────────────────────
 export type AuthStackParamList = {
   Login: undefined;
@@ -71,7 +71,7 @@ function LoginWrapper({ navigation }: LoginProps) {
   return (
     <LoginScreen
       onNavigate={(screen) => {
-        navigation.navigate(screen as keyof AuthStackParamList);
+        navigation.navigate(screen as any);
       }}
     />
   );
@@ -84,7 +84,7 @@ function WorkerHomeWrapper({ navigation }: WorkerHomeProps) {
   return (
     <HomeScreen
       onNavigate={(screen) => {
-        navigation.navigate(screen as keyof WorkerStackParamList);
+        navigation.navigate(screen as any);
       }}
     />
   );
