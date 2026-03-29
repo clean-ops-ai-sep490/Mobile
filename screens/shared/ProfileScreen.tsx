@@ -2,8 +2,10 @@ import AppButton from "@/components/common/AppButton";
 import { TabKey } from "@/components/common/BottomTabBar";
 import Header from "@/components/common/Header";
 import { useAuth } from "@/contexts/AuthContext";
+import { RootStackParamList } from "@/navigation/AppNavigator";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import React, { useState } from "react";
 import {
   Alert,
@@ -62,10 +64,11 @@ export default function ProfileScreen() {
   const [shareLocation, setShareLocation] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const navigation = useNavigation();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const handleNavigate = (screen: TabKey) => {
-    navigation.navigate(screen as never);
+    navigation.navigate(screen as any);
   };
 
   const isSupervisor = user?.role === "Supervisor";
@@ -81,9 +84,19 @@ export default function ProfileScreen() {
         text: "Log Out",
         style: "destructive",
         onPress: async () => {
-          setSubmitting(true);
-          await logout();
-          setSubmitting(false);
+          try {
+            setSubmitting(true);
+            await logout();
+            // AppNavigator sẽ tự động chuyển về AuthNavigator khi isAuthenticated = false
+          } catch (error) {
+            console.error("Logout error:", error);
+            Alert.alert(
+              "Error",
+              "Something went wrong while logging out. Please try again.",
+            );
+          } finally {
+            setSubmitting(false);
+          }
         },
       },
     ]);
