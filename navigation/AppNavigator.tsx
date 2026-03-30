@@ -28,6 +28,8 @@ import ResetSuccessScreen from "@/screens/auth/ResetSuccessScreen";
 import SupervisorHomeScreen from "@/screens/supervisor/home/SupervisorHomeScreen";
 
 import CreateEmergencyTaskScreen from "@/screens/supervisor/adhoc-task/CreateEmergencyTaskScreen";
+import SwapRequestDetailScreen from "@/screens/supervisor/swap-task/SwapRequestDetailScreen";
+import SwapRequestListScreen from "@/screens/supervisor/swap-task/SwapRequestListScreen";
 // ─── Auth Route params ──────────────────────────────────────────────────────
 export type AuthStackParamList = {
   Login: undefined;
@@ -53,6 +55,8 @@ export type WorkerStackParamList = {
 export type SupervisorStackParamList = {
   SupervisorHome: undefined;
   CreateEmergencyTask: undefined;
+  SwapRequestList: undefined;
+  SwapRequestDetail: { requestId: string };
   Profile: undefined;
 };
 
@@ -102,6 +106,8 @@ function SupervisorHomeWrapper({ navigation }: SupervisorHomeProps) {
       onNavigate={(screen) => {
         if (screen === "create-task") {
           navigation.navigate("CreateEmergencyTask");
+        } else if (screen === "SwapRequestList") {
+          navigation.navigate("SwapRequestList");
         } else {
           // Handle other navigation cases
           console.log("Navigate to:", screen);
@@ -172,6 +178,14 @@ function SupervisorNavigator() {
         name="CreateEmergencyTask"
         component={CreateEmergencyTaskScreen}
       />
+      <SupervisorStack.Screen
+        name="SwapRequestList"
+        component={SwapRequestListScreen}
+      />
+      <SupervisorStack.Screen
+        name="SwapRequestDetail"
+        component={SwapRequestDetailScreen}
+      />
       <SupervisorStack.Screen name="Profile" component={ProfileScreen} />
     </SupervisorStack.Navigator>
   );
@@ -193,6 +207,6 @@ export default function AppNavigator() {
     return <SupervisorNavigator />;
   }
 
-  // Fallback: hiển thị worker navigator nếu role không xác định
-  return <WorkerNavigator />;
+  // Fallback: không bao giờ đến đây vì đã check role trong login
+  return <AuthNavigator />;
 }
