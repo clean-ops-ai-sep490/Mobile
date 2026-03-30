@@ -1,19 +1,31 @@
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 interface Props {
   icon: string;
   label: string;
+  badge?: number;
   onPress?: () => void;
 }
 
-export default function QuickActionButton({ icon, label, onPress }: Props) {
+export default function QuickActionButton({
+  icon,
+  label,
+  badge,
+  onPress,
+}: Props) {
   return (
     <TouchableOpacity
       style={styles.button}
       onPress={onPress}
       activeOpacity={0.75}
+      testID={`quick-action-${label.toLowerCase().replace(/\s+/g, "-")}`}
     >
+      {badge !== undefined && badge > 0 && (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{badge > 99 ? "99+" : badge}</Text>
+        </View>
+      )}
       <Text style={styles.icon}>{icon}</Text>
       <Text style={styles.label}>{label}</Text>
     </TouchableOpacity>
@@ -33,6 +45,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+    position: "relative",
   },
   icon: {
     fontSize: 28,
@@ -43,5 +56,23 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#1E293B",
     textAlign: "center",
+  },
+  badge: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "#EF4444",
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 6,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1,
+  },
+  badgeText: {
+    color: "#FFF",
+    fontSize: 11,
+    fontWeight: "700",
   },
 });

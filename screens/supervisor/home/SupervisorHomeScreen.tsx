@@ -4,6 +4,7 @@ import KPICard from "@/components/cards/kpi-card";
 import QuickActionButton from "@/components/cards/quick-action-button";
 import Header from "@/components/header";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTaskSwap } from "@/hooks/useTaskSwap";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -27,7 +28,9 @@ const CARD_GAP = 12;
 
 export default function SupervisorHomeScreen({ onNavigate }: Props) {
   const { logout } = useAuth();
+  const { getList } = useTaskSwap();
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [pendingSwapCount, setPendingSwapCount] = useState(0);
   const headerFade = useRef(new Animated.Value(0)).current;
   const headerSlide = useRef(new Animated.Value(-16)).current;
 
@@ -45,6 +48,18 @@ export default function SupervisorHomeScreen({ onNavigate }: Props) {
       }),
     ]).start();
   }, []);
+
+  useEffect(() => {
+    const fetchPendingCount = async () => {
+      try {
+        const result = await getList({ status: "PendingManagerApproval" });
+        setPendingSwapCount(result.totalElements);
+      } catch (error) {
+        console.error("Failed to fetch pending swap count:", error);
+      }
+    };
+    fetchPendingCount();
+  }, [getList]);
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
@@ -157,6 +172,14 @@ export default function SupervisorHomeScreen({ onNavigate }: Props) {
                 label="View Workers"
                 onPress={() => handleTabPress("workers")}
               />
+              <QuickActionButton
+                icon="🔄"
+                label="Swap Requests"
+                badge={pendingSwapCount}
+                onPress={() => handleTabPress("SwapRequestList")}
+              />
+            </View>
+            <View style={styles.quickGrid}>
               <QuickActionButton
                 icon="🚨"
                 label="Issues Hub"
