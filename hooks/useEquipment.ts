@@ -2,6 +2,30 @@ import axiosInstance from "@/config/axiosInstance";
 import { useAuth } from "@/contexts/AuthContext";
 import { useState } from "react";
 
+// pagination types (local)
+export interface PaginationRequest {
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedResult<T> {
+  pageNumber: number;
+  pageSize: number;
+  totalElements: number;
+  content: T[];
+}
+
+export interface EquipmentRequestItem {
+  id: string;
+  taskAssignmentId: string;
+  workerId: string;
+  equipmentId: string;
+  quantity: number;
+  reason?: string;
+  status?: string;
+  createdAt?: string;
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface EquipmentItem {
   id: string;
@@ -66,6 +90,26 @@ const useEquipment = () => {
     }
   };
 
+  // GET equipment requests by worker (paginated)
+  const getByWorker = async (workerId: string, params?: PaginationRequest) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await axiosInstance.get<
+        PaginatedResult<EquipmentRequestItem>
+      >(`/EquipmentRequests/worker/${workerId}`, { params });
+
+      return res.data;
+    } catch (e: any) {
+      setError(
+        e?.response?.data?.message || "Failed to fetch equipment requests",
+      );
+      throw e;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     equipmentList,
     loading,
@@ -73,6 +117,7 @@ const useEquipment = () => {
     error,
     fetchEquipments,
     createEquipmentRequest,
+    getByWorker,
   };
 };
 

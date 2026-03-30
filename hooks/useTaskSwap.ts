@@ -1,4 +1,4 @@
-import axiosInstance from "@/lib/axios";
+import axiosInstance from "@/config/axiosInstance";
 import { useCallback, useState } from "react";
 
 /* ================= TYPES ================= */
@@ -33,6 +33,9 @@ export interface SwapRequest {
   createdAt: string;
   requesterId: string;
   targetWorkerId: string;
+  requesterName: string;
+  targetWorkerName?: string;
+  reviewerName?: string;
 }
 
 export interface TaskSwapRequestListItem {
@@ -55,6 +58,7 @@ export const useTaskSwap = () => {
     async (
       params?: {
         status?: SwapRequestStatus;
+        requesterId?: string;
       },
       pagination?: PaginationRequest,
     ) => {
@@ -63,12 +67,13 @@ export const useTaskSwap = () => {
 
         const res = await axiosInstance.get<
           PaginatedResult<TaskSwapRequestListItem>
-        >("/taskSwapRequests", {
+        >("/TaskSwapRequests", {
           params: {
             ...params,
             ...pagination,
           },
         });
+        console.log("API response:", res.data);
 
         return res.data;
       } catch (err: any) {
@@ -87,7 +92,7 @@ export const useTaskSwap = () => {
       setLoading(true);
 
       const res = await axiosInstance.get<SwapRequest>(
-        `/taskSwapRequests/${id}`,
+        `/TaskSwapRequests/${id}`,
       );
 
       return res.data;
@@ -112,7 +117,7 @@ export const useTaskSwap = () => {
         setLoading(true);
 
         const res = await axiosInstance.post<SwapRequest>(
-          "/taskSwapRequests",
+          "/TaskSwapRequests",
           data,
         );
 
@@ -137,7 +142,7 @@ export const useTaskSwap = () => {
       try {
         setLoading(true);
 
-        await axiosInstance.put("/taskSwapRequests/respond", data);
+        await axiosInstance.put("/TaskSwapRequests/respond", data);
 
         return true;
       } catch (err: any) {
@@ -160,7 +165,7 @@ export const useTaskSwap = () => {
       try {
         setLoading(true);
 
-        await axiosInstance.put("/taskSwapRequests/review", data);
+        await axiosInstance.put("/TaskSwapRequests/review", data);
 
         return true;
       } catch (err: any) {
@@ -178,7 +183,7 @@ export const useTaskSwap = () => {
     try {
       setLoading(true);
 
-      await axiosInstance.delete(`/taskSwapRequests/${id}/cancel`, {
+      await axiosInstance.delete(`/TaskSwapRequests/${id}/cancel`, {
         data: { requesterId },
       });
 
@@ -191,6 +196,39 @@ export const useTaskSwap = () => {
     }
   }, []);
 
+  const getSwapCandidates = useCallback(
+    async (
+      taskAssignmentId: string,
+      params?: {
+        date?: string;
+        preferredStartTime?: string;
+      },
+      pagination?: PaginationRequest,
+    ) => {
+      try {
+        setLoading(true);
+
+        const res = await axiosInstance.get<PaginatedResult<any>>(
+          `/TaskSwapRequests/${taskAssignmentId}/swap-candidates`,
+          {
+            params: {
+              ...params,
+              ...pagination,
+            },
+          },
+        );
+
+        return res.data;
+      } catch (err: any) {
+        setError(err.message);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
+
   return {
     loading,
     error,
@@ -202,5 +240,6 @@ export const useTaskSwap = () => {
     respond,
     review,
     cancel,
+    getSwapCandidates,
   };
 };

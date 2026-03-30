@@ -1,6 +1,7 @@
 import AppButton from "@/components/common/AppButton";
 import BottomTabBar, { TabKey } from "@/components/common/BottomTabBar";
 import Header from "@/components/common/Header";
+import { useEmergencyLeaveRequest } from "@/hooks/useEmergencyLeave";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { Audio } from "expo-av";
@@ -18,19 +19,15 @@ import {
 } from "react-native";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type ScreenMode = "voice";
 type RecordState = "idle" | "recording" | "recorded";
 type PlayState = "idle" | "playing" | "paused";
 
 interface Props {
+  workerId: string;
+  taskAssignmentId: string;
   location?: string;
   onClose?: () => void;
-  onSubmit?: (data: {
-    type: "voice";
-    uri?: string;
-    content: string;
-    location: string;
-  }) => void;
+  onSubmitSuccess?: (id: string) => void;
 }
 
 // ─── Waveform Bars ────────────────────────────────────────────────────────────
@@ -218,11 +215,28 @@ const ProgressBar = ({ progress }: { progress: number }) => (
   </View>
 );
 
+// ─── Status Badge ─────────────────────────────────────────────────────────────
+const StatusBadge = ({ status }: { status: string }) => {
+  const colors: Record<string, { bg: string; text: string }> = {
+    Pending: { bg: "#FEF3C7", text: "#92400E" },
+    Approved: { bg: "#D1FAE5", text: "#065F46" },
+    Rejected: { bg: "#FEE2E2", text: "#991B1B" },
+  };
+  const c = colors[status] ?? { bg: "#F3F4F6", text: "#374151" };
+  return (
+    <View style={[styles.badge, { backgroundColor: c.bg }]}>
+      <Text style={[styles.badgeText, { color: c.text }]}>{status}</Text>
+    </View>
+  );
+};
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function EmergencyLeaveScreen({
+  workerId,
+  taskAssignmentId,
   location = "Central Park Plaza - North Wing",
   onClose,
-  onSubmit,
+  onSubmitSuccess,
 }: Props) {
   const [recordState, setRecordState] = useState<RecordState>("idle");
   const [playState, setPlayState] = useState<PlayState>("idle");
@@ -231,16 +245,23 @@ export default function EmergencyLeaveScreen({
   const [duration, setDuration] = useState(0);
   const [recordingUri, setRecordingUri] = useState<string | null>(null);
 
+  // Track result after successful submission
+  const [submittedStatus, setSubmittedStatus] = useState<string | null>(null);
+
   const recordingRef = useRef<Audio.Recording | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
   const recTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const playTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const navigation = useNavigation();
 
-  const handleNavigate = (screen: TabKey) => {
+  const navigation = useNavigation();
+  const {
+    loading: submitting,
+    error: submitError,
+    createRequest,
+  } = useEmergencyLeaveRequest();
+
+  const handleNavigate = (screen: TabKey) =>
     navigation.navigate(screen as never);
-  };
 
   const isRecording = recordState === "recording";
   const isRecorded = recordState === "recorded";
@@ -261,6 +282,7 @@ export default function EmergencyLeaveScreen({
     };
   }, []);
 
+  // ── Recording ──────────────────────────────────────────────────────────────
   const startRecording = async () => {
     try {
       const { granted } = await Audio.requestPermissionsAsync();
@@ -323,9 +345,11 @@ export default function EmergencyLeaveScreen({
       setRecSeconds(0);
       setRecordingUri(null);
       setDuration(0);
+      setSubmittedStatus(null);
     } catch {}
   };
 
+  // ── Playback ───────────────────────────────────────────────────────────────
   const handlePlayPause = async () => {
     if (!recordingUri) return;
     if (playState === "idle") {
@@ -338,17 +362,17 @@ export default function EmergencyLeaveScreen({
         setPlayState("playing");
         setPlaySeconds(0);
         playTimerRef.current = setInterval(async () => {
-          const status = await sound.getStatusAsync();
-          if (!status.isLoaded) return;
-          setPlaySeconds(status.positionMillis / 1000);
-          if (status.didJustFinish) {
+          const s = await sound.getStatusAsync();
+          if (!s.isLoaded) return;
+          setPlaySeconds(s.positionMillis / 1000);
+          if (s.didJustFinish) {
             clearInterval(playTimerRef.current!);
             setPlayState("idle");
             setPlaySeconds(0);
           }
         }, 200);
-        sound.setOnPlaybackStatusUpdate((status) => {
-          if (status.isLoaded && status.didJustFinish) {
+        sound.setOnPlaybackStatusUpdate((s) => {
+          if (s.isLoaded && s.didJustFinish) {
             clearInterval(playTimerRef.current!);
             setPlayState("idle");
             setPlaySeconds(0);
@@ -364,33 +388,63 @@ export default function EmergencyLeaveScreen({
     } else if (playState === "paused") {
       await soundRef.current?.playAsync();
       playTimerRef.current = setInterval(async () => {
-        const status = await soundRef.current?.getStatusAsync();
-        if (!status?.isLoaded) return;
-        setPlaySeconds(status.positionMillis / 1000);
+        const s = await soundRef.current?.getStatusAsync();
+        if (!s?.isLoaded) return;
+        setPlaySeconds(s.positionMillis / 1000);
       }, 200);
       setPlayState("playing");
     }
   };
 
-  const handleSubmit = () => {
-    if (!isRecorded) {
+  // ── Submit ─────────────────────────────────────────────────────────────────
+  const handleSubmit = async () => {
+    if (!isRecorded || !recordingUri) {
       Alert.alert("No Recording", "Please record your reason first.");
       return;
     }
-    onSubmit?.({
-      type: "voice",
-      uri: recordingUri ?? undefined,
-      content: "[voice]",
-      location,
-    });
-    Alert.alert(
-      "Submitted",
-      "Your emergency leave request has been sent to your manager.",
-      [{ text: "OK", onPress: onClose }],
-    );
+
+    const uriParts = recordingUri.split("/");
+    const rawName =
+      uriParts[uriParts.length - 1] ?? `recording_${Date.now()}.m4a`;
+
+    try {
+      const result = await createRequest({
+        workerId,
+        taskAssignmentId,
+        audioFile: {
+          uri: recordingUri,
+          name: rawName,
+          type: "audio/m4a",
+        },
+      });
+
+      setSubmittedStatus(result.status);
+
+      Alert.alert(
+        "Request Submitted",
+        "Your emergency leave request has been sent to your manager. Status: Pending.",
+        [
+          {
+            text: "OK",
+            onPress: () => {
+              onSubmitSuccess?.(result.id);
+              onClose?.();
+            },
+          },
+        ],
+      );
+    } catch {
+      // Try to show backend error details if available
+      const beErr =
+        (submitError as string) ||
+        (typeof arguments?.[0] === "object" &&
+          (arguments as any)[0]?.response?.data?.errors?.[0]) ||
+        "Could not submit the request. Please try again.";
+      Alert.alert("Submission Failed", beErr);
+    }
   };
 
-  // ── Mic button icon ──
+  // ── Mic icon ───────────────────────────────────────────────────────────────
   const micIconName = (): keyof typeof Ionicons.glyphMap => {
     if (isRecording) return "stop";
     if (isRecorded) return "refresh";
@@ -401,9 +455,8 @@ export default function EmergencyLeaveScreen({
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor="#db0614" />
 
-      {/* ── Header ── */}
       <Header
-        title="Emergency Leave"
+        title="Emergency Leave Request"
         onBack={() => handleNavigate("Home")}
         style={{ backgroundColor: "#db0614" }}
         titleStyle={{ color: "#FFFFFF" }}
@@ -415,6 +468,7 @@ export default function EmergencyLeaveScreen({
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        {/* ── Title ── */}
         <Text style={styles.title}>
           {isRecording
             ? "Recording..."
@@ -429,7 +483,15 @@ export default function EmergencyLeaveScreen({
             : "State your reason clearly. Your manager\nwill be notified immediately."}
         </Text>
 
-        {/* Mic + Pulse */}
+        {/* ── Status badge (shown after submit) ── */}
+        {submittedStatus && (
+          <View style={styles.statusRow}>
+            <Text style={styles.statusLabel}>Request status: </Text>
+            <StatusBadge status={submittedStatus} />
+          </View>
+        )}
+
+        {/* ── Mic + Pulse ── */}
         <View style={styles.micSection}>
           <PulseRing isRecording={isRecording} />
           <TouchableOpacity
@@ -445,7 +507,7 @@ export default function EmergencyLeaveScreen({
           </TouchableOpacity>
         </View>
 
-        {/* Timer (recording) */}
+        {/* ── Recording timer ── */}
         {!isRecorded && (
           <View style={styles.timerRow}>
             <View style={styles.timerBox}>
@@ -460,13 +522,13 @@ export default function EmergencyLeaveScreen({
           </View>
         )}
 
-        {/* Waveform */}
+        {/* ── Waveform ── */}
         <WaveformBars
           active={isRecording || isPlaying}
           color={isPlaying ? "#6366F1" : "#E8365D"}
         />
 
-        {/* Playback card */}
+        {/* ── Playback card ── */}
         {isRecorded && (
           <View style={styles.playbackCard}>
             <View style={styles.playbackTop}>
@@ -500,7 +562,7 @@ export default function EmergencyLeaveScreen({
           </View>
         )}
 
-        {/* Re-record */}
+        {/* ── Re-record ── */}
         {isRecorded && (
           <TouchableOpacity onPress={handleReRecord} style={styles.reRecordBtn}>
             <Ionicons name="refresh" size={13} color="#6B7280" />
@@ -508,7 +570,15 @@ export default function EmergencyLeaveScreen({
           </TouchableOpacity>
         )}
 
-        {/* Location */}
+        {/* ── Audio size note ── */}
+        {isRecorded && (
+          <Text style={styles.audioNote}>
+            Audio will be sent to your manager for review (max 10 MB
+            recommended).
+          </Text>
+        )}
+
+        {/* ── Location ── */}
         <View style={styles.locationRow}>
           <Ionicons
             name="location-outline"
@@ -522,7 +592,7 @@ export default function EmergencyLeaveScreen({
           </Text>
         </View>
 
-        {/* Submit */}
+        {/* ── Submit ── */}
         <AppButton
           label="Submit Emergency Request"
           onPress={handleSubmit}
@@ -530,8 +600,10 @@ export default function EmergencyLeaveScreen({
           loadingLabel="Submitting..."
           iconLeft="send"
           style={{ backgroundColor: "#db0614" }}
+          disabled={!isRecorded || submitting}
         />
       </ScrollView>
+
       <BottomTabBar activeTab="EmergencyLeave" onNavigate={handleNavigate} />
     </SafeAreaView>
   );
@@ -539,183 +611,149 @@ export default function EmergencyLeaveScreen({
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#F5F6FA" },
-
+  safe: { flex: 1, backgroundColor: "#f5f6fa" },
   scroll: { flex: 1 },
-  scrollContent: {
-    paddingHorizontal: 28,
-    paddingTop: 32,
-    paddingBottom: 48,
-    alignItems: "center",
-  },
+  scrollContent: { padding: 20, paddingBottom: 40 },
 
   title: {
     fontSize: 22,
-    fontWeight: "800",
+    fontWeight: "700",
     color: "#111827",
     textAlign: "center",
-    marginBottom: 10,
+    marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
     color: "#6B7280",
     textAlign: "center",
-    lineHeight: 22,
-    marginBottom: 36,
+    lineHeight: 20,
+    marginBottom: 24,
   },
 
-  // Mic
-  micSection: {
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 28,
-    height: 180,
-  },
-  pulseContainer: {
-    position: "absolute",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  pulseInner: { width: 130, height: 130, borderRadius: 65 },
-  pulseOuter: { width: 175, height: 175, borderRadius: 88 },
-  pulseRing: { position: "absolute", backgroundColor: "#E8365D" },
-  micBtn: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: "#E8365D",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#E8365D",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 10,
-    zIndex: 10,
-  },
-  micBtnRecording: { backgroundColor: "#C0143C", shadowOpacity: 0.6 },
-  micBtnRecorded: { backgroundColor: "#6366F1", shadowColor: "#6366F1" },
-
-  // Timer
-  timerRow: {
+  statusRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    marginBottom: 20,
+    justifyContent: "center",
+    marginBottom: 16,
   },
-  timerBox: {
+  statusLabel: { fontSize: 13, color: "#6B7280" },
+  badge: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 3 },
+  badgeText: { fontSize: 12, fontWeight: "600" },
+
+  micSection: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginVertical: 24,
+    height: 140,
+  },
+  pulseContainer: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pulseRing: { position: "absolute", borderRadius: 100 },
+  pulseOuter: { width: 130, height: 130, backgroundColor: "#E8365D" },
+  pulseInner: { width: 110, height: 110, backgroundColor: "#E8365D" },
+  micBtn: {
     width: 80,
-    height: 64,
-    borderRadius: 16,
-    backgroundColor: "#F9FAFB",
-    borderWidth: 1.5,
-    borderColor: "#E5E7EB",
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#E8365D",
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 6,
+    shadowColor: "#E8365D",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+  },
+  micBtnRecording: { backgroundColor: "#C0143C", shadowOpacity: 0.6 },
+  micBtnRecorded: { backgroundColor: "#6366F1" },
+
+  timerRow: {
+    flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
+    marginBottom: 16,
   },
-  timerNum: { fontSize: 24, fontWeight: "800", color: "#111827" },
-  timerLabel: {
-    fontSize: 9,
-    fontWeight: "700",
-    color: "#9CA3AF",
-    letterSpacing: 1,
-    marginTop: 2,
-  },
+  timerBox: { alignItems: "center", minWidth: 60 },
+  timerNum: { fontSize: 36, fontWeight: "700", color: "#111827" },
+  timerLabel: { fontSize: 10, color: "#9CA3AF", letterSpacing: 1.5 },
   timerColon: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#D1D5DB",
+    fontSize: 32,
+    fontWeight: "700",
+    color: "#111827",
+    marginHorizontal: 8,
     marginBottom: 12,
   },
 
-  // Waveform
   waveform: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 3,
-    height: 40,
+    justifyContent: "center",
+    height: 48,
+    gap: 4,
     marginBottom: 20,
   },
-  waveBar: { width: 4, height: 30, borderRadius: 2 },
+  waveBar: { width: 4, height: 32, borderRadius: 2 },
 
-  // Playback card
   playbackCard: {
-    width: "100%",
-    backgroundColor: "#F5F3FF",
+    backgroundColor: "#F9FAFB",
     borderRadius: 16,
     padding: 16,
-    borderWidth: 1.5,
-    borderColor: "#DDD6FE",
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
   },
   playbackTop: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
     marginBottom: 12,
+    gap: 12,
   },
   playBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: "#6366F1",
-    justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#6366F1",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 5,
+    justifyContent: "center",
   },
   playbackInfo: { flex: 1 },
-  playbackTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#4338CA",
-    marginBottom: 2,
-  },
-  playbackDuration: { fontSize: 12, color: "#7C3AED", fontWeight: "600" },
-  playbackHint: {
-    fontSize: 12,
-    color: "#8B5CF6",
-    textAlign: "center",
-    marginTop: 8,
-  },
-
-  // Progress bar
+  playbackTitle: { fontSize: 14, fontWeight: "600", color: "#4338CA" },
+  playbackDuration: { fontSize: 12, color: "#7C3AED", marginTop: 2 },
   progressTrack: {
     height: 4,
-    backgroundColor: "#DDD6FE",
+    backgroundColor: "#E5E7EB",
     borderRadius: 2,
     overflow: "hidden",
   },
   progressFill: { height: "100%", backgroundColor: "#6366F1", borderRadius: 2 },
+  playbackHint: { fontSize: 12, color: "#9CA3AF", marginTop: 8 },
 
-  // Re-record
   reRecordBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    marginBottom: 12,
+    justifyContent: "center",
+    gap: 4,
+    marginBottom: 8,
   },
-  reRecordText: { fontSize: 13, color: "#6B7280", fontWeight: "600" },
+  reRecordText: { fontSize: 13, color: "#6B7280" },
 
-  // Location
+  audioNote: {
+    fontSize: 12,
+    color: "#9CA3AF",
+    textAlign: "center",
+    marginBottom: 16,
+    fontStyle: "italic",
+  },
+
   locationRow: {
     flexDirection: "row",
     alignItems: "flex-start",
-    backgroundColor: "#F9FAFB",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    width: "100%",
+    gap: 6,
     marginBottom: 24,
-    gap: 8,
   },
-  locationText: { fontSize: 13, color: "#6B7280", flex: 1, lineHeight: 20 },
-  locationBold: { fontWeight: "700", color: "#374151" },
+  locationText: { flex: 1, fontSize: 13, color: "#9CA3AF" },
+  locationBold: { color: "#374151", fontWeight: "500" },
 });

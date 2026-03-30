@@ -25,11 +25,16 @@ import LoginScreen from "@/screens/auth/LoginScreen";
 import OTPVerificationScreen from "@/screens/auth/OtpVerificationScreen";
 import ResetPasswordScreen from "@/screens/auth/ResetPasswordScreen";
 import ResetSuccessScreen from "@/screens/auth/ResetSuccessScreen";
-import SupervisorHomeScreen from "@/screens/supervisor/home/SupervisorHomeScreen";
-
 import CreateEmergencyTaskScreen from "@/screens/supervisor/adhoc-task/CreateEmergencyTaskScreen";
+import SupervisorHomeScreen from "@/screens/supervisor/home/SupervisorHomeScreen";
 import SwapRequestDetailScreen from "@/screens/supervisor/swap-task/SwapRequestDetailScreen";
 import SwapRequestListScreen from "@/screens/supervisor/swap-task/SwapRequestListScreen";
+import EmergencyLeaveDetailScreen from "@/screens/worker/EmergencyLeaveDetailScreen";
+import EquipmentRequestDetailScreen from "@/screens/worker/EquipmentRequestDetailScreen";
+import IssueReportDetailScreen from "@/screens/worker/IssueReportDetailScreen";
+import ListAllRequestsScreen from "@/screens/worker/ListAllRequestsScreen";
+import TaskSwapDetailScreen from "@/screens/worker/TaskSwapDetailScreen";
+
 // ─── Auth Route params ──────────────────────────────────────────────────────
 export type AuthStackParamList = {
   Login: undefined;
@@ -49,6 +54,11 @@ export type WorkerStackParamList = {
   RequestEquipment: undefined;
   SwapTask: undefined;
   AdhocRequest: undefined;
+  ListAllRequests: undefined;
+  EmergencyLeaveDetail: { id: string };
+  IssueReportDetail: { id: string };
+  TaskSwapDetail: { id: string };
+  EquipmentRequestDetail: { id: string; item?: any };
 };
 
 // ─── Supervisor Route params ──────────────────────────────────────────────────
@@ -159,6 +169,26 @@ function WorkerNavigator() {
       />
       <WorkerStack.Screen name="SwapTask" component={RequestSwapTaskScreen} />
       <WorkerStack.Screen name="AdhocRequest" component={AdhocRequestScreen} />
+      <WorkerStack.Screen
+        name="ListAllRequests"
+        component={ListAllRequestsScreen}
+      />
+      <WorkerStack.Screen
+        name="EmergencyLeaveDetail"
+        component={EmergencyLeaveDetailScreen}
+      />
+      <WorkerStack.Screen
+        name="IssueReportDetail"
+        component={IssueReportDetailScreen}
+      />
+      <WorkerStack.Screen
+        name="TaskSwapDetail"
+        component={TaskSwapDetailScreen}
+      />
+      <WorkerStack.Screen
+        name="EquipmentRequestDetail"
+        component={EquipmentRequestDetailScreen}
+      />
     </WorkerStack.Navigator>
   );
 }
