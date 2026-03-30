@@ -1,4 +1,6 @@
 import useAuthHook from "@/hooks/useAuth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "axios";
 import React, { createContext, useContext, useEffect, useState } from "react";
 
 // ─── Types ─────────────────────────────────────────────────────
@@ -83,7 +85,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await loginApi(email, password);
 
       const me = await getMe();
-      if (me) setAppUser(mapUser(me));
+      if (me) {
+        const mappedUser = mapUser(me);
+
+        // Kiểm tra role có hợp lệ không
+        if (mappedUser.role !== "Worker" && mappedUser.role !== "Supervisor") {
+          // Role không hợp lệ - logout ngay
+          await logout();
+          throw new Error(
+            `Quyền của bạn hiện tại (${mappedUser.role}) không thể đăng nhập vào hệ thống được.`,
+          );
+        }
+
+        setAppUser(mappedUser);
+      }
     } catch (e) {
       throw e;
     } finally {
@@ -95,10 +110,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       setIsLoading(true);
-      await logoutApi();
+
+      // 1. Gọi API logout (nếu backend có)
+      try {
+        await logoutApi();
+      } catch (apiError) {
+        // ❗ Không block logout nếu API fail
+        console.warn("Logout API failed:", apiError);
+      }
+
+      // 2. Xoá token/local storage
+      await AsyncStorage.multiRemove([
+        "accessToken",
+        "refreshToken",
+        "userInfo",
+      ]);
+
+      // 3. Clear state user
       setAppUser(null);
-    } catch (e) {
-      throw e;
+
+      // 4. (Optional) clear axios header
+      delete axios.defaults.headers.common["Authorization"];
+    } catch (error) {
+      console.error("Logout error:", error);
+      throw error; // giữ lại nếu bạn muốn handle ở ngoài
     } finally {
       setIsLoading(false);
     }
