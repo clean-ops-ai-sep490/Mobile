@@ -284,7 +284,7 @@ export default function HomeScreen({
             />
             <QuickCard
               icon="swap-horizontal-outline"
-              label="Swap Task"
+              label="Request Swap Task"
               subtitle="Request shift swap"
               iconBg="#F3F4F6"
               iconColor="#6B7280"
@@ -294,39 +294,15 @@ export default function HomeScreen({
           </View>
           <View style={styles.quickGrid}>
             <QuickCard
-              icon="medkit-outline"
-              label="Emergency Leave"
-              subtitle="Submit quick leave request"
-              iconBg="#EFF6FF"
-              iconColor="#3B82F6"
-              delay={420}
-              onPress={() => onNavigate?.("EmergencyLeave")}
+              icon="list-outline"
+              label="List All Requests"
+              subtitle="View and manage all requests"
+              iconBg="#FFF7ED"
+              iconColor="#F97316"
+              delay={260}
+              onPress={() => onNavigate?.("ListAllRequests")}
             />
           </View>
-
-          {/* ── Weekly Performance ── */}
-          <Animated.View style={[styles.perfCard, { opacity: headerFade }]}>
-            <View style={styles.perfHeader}>
-              <Text style={styles.perfTitle}>Weekly Performance</Text>
-              <Text style={styles.perfPct}>{performance}%</Text>
-            </View>
-            <View style={styles.perfTrack}>
-              <Animated.View
-                style={[
-                  styles.perfFill,
-                  {
-                    width: progressWidth.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ["0%", "100%"],
-                    }),
-                  },
-                ]}
-              />
-            </View>
-            <Text style={styles.perfSub}>
-              You have completed {completedTasks}/{totalTasks} assigned tasks.
-            </Text>
-          </Animated.View>
 
           <View style={{ height: 20 }} />
         </ScrollView>

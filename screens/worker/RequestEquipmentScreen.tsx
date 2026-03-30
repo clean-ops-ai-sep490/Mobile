@@ -110,10 +110,12 @@ export default function RequestEquipmentScreen({
         [{ text: "OK", onPress: handleBack }],
       );
     } catch (e: any) {
-      Alert.alert(
-        "Error",
-        e?.response?.data?.message || "Failed to submit request.",
-      );
+      const beErr =
+        e?.response?.data?.errors?.[0] ||
+        e?.response?.data?.message ||
+        e?.message ||
+        "Failed to submit request.";
+      Alert.alert("Error", String(beErr));
     }
   };
 
