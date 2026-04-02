@@ -1,4 +1,5 @@
 import BottomTabBar, { TabKey } from "@/components/common/BottomTabBar";
+import { useAuth } from "@/contexts/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import React, { useEffect, useRef } from "react";
@@ -121,22 +122,13 @@ function TabItem({ icon, activeIcon, label, active, onPress }: TabItemProps) {
 }
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
-export default function HomeScreen({
-  userName = "Minh Luan",
-  company = "CleanOps",
-  location = "Production Area A",
-  pendingTasks = 3,
-  completedTasks = 24,
-  totalTasks = 26,
-  onNavigate,
-}: Props) {
+export default function HomeScreen({ onNavigate }: Props) {
   const headerFade = useRef(new Animated.Value(0)).current;
   const headerSlide = useRef(new Animated.Value(-16)).current;
-  const progressWidth = useRef(new Animated.Value(0)).current;
-
-  const performance = Math.round((completedTasks / totalTasks) * 100);
 
   const navigation = useNavigation();
+  const { user } = useAuth();
+  const userName = user?.fullName ?? "";
 
   const handleNavigate = (screen: TabKey) => {
     navigation.navigate(screen as never);
@@ -155,13 +147,6 @@ export default function HomeScreen({
         useNativeDriver: true,
       }),
     ]).start();
-
-    Animated.timing(progressWidth, {
-      toValue: performance / 100,
-      duration: 900,
-      delay: 600,
-      useNativeDriver: false,
-    }).start();
   }, []);
 
   const today = new Date().toLocaleDateString("en-US", {
@@ -178,12 +163,10 @@ export default function HomeScreen({
         {/* ── Top bar ── */}
         <View style={styles.topBar}>
           <View style={styles.topBarLeft}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>ML</Text>
-            </View>
             <View>
-              <Text style={styles.companyName}>{company}</Text>
-              <Text style={styles.locationText}>{location}</Text>
+              <Text style={styles.greeting}>Have a good day,</Text>
+              <Text style={styles.userName}>{userName}</Text>
+              <Text style={styles.date}>{today}</Text>
             </View>
           </View>
           <View style={styles.topBarRight}>
@@ -212,18 +195,6 @@ export default function HomeScreen({
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* ── Greeting ── */}
-          <Animated.View
-            style={{
-              opacity: headerFade,
-              transform: [{ translateY: headerSlide }],
-            }}
-          >
-            <Text style={styles.greeting}>Good morning,</Text>
-            <Text style={styles.userName}>{userName}</Text>
-            <Text style={styles.date}>{today}</Text>
-          </Animated.View>
-
           {/* ── My Tasks ── */}
           <Animated.View style={{ opacity: headerFade }}>
             <TouchableOpacity
@@ -241,9 +212,6 @@ export default function HomeScreen({
                 </View>
                 <View>
                   <Text style={styles.tasksTitle}>My Tasks</Text>
-                  <Text style={styles.tasksPending}>
-                    {pendingTasks} tasks pending
-                  </Text>
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
@@ -333,23 +301,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F5F6FA",
   },
   topBarLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: "#2563EB",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  avatarText: {
-    color: "#FFF",
-    fontSize: 13,
-    fontWeight: "800",
-    letterSpacing: 0.5,
-  },
-  companyName: { fontSize: 14, fontWeight: "700", color: "#1E293B" },
-  locationText: { fontSize: 11, color: "#64748B", marginTop: 1 },
-  topBarRight: { flexDirection: "row", gap: 8 },
+  topBarRight: { flexDirection: "row", gap: 10 },
   iconBtn: {
     width: 38,
     height: 38,
@@ -393,6 +345,20 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
   },
   date: { fontSize: 13, color: "#94A3B8", marginBottom: 24 },
+
+  // Stats
+  statsRow: { flexDirection: "row", gap: 12, marginBottom: 16 },
+  statCard: {
+    flex: 1,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 12,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E6EEF8",
+  },
+  statNumber: { fontSize: 18, fontWeight: "800", color: "#0F172A" },
+  statLabel: { fontSize: 12, color: "#64748B", marginTop: 6 },
 
   // Tasks card
   tasksCard: {

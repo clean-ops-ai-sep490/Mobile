@@ -18,7 +18,7 @@ export interface IssueReport {
   taskAssignmentId: string;
   reportedByWorkerId: string;
   description: string;
-  status: "Open" | "Approved" | "Rejected";
+  status: "Approved" | "Rejected";
   resolvedByUserId?: string;
   resolvedAt?: string;
   created: string;

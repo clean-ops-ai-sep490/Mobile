@@ -17,6 +17,7 @@ import HomeScreen from "@/screens/worker/HomeScreen";
 import IssueReportScreen from "@/screens/worker/IssueReportScreen";
 import RequestEquipmentScreen from "@/screens/worker/RequestEquipmentScreen";
 import RequestSwapTaskScreen from "@/screens/worker/RequestSwapTaskScreen";
+import TaskExecutionScreen from "@/screens/worker/TaskExecutionScreen";
 import TaskListScreen from "@/screens/worker/TaskListScreen";
 
 // ─── Import supervisor screens ────────────────────────────────────────────────
@@ -59,6 +60,7 @@ export type WorkerStackParamList = {
   IssueReportDetail: { id: string };
   TaskSwapDetail: { id: string };
   EquipmentRequestDetail: { id: string; item?: any };
+  TaskExecution: { id: string; steps?: any[] };
 };
 
 // ─── Supervisor Route params ──────────────────────────────────────────────────
@@ -188,6 +190,10 @@ function WorkerNavigator() {
       <WorkerStack.Screen
         name="EquipmentRequestDetail"
         component={EquipmentRequestDetailScreen}
+      />
+      <WorkerStack.Screen
+        name="TaskExecution"
+        component={TaskExecutionScreen}
       />
     </WorkerStack.Navigator>
   );
