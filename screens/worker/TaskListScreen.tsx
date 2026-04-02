@@ -3,8 +3,10 @@ import BottomTabBar, { TabKey } from "@/components/common/BottomTabBar";
 import Header from "@/components/common/Header";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -14,6 +16,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  TaskAssignmentDto,
+  TaskAssignmentStatus,
+  useTaskAssignments,
+} from "@/hooks/useTaskAssignment";
 
 // ─── Mock Data ───────────────────────────────────────────────────────────────
 const TODAY = new Date();
@@ -30,7 +39,7 @@ const getDays = () => {
   });
 };
 
-type TaskStatus = "in_progress" | "upcoming" | "completed";
+type TaskStatus = "in_progress" | "upcoming" | "completed" | "block";
 
 interface Task {
   id: string;
@@ -45,78 +54,11 @@ interface Task {
   dayOffset: number;
 }
 
-const MOCK_TASKS: Task[] = [
-  {
-    id: "1",
-    title: "Floor Maintenance - Lobby",
-    location: "Westside Plaza",
-    sublocation: "Main Entrance",
-    status: "in_progress",
-    startTime: "09:00",
-    endTime: "11:30",
-    tags: ["Biohazard"],
-    dayOffset: 0,
-  },
-  {
-    id: "2",
-    title: "Deep Clean - Office Suite B",
-    location: "Downtown Corporate Center",
-    sublocation: "Room 402",
-    status: "upcoming",
-    startTime: "13:00",
-    endTime: "15:30",
-    tags: ["High-Traffic"],
-    dayOffset: 0,
-  },
-  {
-    id: "3",
-    title: "Sanitization - Break Room",
-    location: "Westside Plaza",
-    sublocation: "2nd Floor",
-    status: "completed",
-    startTime: "07:00",
-    endTime: "08:45",
-    finishedAt: "08:45",
-    tags: [],
-    dayOffset: 0,
-  },
-  {
-    id: "4",
-    title: "Window Cleaning - Facade",
-    location: "North Tower",
-    sublocation: "Exterior Level 1-3",
-    status: "upcoming",
-    startTime: "08:00",
-    endTime: "10:00",
-    tags: ["High-Rise"],
-    dayOffset: 1,
-  },
-  {
-    id: "5",
-    title: "Restroom Deep Clean",
-    location: "City Mall",
-    sublocation: "Ground Floor",
-    status: "upcoming",
-    startTime: "11:00",
-    endTime: "12:30",
-    tags: ["Biohazard"],
-    dayOffset: -1,
-  },
-  {
-    id: "6",
-    title: "Carpet Steam Cleaning",
-    location: "Grand Hotel",
-    sublocation: "Conference Room A",
-    status: "completed",
-    startTime: "09:00",
-    finishedAt: "10:20",
-    tags: [],
-    dayOffset: -1,
-  },
-];
-
 // ─── Status Config ────────────────────────────────────────────────────────────
-const STATUS_CONFIG = {
+const STATUS_CONFIG: Record<
+  TaskStatus,
+  { label: string; color: string; bg: string; dot: string }
+> = {
   in_progress: {
     label: "In Progress",
     color: "#F59E0B",
@@ -124,7 +66,7 @@ const STATUS_CONFIG = {
     dot: "#F59E0B",
   },
   upcoming: {
-    label: "Upcoming",
+    label: "Not Started",
     color: "#3B82F6",
     bg: "#EFF6FF",
     dot: "#3B82F6",
@@ -134,6 +76,12 @@ const STATUS_CONFIG = {
     color: "#10B981",
     bg: "#ECFDF5",
     dot: "#10B981",
+  },
+  block: {
+    label: "Block",
+    color: "#DC2626",
+    bg: "#FEF2F2",
+    dot: "#DC2626",
   },
 };
 
@@ -171,7 +119,13 @@ const TagBadge = ({ tag }: { tag: string }) => {
   );
 };
 
-const TaskCard = ({ task }: { task: Task }) => {
+const TaskCard = ({
+  task,
+  onStart,
+}: {
+  task: Task;
+  onStart?: (id: string) => void;
+}) => {
   const isInProgress = task.status === "in_progress";
   const isCompleted = task.status === "completed";
   const isUpcoming = task.status === "upcoming";
@@ -223,7 +177,7 @@ const TaskCard = ({ task }: { task: Task }) => {
         {isUpcoming && (
           <AppButton
             label="Start Task"
-            onPress={() => {}}
+            onPress={() => onStart && onStart(task.id)}
             size="md"
             style={{ flex: 1, marginBottom: 0 }}
           />
@@ -249,25 +203,175 @@ export default function TaskListScreen() {
   const [selectedDay, setSelectedDay] = useState(0);
   const [filter, setFilter] = useState<FilterType>("all");
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingTasks, setLoadingTasks] = useState(false);
   const days = getDays();
   const navigation = useNavigation();
+  const { user } = useAuth();
+  const {
+    getTaskAssignments,
+    startTask,
+    loading: hookLoading,
+  } = useTaskAssignments();
+  const [tasks, setTasks] = useState<TaskAssignmentDto[]>([]);
 
   const handleNavigate = (screen: TabKey) => {
     navigation.navigate(screen as never);
   };
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1200);
+  // DEV: demo tasks map (id -> steps) to allow testing without backend
+  const [demoMap, setDemoMap] = useState<Record<string, any[]>>({});
+
+  const loadDemoTask = () => {
+    const demoId = `demo-${Date.now()}`;
+    const demoAssignment: TaskAssignmentDto = {
+      id: demoId,
+      taskScheduleId: "demo-schedule",
+      assigneeId: user?.userId || "demo-worker",
+      originalAssigneeId: user?.userId || "demo-worker",
+      status: TaskAssignmentStatus.NotStarted,
+      scheduledStartAt: new Date().toISOString(),
+      isAdhocTask: true,
+      nameAdhocTask: "Demo - Verify Floor Clean",
+      displayLocation: "Demo Building - Lobby",
+    };
+
+    const demoSteps = [
+      {
+        id: `${demoId}-s1`,
+        sopStepId: "sop-1",
+        stepOrder: 1,
+        status: "NotStarted",
+      },
+      {
+        id: `${demoId}-s2`,
+        sopStepId: "sop-2",
+        stepOrder: 2,
+        status: "NotStarted",
+      },
+    ];
+
+    setTasks([demoAssignment]);
+    setDemoMap((m) => ({ ...m, [demoId]: demoSteps }));
   };
 
-  const filtered = MOCK_TASKS.filter((t) => {
-    const dayMatch = t.dayOffset === selectedDay;
-    const statusMatch = filter === "all" || t.status === filter;
-    return dayMatch && statusMatch;
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchTasks();
+    setRefreshing(false);
+  };
+
+  const buildDateForOffset = (offset: number) => {
+    const d = new Date(TODAY);
+    d.setDate(TODAY.getDate() + offset);
+    return d.toISOString().split("T")[0];
+  };
+
+  const mapStatusToTaskStatus = (s: TaskAssignmentStatus): TaskStatus => {
+    switch (s) {
+      case TaskAssignmentStatus.InProgress:
+        return "in_progress";
+      case TaskAssignmentStatus.Completed:
+        return "completed";
+      case TaskAssignmentStatus.Block:
+        return "block";
+      case TaskAssignmentStatus.NotStarted:
+      default:
+        return "upcoming";
+    }
+  };
+
+  const fetchTasks = async () => {
+    if (!user?.userId) return;
+    setLoadingTasks(true);
+    const date = buildDateForOffset(selectedDay);
+    const filterReq: any = {
+      assigneeId: user.userId,
+      fromDate: date,
+      toDate: date,
+    };
+    if (filter !== "all") {
+      // map filter string to numeric enum
+      if (filter === "in_progress")
+        filterReq.status = TaskAssignmentStatus.InProgress;
+      if (filter === "completed")
+        filterReq.status = TaskAssignmentStatus.Completed;
+      if (filter === "upcoming")
+        filterReq.status = TaskAssignmentStatus.NotStarted;
+    }
+
+    const resp = await getTaskAssignments(filterReq, {
+      pageNumber: 1,
+      pageSize: 200,
+    });
+    if (resp && resp.content) {
+      setTasks(resp.content);
+    } else {
+      setTasks([]);
+    }
+    setLoadingTasks(false);
+  };
+
+  useEffect(() => {
+    fetchTasks();
+  }, [selectedDay, filter, user?.userId]);
+
+  const handleStartTask = async (id: string) => {
+    if (!user?.userId) {
+      Alert.alert("User not available", "Cannot start task without user id.");
+      return;
+    }
+    try {
+      setLoadingTasks(true);
+      // If demo task exists, navigate with demo steps without calling API
+      if (demoMap[id]) {
+        (navigation as any).navigate("TaskExecution", {
+          id,
+          steps: demoMap[id],
+        });
+        return;
+      }
+
+      const res = await startTask(id, user.userId);
+      if (res) {
+        // Navigate to task execution screen and pass steps if returned
+        (navigation as any).navigate("TaskExecution", { id, steps: res.steps });
+      } else {
+        Alert.alert("Start failed", "Could not start the task.");
+      }
+    } catch (e: any) {
+      Alert.alert("Error", e?.message || "An error occurred");
+    } finally {
+      setLoadingTasks(false);
+    }
+  };
+
+  const mappedTasks: Task[] = tasks.map((t) => {
+    const startsAt = t.scheduledStartAt;
+    const dateObj = new Date(startsAt);
+    const time = dateObj.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    return {
+      id: t.id,
+      title: t.isAdhocTask
+        ? t.nameAdhocTask || "Adhoc Task"
+        : `Task ${t.taskScheduleId}`,
+      location: t.displayLocation || "",
+      sublocation: "",
+      status: mapStatusToTaskStatus(t.status) as TaskStatus,
+      startTime: time,
+      tags: [],
+      dayOffset: 0,
+    };
   });
 
-  const todayTasks = MOCK_TASKS.filter((t) => t.dayOffset === selectedDay);
+  const filtered = mappedTasks.filter((t) => {
+    if (filter === "all") return true;
+    return t.status === filter;
+  });
+
+  const todayTasks = mappedTasks;
   const remaining = todayTasks.filter((t) => t.status !== "completed").length;
 
   const FILTERS: { key: FilterType; label: string }[] = [
@@ -279,12 +383,29 @@ export default function TaskListScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
+      <StatusBar barStyle="dark-content" backgroundColor="#f5f6fa" />
       <Header
         title="My Tasks"
         onBack={() => handleNavigate("Home")}
         style={{ backgroundColor: "#F5F6FA" }}
       />
+      {__DEV__ && (
+        <View style={{ paddingHorizontal: 20, paddingTop: 10 }}>
+          <TouchableOpacity
+            onPress={loadDemoTask}
+            style={{
+              backgroundColor: "#EFF6FF",
+              padding: 8,
+              borderRadius: 8,
+              alignSelf: "flex-start",
+            }}
+          >
+            <Text style={{ color: "#2563EB", fontWeight: "700" }}>
+              Load demo task
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
       {/* ── Day Selector ── */}
       <View style={styles.dayRow}>
         {days.map((d) => {
@@ -333,7 +454,7 @@ export default function TaskListScreen() {
           <Text style={styles.sectionSub}>
             {remaining > 0
               ? `${remaining} tasks remaining`
-              : "All tasks completed 🎉"}
+              : "All tasks completed"}
           </Text>
         </View>
 
@@ -383,7 +504,9 @@ export default function TaskListScreen() {
 
         {/* ── Task Cards ── */}
         <View style={styles.taskList}>
-          {filtered.length === 0 ? (
+          {loadingTasks || hookLoading ? (
+            <ActivityIndicator size="large" color="#2563EB" />
+          ) : filtered.length === 0 ? (
             <View style={styles.emptyState}>
               <View style={styles.emptyIconWrap}>
                 <Ionicons name="clipboard-outline" size={36} color="#CBD5E1" />
@@ -394,7 +517,9 @@ export default function TaskListScreen() {
               </Text>
             </View>
           ) : (
-            filtered.map((task) => <TaskCard key={task.id} task={task} />)
+            filtered.map((task) => (
+              <TaskCard key={task.id} task={task} onStart={handleStartTask} />
+            ))
           )}
         </View>
 
@@ -408,7 +533,7 @@ export default function TaskListScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#f5f6fa",
   },
 
   // ── Day Selector ─────────────────────────────────────────
