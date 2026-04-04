@@ -1,6 +1,8 @@
 import AppButton from "@/components/common/AppButton";
 import BottomTabBar, { TabKey } from "@/components/common/BottomTabBar";
 import Header from "@/components/common/Header";
+import { useAuth } from "@/contexts/AuthContext";
+import { useIssueReport } from "@/hooks/useIssueReport";
 import CameraScreen from "@/screens/worker/CameraScreen";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -91,6 +93,12 @@ export default function IssueReportScreen({
     navigation.navigate(screen as never);
   };
 
+  const { getWorkerProfile } = useAuth();
+  const { create } = useIssueReport();
+
+  const [workerId, setWorkerId] = useState<string | null>(null);
+  const [loadingWorker, setLoadingWorker] = useState(false);
+
   const [selectedIssue, setSelectedIssue] = useState("chemical");
   const [selectedSeverity, setSelectedSeverity] = useState("high");
   const [description, setDescription] = useState("");
@@ -100,6 +108,26 @@ export default function IssueReportScreen({
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    const fetchWorkerId = async () => {
+      try {
+        setLoadingWorker(true);
+        const profile = await getWorkerProfile();
+
+        // Nếu lấy thành công, gán id vào state workerId
+        if (profile && profile.id) {
+          setWorkerId(profile.id);
+        }
+      } catch (error) {
+        console.error("Lỗi khi lấy worker profile:", error);
+      } finally {
+        setLoadingWorker(false);
+      }
+    };
+
+    fetchWorkerId();
+  }, []);
 
   useEffect(() => {
     Animated.parallel([
@@ -145,14 +173,37 @@ export default function IssueReportScreen({
       Alert.alert("Missing Info", "Please provide a description of the issue.");
       return;
     }
+
+    if (!workerId) {
+      Alert.alert(
+        "Not authenticated",
+        "You must be signed in to report an issue.",
+      );
+      return;
+    }
+
     setSubmitting(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    setSubmitting(false);
-    Alert.alert(
-      "Report Submitted",
-      "Your issue has been reported successfully.",
-      [{ text: "OK", onPress: handleBack }],
-    );
+    try {
+      await create({
+        taskAssignmentId: taskRef,
+        reportedByWorkerId: workerId,
+        description: description.trim(),
+      });
+
+      setDescription("");
+      setPhotos([]);
+
+      Alert.alert(
+        "Report Submitted",
+        "Your issue has been reported successfully.",
+        [{ text: "OK", onPress: handleBack }],
+      );
+    } catch (err: any) {
+      console.error("Issue report failed:", err);
+      Alert.alert("Submission failed", err?.message ?? "Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (showCamera) {

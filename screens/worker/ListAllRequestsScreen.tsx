@@ -222,15 +222,16 @@ function Empty({ label }: { label: string }) {
 const PAGE_SIZE = 20;
 
 export default function MyRequestsScreen({ navigation }: Props) {
-  const { user } = useAuth();
-  const workerId = user?.userId ?? "";
+  const { getWorkerProfile } = useAuth();
+  const [workerId, setWorkerId] = useState<string | null>(null);
+  const [loadingWorker, setLoadingWorker] = useState(true);
 
   const [activeTab, setActiveTab] = useState<TabKey2>("equipment");
   const [refreshing, setRefreshing] = useState(false);
 
   const { loading: eqLoading, getByWorker: eqGet } = useEquipment();
   const { loading: issLoading, getByWorker: issGet } = useIssueReport();
-  const { loading: swLoading, getList: swGet } = useTaskSwap();
+  const { loading: swLoading, getMine: swGet } = useTaskSwap();
   const { loading: elLoading, getListByWorkerId: elGet } =
     useEmergencyLeaveRequest();
 
@@ -239,7 +240,26 @@ export default function MyRequestsScreen({ navigation }: Props) {
   const [swItems, setSwItems] = useState<TaskSwapRequestListItem[]>([]);
   const [elItems, setElItems] = useState<EmergencyLeaveRequestDto[]>([]);
 
-  const isLoading = eqLoading || issLoading || swLoading || elLoading;
+  const isLoading =
+    eqLoading || issLoading || swLoading || elLoading || loadingWorker;
+
+  useEffect(() => {
+    const fetchWorkerId = async () => {
+      try {
+        setLoadingWorker(true);
+        const profile = await getWorkerProfile();
+        if (profile && profile.id) {
+          setWorkerId(profile.id);
+        }
+      } catch (error) {
+        console.error("Error fetching worker profile:", error);
+      } finally {
+        setLoadingWorker(false);
+      }
+    };
+
+    fetchWorkerId();
+  }, []);
 
   const fetchAll = useCallback(async () => {
     // don't fetch if we don't have a valid workerId yet — avoids returning all users
@@ -248,7 +268,7 @@ export default function MyRequestsScreen({ navigation }: Props) {
     const [eq, iss, sw, el] = await Promise.allSettled([
       eqGet(workerId, p),
       issGet(workerId, p),
-      swGet({ requesterId: workerId }, p),
+      swGet(workerId, "All", p),
       elGet(workerId, p),
     ]);
     if (eq.status === "fulfilled") setEqItems(eq.value?.content ?? []);

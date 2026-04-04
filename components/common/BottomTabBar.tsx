@@ -1,11 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import {
-    Platform,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -27,6 +27,7 @@ interface TabItemProps {
 interface BottomTabBarProps {
   activeTab?: TabKey;
   onNavigate?: (screen: TabKey) => void;
+  onEmergencyPress?: () => void;
 }
 
 // ─── Tab config (Emergency slot is a placeholder — rendered separately) ───────
@@ -86,6 +87,7 @@ function TabItem({ icon, activeIcon, label, active, onPress }: TabItemProps) {
 export default function BottomTabBar({
   activeTab = "Home",
   onNavigate,
+  onEmergencyPress,
 }: BottomTabBarProps) {
   return (
     <View style={styles.wrapper}>
@@ -121,7 +123,14 @@ export default function BottomTabBar({
       {/* Floating Emergency button */}
       <TouchableOpacity
         style={styles.emergencyBtn}
-        onPress={() => onNavigate?.("EmergencyLeave")}
+        onPress={() => {
+          // ✅ Gọi hàm từ HomeScreen truyền vào, nếu không có thì chạy mặc định
+          if (onEmergencyPress) {
+            onEmergencyPress();
+          } else {
+            onNavigate?.("EmergencyLeave");
+          }
+        }}
         activeOpacity={0.85}
       >
         <View style={styles.emergencyInner}>

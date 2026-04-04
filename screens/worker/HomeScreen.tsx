@@ -1,8 +1,10 @@
 import BottomTabBar, { TabKey } from "@/components/common/BottomTabBar";
+import TaskPickerModal from "@/components/TaskPickerModal";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSelectedTask } from "@/contexts/SelectedTaskContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
@@ -129,6 +131,9 @@ export default function HomeScreen({ onNavigate }: Props) {
   const navigation = useNavigation();
   const { user } = useAuth();
   const userName = user?.fullName ?? "";
+  const { selectedTaskId, setSelectedTaskId } = useSelectedTask();
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
 
   const handleNavigate = (screen: TabKey) => {
     navigation.navigate(screen as never);
@@ -212,6 +217,11 @@ export default function HomeScreen({ onNavigate }: Props) {
                 </View>
                 <View>
                   <Text style={styles.tasksTitle}>My Tasks</Text>
+                  {selectedTaskId ? (
+                    <Text style={styles.tasksPending}>
+                      Using: {selectedTaskId.slice(0, 8)}...
+                    </Text>
+                  ) : null}
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
@@ -228,7 +238,17 @@ export default function HomeScreen({ onNavigate }: Props) {
               iconBg="#FEE2E2"
               iconColor="#EF4444"
               delay={100}
-              onPress={() => onNavigate?.("IssueReport")}
+              onPress={() => {
+                if (selectedTaskId) {
+                  navigation.navigate(
+                    "IssueReport" as never,
+                    { taskRef: selectedTaskId } as never,
+                  );
+                } else {
+                  setPendingAction("IssueReport");
+                  setPickerVisible(true);
+                }
+              }}
             />
             <QuickCard
               icon="add-circle-outline"
@@ -248,7 +268,17 @@ export default function HomeScreen({ onNavigate }: Props) {
               iconBg="#FFF7ED"
               iconColor="#F97316"
               delay={260}
-              onPress={() => onNavigate?.("RequestEquipment")}
+              onPress={() => {
+                if (selectedTaskId) {
+                  navigation.navigate(
+                    "RequestEquipment" as never,
+                    { taskAssignmentId: selectedTaskId } as never,
+                  );
+                } else {
+                  setPendingAction("RequestEquipment");
+                  setPickerVisible(true);
+                }
+              }}
             />
             <QuickCard
               icon="swap-horizontal-outline"
@@ -276,6 +306,36 @@ export default function HomeScreen({ onNavigate }: Props) {
         </ScrollView>
 
         <BottomTabBar activeTab="Home" onNavigate={handleNavigate} />
+        <TaskPickerModal
+          visible={pickerVisible}
+          onClose={() => {
+            setPickerVisible(false);
+            setPendingAction(null);
+          }}
+          onSelect={async (id) => {
+            await setSelectedTaskId(id);
+            setPickerVisible(false);
+            const action = pendingAction ?? "IssueReport";
+            if (action === "IssueReport") {
+              navigation.navigate(
+                "IssueReport" as never,
+                { taskRef: id } as never,
+              );
+            } else if (action === "RequestEquipment") {
+              navigation.navigate(
+                "RequestEquipment" as never,
+                { taskAssignmentId: id } as never,
+              );
+            } else {
+              // fallback: go to IssueReport
+              navigation.navigate(
+                "IssueReport" as never,
+                { taskRef: id } as never,
+              );
+            }
+            setPendingAction(null);
+          }}
+        />
       </SafeAreaView>
     </View>
   );

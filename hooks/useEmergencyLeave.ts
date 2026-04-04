@@ -34,18 +34,18 @@ export interface EmergencyLeaveRequestDto {
 
 export interface CreateEmergencyLeaveRequestPayload {
   workerId: string;
-  taskAssignmentId?: string;
+  taskAssignmentId?: string | null; // optional, nhưng bắt buộc nếu không có leaveDateFrom/to
   leaveDateFrom?: string; // bắt buộc nếu không có taskAssignmentId
   leaveDateTo?: string; // bắt buộc nếu không có taskAssignmentId
   audioFile?: File | { uri: string; name: string; type?: string }; // hỗ trợ cả File và RNAudioFile
-  transcription?: string;
+  transcription?: string | null;
 }
 
 export interface UpdateEmergencyLeaveRequestPayload {
   leaveDateFrom?: string;
   leaveDateTo?: string;
   audioFile?: File | { uri: string; name: string; type?: string }; // hỗ trợ cả File và RNAudioFile
-  transcription?: string;
+  transcription?: string | null;
 }
 
 export interface ReviewEmergencyLeaveRequestPayload {
@@ -180,12 +180,20 @@ export const useEmergencyLeaveRequest = () => {
       try {
         setLoading(true);
 
+        console.log(
+          "👉 1. PAYLOAD TỪ COMPONENT GỬI SANG HOOK:",
+          JSON.stringify(payload, null, 2),
+        );
+
         const formData = new FormData();
         formData.append("workerId", payload.workerId);
 
+        // 🔴 ĐÃ FIX LỖI 400: CHỈ APPEND KHI CÓ taskAssignmentId
+        // Tuyệt đối không append chuỗi rỗng ""
         if (payload.taskAssignmentId) {
           formData.append("taskAssignmentId", payload.taskAssignmentId);
         }
+
         if (payload.leaveDateFrom) {
           formData.append("leaveDateFrom", payload.leaveDateFrom);
         }
@@ -195,14 +203,12 @@ export const useEmergencyLeaveRequest = () => {
         if (payload.audioFile) {
           const af: any = payload.audioFile;
           if (af && typeof af.uri === "string") {
-            // React Native file object: append the object directly (RN FormData expects { uri, name, type })
             formData.append("audioFile", {
               uri: af.uri,
               name: af.name,
               type: af.type ?? "audio/m4a",
             } as any);
           } else {
-            // Browser File
             formData.append(
               "audioFile",
               payload.audioFile as File,
@@ -214,6 +220,12 @@ export const useEmergencyLeaveRequest = () => {
           formData.append("transcription", payload.transcription);
         }
 
+        // 🚀 LOG CHÍNH XÁC NHỮNG GÌ SẼ GỬI QUA AXIOS
+        console.log(
+          "👉 2. FORM DATA CHUẨN BỊ GỬI ĐI (Ruột _parts):",
+          JSON.stringify((formData as any)._parts, null, 2),
+        );
+
         const res = await axiosInstance.post<EmergencyLeaveRequestDto>(
           "/EmergencyLeaveRequests",
           formData,
@@ -221,7 +233,20 @@ export const useEmergencyLeaveRequest = () => {
         );
         return res.data;
       } catch (err: any) {
-        setError(err.response?.data?.errors?.[0] || err.message);
+        // 🔴 LOG CHI TIẾT LỖI 400 TỪ BACKEND
+        console.log(
+          "🔥 LỖI TỪ BACKEND TRẢ VỀ:",
+          JSON.stringify(err.response?.data, null, 2),
+        );
+
+        const errorData = err.response?.data;
+        const errorMessage =
+          errorData?.message ||
+          errorData?.detail ||
+          (errorData?.errors ? JSON.stringify(errorData.errors) : null) ||
+          err.message;
+
+        setError(errorMessage);
         throw err;
       } finally {
         setLoading(false);
