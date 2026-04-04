@@ -47,6 +47,8 @@ export interface TaskSwapRequestListItem {
   reviewedByUserId?: string;
 }
 
+export type SwapPerspective = "All" | "Sent" | "Received";
+
 /* ================= HOOK ================= */
 
 export const useTaskSwap = () => {
@@ -73,7 +75,6 @@ export const useTaskSwap = () => {
             ...pagination,
           },
         });
-        console.log("API response:", res.data);
 
         return res.data;
       } catch (err: any) {
@@ -229,12 +230,46 @@ export const useTaskSwap = () => {
     [],
   );
 
+  /* ================= GET MY SWAP REQUESTS (sent & received) ================= */
+  const getMine = useCallback(
+    async (
+      workerId: string,
+      perspective: SwapPerspective = "All",
+      pagination?: PaginationRequest,
+      status?: SwapRequestStatus,
+    ) => {
+      try {
+        setLoading(true);
+
+        const res = await axiosInstance.get<
+          PaginatedResult<TaskSwapRequestListItem>
+        >("/TaskSwapRequests/me", {
+          params: {
+            workerId,
+            perspective,
+            status,
+            ...pagination,
+          },
+        });
+
+        return res.data;
+      } catch (err: any) {
+        setError(err.message);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
+
   return {
     loading,
     error,
 
     getList,
     getById,
+    getMine,
 
     create,
     respond,

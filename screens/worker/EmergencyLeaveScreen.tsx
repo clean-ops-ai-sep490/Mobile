@@ -1,6 +1,8 @@
 import AppButton from "@/components/common/AppButton";
 import BottomTabBar, { TabKey } from "@/components/common/BottomTabBar";
+import CustomDatePicker from "@/components/common/CustomDatePicker";
 import Header from "@/components/common/Header";
+import { useAuth } from "@/contexts/AuthContext";
 import { useEmergencyLeaveRequest } from "@/hooks/useEmergencyLeave";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -23,9 +25,7 @@ type RecordState = "idle" | "recording" | "recorded";
 type PlayState = "idle" | "playing" | "paused";
 
 interface Props {
-  workerId: string;
   taskAssignmentId: string;
-  location?: string;
   onClose?: () => void;
   onSubmitSuccess?: (id: string) => void;
 }
@@ -232,19 +232,29 @@ const StatusBadge = ({ status }: { status: string }) => {
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function EmergencyLeaveScreen({
-  workerId,
   taskAssignmentId,
-  location = "Central Park Plaza - North Wing",
   onClose,
   onSubmitSuccess,
 }: Props) {
+  const { getWorkerProfile } = useAuth();
+  const [workerId, setWorkerId] = useState<string | null>(null);
+  const [loadingWorker, setLoadingWorker] = useState(true);
   const [recordState, setRecordState] = useState<RecordState>("idle");
   const [playState, setPlayState] = useState<PlayState>("idle");
   const [recSeconds, setRecSeconds] = useState(0);
   const [playSeconds, setPlaySeconds] = useState(0);
   const [duration, setDuration] = useState(0);
   const [recordingUri, setRecordingUri] = useState<string | null>(null);
+  const [leaveDateFrom, setLeaveDateFrom] = useState<Date | undefined>(
+    undefined,
+  );
+  const [leaveDateTo, setLeaveDateTo] = useState<Date | undefined>(undefined);
+  const [transcription, setTranscription] = useState<string>("");
 
+  const [showDatePicker, setShowDatePicker] = useState<"from" | "to" | null>(
+    null,
+  );
+  const [tempDate, setTempDate] = useState(new Date());
   // Track result after successful submission
   const [submittedStatus, setSubmittedStatus] = useState<string | null>(null);
 
@@ -272,6 +282,26 @@ export default function EmergencyLeaveScreen({
   const recMin = Math.floor(recSeconds / 60);
   const recSec = recSeconds % 60;
   const progress = duration > 0 ? playSeconds / duration : 0;
+
+  useEffect(() => {
+    const fetchWorkerId = async () => {
+      try {
+        setLoadingWorker(true);
+        const profile = await getWorkerProfile();
+
+        // Nếu lấy thành công, gán id vào state workerId
+        if (profile && profile.id) {
+          setWorkerId(profile.id);
+        }
+      } catch (error) {
+        console.error("Error fetching worker profile:", error);
+      } finally {
+        setLoadingWorker(false);
+      }
+    };
+
+    fetchWorkerId();
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -398,9 +428,61 @@ export default function EmergencyLeaveScreen({
 
   // ── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
+    if (loadingWorker) {
+      Alert.alert("Loading", "Fetching your profile. Please wait a moment.");
+      return;
+    }
+    if (!workerId) {
+      Alert.alert(
+        "Session Expired",
+        "Your session has expired. Please log in again to submit an emergency leave request.",
+      );
+      return;
+    }
+
     if (!isRecorded || !recordingUri) {
       Alert.alert("No Recording", "Please record your reason first.");
       return;
+    }
+
+    // ✅ Validate: nếu không có taskAssignmentId thì phải có dates
+    if (!taskAssignmentId && (!leaveDateFrom || !leaveDateTo)) {
+      Alert.alert(
+        "Missing Dates",
+        "Please select both start and end dates for your leave.",
+      );
+      return;
+    }
+
+    // ✅ Khai báo fromDate và toDate ở ngoài để dùng sau
+    let fromDate: Date | undefined;
+    let toDate: Date | undefined;
+
+    // ✅ Validate và chuẩn bị dates
+    if (leaveDateFrom && leaveDateTo) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      fromDate = new Date(leaveDateFrom);
+      fromDate.setHours(0, 0, 0, 0);
+
+      toDate = new Date(leaveDateTo);
+      toDate.setHours(23, 59, 59, 999); // ✅ Cuối ngày
+
+      // Validate: không được ở quá khứ
+      if (fromDate < today) {
+        Alert.alert("Invalid Date", "Leave start date cannot be in the past.");
+        return;
+      }
+
+      // Validate: fromDate <= toDate
+      if (fromDate > toDate) {
+        Alert.alert(
+          "Invalid Dates",
+          "Start date must be before or equal to end date.",
+        );
+        return;
+      }
     }
 
     const uriParts = recordingUri.split("/");
@@ -410,12 +492,16 @@ export default function EmergencyLeaveScreen({
     try {
       const result = await createRequest({
         workerId,
-        taskAssignmentId,
+        taskAssignmentId: taskAssignmentId || null,
+        // ✅ Dùng fromDate và toDate đã set giờ chính xác
+        leaveDateFrom: fromDate ? fromDate.toISOString() : undefined,
+        leaveDateTo: toDate ? toDate.toISOString() : undefined,
         audioFile: {
           uri: recordingUri,
           name: rawName,
           type: "audio/m4a",
         },
+        transcription: transcription || null,
       });
 
       setSubmittedStatus(result.status);
@@ -433,15 +519,31 @@ export default function EmergencyLeaveScreen({
           },
         ],
       );
-    } catch {
-      // Try to show backend error details if available
+    } catch (err: any) {
       const beErr =
-        (submitError as string) ||
-        (typeof arguments?.[0] === "object" &&
-          (arguments as any)[0]?.response?.data?.errors?.[0]) ||
+        submitError ||
+        err?.response?.data?.message ||
+        err?.response?.data?.errors?.[0] ||
+        err?.message ||
         "Could not submit the request. Please try again.";
       Alert.alert("Submission Failed", beErr);
     }
+  };
+  const handleConfirmDate = (selectedDate: Date) => {
+    // Component con đã đảm bảo selectedDate là 00:00:00
+    if (showDatePicker === "from") {
+      setLeaveDateFrom(selectedDate);
+
+      // UX Logic: Tự đẩy ngày 'To' lên nếu 'From' vượt qua 'To' hiện tại
+      if (leaveDateTo && selectedDate > leaveDateTo) {
+        setLeaveDateTo(selectedDate);
+      }
+    } else if (showDatePicker === "to") {
+      setLeaveDateTo(selectedDate);
+    }
+
+    // Đóng Modal/Dialog
+    setShowDatePicker(null);
   };
 
   // ── Mic icon ───────────────────────────────────────────────────────────────
@@ -578,19 +680,79 @@ export default function EmergencyLeaveScreen({
           </Text>
         )}
 
-        {/* ── Location ── */}
-        <View style={styles.locationRow}>
-          <Ionicons
-            name="location-outline"
-            size={15}
-            color="#9CA3AF"
-            style={{ marginTop: 1 }}
-          />
-          <Text style={styles.locationText}>
-            Location captured:{" "}
-            <Text style={styles.locationBold}>{location}</Text>
-          </Text>
-        </View>
+        {/* ── Leave Dates (chỉ hiện khi không có taskAssignmentId) ── */}
+        {!taskAssignmentId && (
+          <View style={styles.datesSection}>
+            <Text style={styles.datesSectionTitle}>Leave Period</Text>
+
+            {/* Nút bấm From Date */}
+            <TouchableOpacity
+              style={styles.dateInputRow}
+              onPress={() => setShowDatePicker("from")}
+            >
+              <Ionicons name="calendar-outline" size={18} color="#6B7280" />
+              <View style={styles.dateInputContent}>
+                <Text style={styles.dateInputLabel}>From Date *</Text>
+                <Text style={styles.dateInputValue}>
+                  {leaveDateFrom
+                    ? leaveDateFrom.toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })
+                    : "Select start date"}
+                </Text>
+              </View>
+              <Ionicons name="chevron-down" size={18} color="#9CA3AF" />
+            </TouchableOpacity>
+
+            {/* Nút bấm To Date */}
+            <TouchableOpacity
+              style={[
+                styles.dateInputRow,
+                !leaveDateFrom && { opacity: 0.5, backgroundColor: "#F3F4F6" },
+              ]}
+              disabled={!leaveDateFrom}
+              onPress={() => setShowDatePicker("to")}
+            >
+              <Ionicons
+                name="calendar-outline"
+                size={18}
+                color={!leaveDateFrom ? "#9CA3AF" : "#6B7280"}
+              />
+              <View style={styles.dateInputContent}>
+                <Text style={styles.dateInputLabel}>To Date *</Text>
+                <Text
+                  style={[
+                    styles.dateInputValue,
+                    !leaveDateFrom && { color: "#9CA3AF" },
+                  ]}
+                >
+                  {leaveDateTo
+                    ? leaveDateTo.toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })
+                    : "Select end date"}
+                </Text>
+              </View>
+              <Ionicons name="chevron-down" size={18} color="#9CA3AF" />
+            </TouchableOpacity>
+
+            <CustomDatePicker
+              visible={showDatePicker !== null}
+              // Truyền giá trị hiện tại tương ứng với trường đang chọn
+              value={showDatePicker === "from" ? leaveDateFrom : leaveDateTo}
+              // MinimumDate:
+              // Nếu chọn "To Date", min date phải là "From Date"
+              // Nếu chọn "From Date", CustomDatePicker đã tự xử lý min date là "hôm nay"
+              minimumDate={showDatePicker === "to" ? leaveDateFrom : null}
+              onConfirm={handleConfirmDate}
+              onCancel={() => setShowDatePicker(null)}
+            />
+          </View>
+        )}
 
         {/* ── Submit ── */}
         <AppButton
@@ -604,7 +766,18 @@ export default function EmergencyLeaveScreen({
         />
       </ScrollView>
 
-      <BottomTabBar activeTab="EmergencyLeave" onNavigate={handleNavigate} />
+      <BottomTabBar
+        activeTab="Home"
+        onNavigate={handleNavigate}
+        onEmergencyPress={() => {
+          navigation.navigate(
+            "EmergencyLeave" as never,
+            {
+              taskAssignmentId: selectedTaskId || null,
+            } as never,
+          );
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -748,12 +921,75 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
   },
 
-  locationRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 6,
-    marginBottom: 24,
+  datesSection: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
   },
-  locationText: { flex: 1, fontSize: 13, color: "#9CA3AF" },
-  locationBold: { color: "#374151", fontWeight: "500" },
+  datesSectionTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#111827",
+    marginBottom: 12,
+  },
+  dateInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    backgroundColor: "#F9FAFB",
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  dateInputContent: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  dateInputLabel: {
+    fontSize: 11,
+    color: "#6B7280",
+    marginBottom: 2,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  dateInputValue: {
+    fontSize: 14,
+    color: "#111827",
+    fontWeight: "500",
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+  },
+  modalBottomSheet: {
+    backgroundColor: "#FFFFFF",
+    paddingBottom: 20, // SafeArea padding cho iPhone
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  modalCancelText: {
+    color: "#6B7280",
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  modalDoneText: {
+    color: "#3B82F6", // Màu xanh lam nổi bật
+    fontSize: 16,
+    fontWeight: "600",
+  },
 });

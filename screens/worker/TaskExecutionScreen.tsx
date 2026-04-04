@@ -1,5 +1,6 @@
 import AppButton from "@/components/common/AppButton";
 import Header from "@/components/common/Header";
+import useTaskStepExecution from "@/hooks/useTaskStepExecution";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -228,6 +229,10 @@ export default function TaskExecutionScreen() {
   const route = useRoute();
   const { user } = useAuth();
   const { updateTaskAssignmentStatus } = useTaskAssignments();
+  const { completeStep } = useTaskStepExecution();
+  const { getWorkerProfile } = useAuth();
+  const [workerId, setWorkerId] = useState<string | null>(null);
+  const [loadingWorker, setLoadingWorker] = useState(false);
 
   const params = route.params as RouteParams;
   const taskAssignmentId = params?.id;
@@ -236,7 +241,24 @@ export default function TaskExecutionScreen() {
   const [steps, setSteps] = useState<TaskStepExecutionDto[]>(initialSteps);
   const [loading, setLoading] = useState(false);
 
-  // Ensure each step has a `tasks` array for subtasks (local UI-only)
+  useEffect(() => {
+    const fetchWorkerId = async () => {
+      try {
+        setLoadingWorker(true);
+        const profile = await getWorkerProfile();
+
+        if (profile && profile.id) {
+          setWorkerId(profile.id);
+        }
+      } catch (error) {
+        console.error("Lỗi khi lấy worker profile:", error);
+      } finally {
+        setLoadingWorker(false);
+      }
+    };
+
+    fetchWorkerId();
+  }, []);
   useEffect(() => {
     const load = async () => {
       // enrich initial steps with demo subtasks if missing
@@ -336,54 +358,70 @@ export default function TaskExecutionScreen() {
       }
     }
 
-    // Update local state
-    const updatedSteps = steps.map((s, idx) => {
-      if (s.id === stepId) {
-        return { ...s, status: StepStatus.Completed };
-      }
-      // Move to next step if exists
-      if (idx === currentStepIndex + 1) {
-        return { ...s, status: StepStatus.InProgress };
-      }
-      return s;
-    });
-
-    setSteps(updatedSteps);
-    // persist progress
+    setLoading(true);
     try {
-      if (taskAssignmentId) {
-        await AsyncStorage.setItem(
-          `taskProgress:${taskAssignmentId}`,
-          JSON.stringify(updatedSteps),
+      // Build result data (include subtasks state)
+      const step = steps.find((s) => s.id === stepId) as any;
+      const resultData = {
+        subtasks: Array.isArray(step?.tasks)
+          ? step.tasks.map((t: any) => ({ id: t.id, done: t.done }))
+          : [],
+      };
+
+      // Call backend to complete step via hook
+      const returned: any = await completeStep(stepId, {
+        workerId: workerId || "unknown",
+        resultData,
+      });
+
+      // Update local steps based on server response (mark completed and activate next)
+      const nextStepId: string | null =
+        returned.nextStepId ?? returned.NextStepId ?? null;
+
+      const updatedSteps = steps.map((s) => {
+        if (s.id === stepId) return { ...s, status: StepStatus.Completed };
+        if (nextStepId && s.id === nextStepId)
+          return { ...s, status: StepStatus.InProgress };
+        return s;
+      });
+
+      setSteps(updatedSteps);
+
+      // persist progress
+      try {
+        if (taskAssignmentId) {
+          await AsyncStorage.setItem(
+            `taskProgress:${taskAssignmentId}`,
+            JSON.stringify(updatedSteps),
+          );
+        }
+      } catch (e) {
+        // ignore
+      }
+
+      const allDone = updatedSteps.every(
+        (s) => s.status === StepStatus.Completed,
+      );
+      if (allDone) {
+        Alert.alert(
+          "Task Completed",
+          "All steps have been completed. Would you like to finish this task?",
+          [
+            { text: "Not Yet", style: "cancel" },
+            { text: "Finish Task", onPress: handleFinishTask },
+          ],
         );
       }
-    } catch (e) {
-      // ignore
-    }
-
-    // TODO: Call API to update step execution status
-    // await updateStepExecution(stepId, StepStatus.Completed);
-
-    // Check if all steps completed
-    const allDone = updatedSteps.every(
-      (s) => s.status === StepStatus.Completed,
-    );
-
-    if (allDone) {
+    } catch (err: any) {
+      console.error("Complete step failed:", err);
       Alert.alert(
-        "Task Completed",
-        "All steps have been completed. Would you like to finish this task?",
-        [
-          {
-            text: "Not Yet",
-            style: "cancel",
-          },
-          {
-            text: "Finish Task",
-            onPress: handleFinishTask,
-          },
-        ],
+        "Error",
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to complete step",
       );
+    } finally {
+      setLoading(false);
     }
   };
 

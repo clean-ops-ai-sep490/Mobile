@@ -143,6 +143,19 @@ const useAuth = () => {
     }
   };
 
+  const getWorkerProfile = async () => {
+    try {
+      const res = await axiosInstance.get("/Workers/me");
+      if (res.data && res.data.length > 0) {
+        return res.data[0];
+      }
+      return null;
+    } catch (err) {
+      console.error("Lỗi lấy thông tin Worker:", err);
+      return null;
+    }
+  };
+
   return {
     user,
     loading,
@@ -155,6 +168,7 @@ const useAuth = () => {
     getMe,
     refreshToken,
     verifyOtp,
+    getWorkerProfile,
   };
 };
 

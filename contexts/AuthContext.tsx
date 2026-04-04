@@ -29,6 +29,7 @@ interface AuthContextType {
     token: string,
     newPassword: string,
   ) => Promise<void>;
+  getWorkerProfile: () => Promise<any>; // ✅ Thêm khai báo hàm ở đây
 }
 
 // ─── Context ───────────────────────────────────────────────────
@@ -44,6 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     forgotPassword: forgotPasswordApi,
     resetPassword: resetPasswordApi,
     verifyOtp: verifyOtpApi,
+    getWorkerProfile, // ✅ Lấy hàm này từ useAuthHook
   } = useAuthHook();
 
   const [appUser, setAppUser] = useState<AuthUser | null>(null);
@@ -121,8 +123,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // 2. Xoá token/local storage
       await AsyncStorage.multiRemove([
-        "accessToken",
-        "refreshToken",
+        "access_token",
+        "refresh_token",
         "userInfo",
       ]);
 
@@ -185,6 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         forgotPassword,
         verifyOtp,
         resetPassword,
+        getWorkerProfile, // ✅ Export ra cho toàn app dùng được
       }}
     >
       {children}

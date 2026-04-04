@@ -1,18 +1,19 @@
+import FormattedDate from "@/components/common/FormattedDate";
 import Header from "@/components/common/Header";
 import {
-    EmergencyLeaveRequestDto,
-    useEmergencyLeaveRequest,
+  EmergencyLeaveRequestDto,
+  useEmergencyLeaveRequest,
 } from "@/hooks/useEmergencyLeave";
 import { WorkerStackParamList } from "@/navigation/AppNavigator";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useEffect, useState } from "react";
 import {
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    View,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 
 type Props = NativeStackScreenProps<
@@ -53,6 +54,16 @@ export default function EmergencyLeaveDetailScreen({
             <Text style={styles.row}>
               Task Assignment: {item.taskAssignmentId ?? "—"}
             </Text>
+
+            {/* ✅ Thêm 2 field Leave From và Leave To ở đây */}
+            <Text style={styles.row}>
+              Leave From: <FormattedDate dateString={item.leaveDateFrom} />
+            </Text>
+            <Text style={styles.row}>
+              Leave To: <FormattedDate dateString={item.leaveDateTo} />
+            </Text>
+            {/* ========================================= */}
+
             <Text style={styles.row}>Status: {item.status}</Text>
             {item.audioUrl && (
               <Text style={styles.row}>Audio: {item.audioUrl}</Text>
@@ -62,7 +73,9 @@ export default function EmergencyLeaveDetailScreen({
                 Transcription: {item.transcription}
               </Text>
             )}
-            <Text style={styles.row}>Created: {item.created}</Text>
+            <Text style={styles.row}>
+              Created: <FormattedDate dateString={item.created} />
+            </Text>
           </View>
         )}
       </ScrollView>
