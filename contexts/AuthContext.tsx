@@ -29,7 +29,7 @@ interface AuthContextType {
     token: string,
     newPassword: string,
   ) => Promise<void>;
-  getWorkerProfile: () => Promise<any>; // ✅ Thêm khai báo hàm ở đây
+  getWorkerProfile: () => Promise<any>;
 }
 
 // ─── Context ───────────────────────────────────────────────────
@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     forgotPassword: forgotPasswordApi,
     resetPassword: resetPasswordApi,
     verifyOtp: verifyOtpApi,
-    getWorkerProfile, // ✅ Lấy hàm này từ useAuthHook
+    getWorkerProfile,
   } = useAuthHook();
 
   const [appUser, setAppUser] = useState<AuthUser | null>(null);

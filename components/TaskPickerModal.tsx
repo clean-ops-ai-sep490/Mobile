@@ -2,13 +2,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTaskAssignments } from "@/hooks/useTaskAssignment";
 import React, { useEffect, useState } from "react";
 import {
-    FlatList,
-    Modal,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  FlatList,
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
+import FormattedDate from "./common/FormattedDate";
 
 interface Props {
   visible: boolean;
@@ -18,27 +19,69 @@ interface Props {
 
 export default function TaskPickerModal({ visible, onClose, onSelect }: Props) {
   const { getTaskAssignments } = useTaskAssignments();
-  const { user } = useAuth();
+  const { getWorkerProfile } = useAuth();
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [workerId, setWorkerId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!visible) return;
+    const fetchWorkerId = async () => {
+      try {
+        const profile = await getWorkerProfile();
+        if (profile?.id) setWorkerId(profile.id);
+      } catch (error) {
+        console.error("Error fetching worker profile:", error);
+      }
+    };
+    fetchWorkerId();
+  }, []);
+
+  useEffect(() => {
+    if (!visible || !workerId) return;
+
+    const buildLocalDateRange = (date: Date) => {
+      const baseDate = `${date.getFullYear()}-${String(
+        date.getMonth() + 1,
+      ).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
+      return {
+        fromDate: `${baseDate}T00:00:00Z`,
+        toDate: `${baseDate}T23:59:59Z`,
+      };
+    };
+
     (async () => {
       setLoading(true);
       try {
+        const { fromDate, toDate } = buildLocalDateRange(new Date());
+
+        console.log("🕒 [TASK_PICKER] Date Range", {
+          fromDate,
+          toDate,
+        });
+
         const res = await getTaskAssignments(
-          { assigneeId: user?.userId },
-          { pageNumber: 1, pageSize: 50 },
+          {
+            assigneeId: workerId,
+            fromDate,
+          },
+          {
+            pageNumber: 1,
+            pageSize: 20,
+            sortBy: "scheduledStartAt",
+            sortDescending: false,
+          },
         );
+
         setTasks(res?.content || []);
       } catch (e) {
+        console.error("❌ [TASK_PICKER] Fetch error", e);
         setTasks([]);
       } finally {
         setLoading(false);
       }
     })();
-  }, [visible]);
+  }, [visible, workerId]);
 
   return (
     <Modal visible={visible} transparent animationType="slide">
@@ -57,21 +100,34 @@ export default function TaskPickerModal({ visible, onClose, onSelect }: Props) {
                   onClose();
                 }}
               >
-                <Text style={styles.rowTitle}>{item.taskRef || item.id}</Text>
-                <Text style={styles.rowSub}>
-                  {item.location || item.taskLocation || ""}
+                <Text style={styles.rowTitle}>
+                  {item.isAdhocTask && item.nameAdhocTask
+                    ? `Ad-hoc: ${item.nameAdhocTask}`
+                    : "Schedule: "}
+                  <FormattedDate
+                    dateString={item.scheduledStartAt}
+                    style={styles.rowTitle}
+                  />
                 </Text>
+
+                <Text style={styles.rowSub}>
+                  📍 {item.displayLocation || "No location assigned"}
+                </Text>
+
+                <View style={styles.statusBadge}>
+                  <Text style={styles.statusText}>{item.status}</Text>
+                </View>
               </TouchableOpacity>
             )}
             ListEmptyComponent={
               <Text style={styles.empty}>
-                {loading ? "Loading..." : "No tasks found"}
+                {loading ? "Loading tasks..." : "No upcoming tasks found"}
               </Text>
             }
           />
 
           <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-            <Text style={styles.closeText}>Close</Text>
+            <Text style={styles.closeText}>Cancel</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -82,25 +138,47 @@ export default function TaskPickerModal({ visible, onClose, onSelect }: Props) {
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
+    backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "flex-end",
   },
   container: {
     backgroundColor: "#fff",
-    padding: 16,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    maxHeight: "70%",
+    padding: 20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "85%",
   },
-  title: { fontSize: 16, fontWeight: "700", marginBottom: 12 },
+  title: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 16,
+    color: "#1e293b",
+  },
   row: {
-    paddingVertical: 12,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#f1f5f9",
   },
-  rowTitle: { fontSize: 14, fontWeight: "700" },
-  rowSub: { fontSize: 12, color: "#64748B", marginTop: 4 },
-  empty: { padding: 12, color: "#94A3B8" },
-  closeBtn: { marginTop: 8, alignItems: "center" },
-  closeText: { color: "#2563EB", fontWeight: "700" },
+  rowTitle: { fontSize: 15, fontWeight: "700", color: "#0f172a" },
+  rowSub: { fontSize: 13, color: "#64748b", marginTop: 6 },
+  statusBadge: {
+    marginTop: 10,
+    backgroundColor: "#f0f9ff",
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#bae6fd",
+  },
+  statusText: { fontSize: 11, fontWeight: "600", color: "#0369a1" },
+  empty: { padding: 40, textAlign: "center", color: "#94a3b8" },
+  closeBtn: {
+    marginTop: 15,
+    padding: 15,
+    alignItems: "center",
+    backgroundColor: "#f8fafc",
+    borderRadius: 12,
+  },
+  closeText: { color: "#475569", fontWeight: "bold", fontSize: 16 },
 });

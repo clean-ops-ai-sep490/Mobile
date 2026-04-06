@@ -151,7 +151,7 @@ const useAuth = () => {
       }
       return null;
     } catch (err) {
-      console.error("Lỗi lấy thông tin Worker:", err);
+      console.error("Error fetching worker profile:", err);
       return null;
     }
   };

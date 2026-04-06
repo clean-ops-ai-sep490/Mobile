@@ -30,11 +30,7 @@ import CreateEmergencyTaskScreen from "@/screens/supervisor/adhoc-task/CreateEme
 import SupervisorHomeScreen from "@/screens/supervisor/home/SupervisorHomeScreen";
 import SwapRequestDetailScreen from "@/screens/supervisor/swap-task/SwapRequestDetailScreen";
 import SwapRequestListScreen from "@/screens/supervisor/swap-task/SwapRequestListScreen";
-import EmergencyLeaveDetailScreen from "@/screens/worker/EmergencyLeaveDetailScreen";
-import EquipmentRequestDetailScreen from "@/screens/worker/EquipmentRequestDetailScreen";
-import IssueReportDetailScreen from "@/screens/worker/IssueReportDetailScreen";
 import ListAllRequestsScreen from "@/screens/worker/ListAllRequestsScreen";
-import TaskSwapDetailScreen from "@/screens/worker/TaskSwapDetailScreen";
 
 // ─── Auth Route params ──────────────────────────────────────────────────────
 export type AuthStackParamList = {
@@ -174,22 +170,6 @@ function WorkerNavigator() {
       <WorkerStack.Screen
         name="ListAllRequests"
         component={ListAllRequestsScreen}
-      />
-      <WorkerStack.Screen
-        name="EmergencyLeaveDetail"
-        component={EmergencyLeaveDetailScreen}
-      />
-      <WorkerStack.Screen
-        name="IssueReportDetail"
-        component={IssueReportDetailScreen}
-      />
-      <WorkerStack.Screen
-        name="TaskSwapDetail"
-        component={TaskSwapDetailScreen}
-      />
-      <WorkerStack.Screen
-        name="EquipmentRequestDetail"
-        component={EquipmentRequestDetailScreen}
       />
       <WorkerStack.Screen
         name="TaskExecution"

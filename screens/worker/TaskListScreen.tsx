@@ -39,7 +39,7 @@ const getDays = () => {
   });
 };
 
-type TaskStatus = "in_progress" | "upcoming" | "completed" | "block";
+type TaskStatus = "in_progress" | "not_started" | "completed" | "block";
 
 interface Task {
   id: string;
@@ -65,7 +65,7 @@ const STATUS_CONFIG: Record<
     bg: "#FEF3C7",
     dot: "#F59E0B",
   },
-  upcoming: {
+  not_started: {
     label: "Not Started",
     color: "#3B82F6",
     bg: "#EFF6FF",
@@ -128,7 +128,7 @@ const TaskCard = ({
 }) => {
   const isInProgress = task.status === "in_progress";
   const isCompleted = task.status === "completed";
-  const isUpcoming = task.status === "upcoming";
+  const isNotStarted = task.status === "not_started";
 
   return (
     <View style={[styles.card, isInProgress && styles.cardActive]}>
@@ -142,8 +142,8 @@ const TaskCard = ({
         </View>
         <Text style={styles.cardTime}>
           {isCompleted
-            ? `Finished ${task.finishedAt}`
-            : `${task.startTime} – ${task.endTime}`}
+            ? `Finished ${task.finishedAt || ""}`
+            : `${task.startTime} ${task.endTime ? `– ${task.endTime}` : ""}`}
         </Text>
       </View>
 
@@ -154,7 +154,7 @@ const TaskCard = ({
       <View style={styles.cardLocation}>
         <Ionicons name="location-outline" size={13} color="#94A3B8" />
         <Text style={styles.locationText}>
-          {task.location} • {task.sublocation}
+          {task.location} {task.sublocation ? `• ${task.sublocation}` : ""}
         </Text>
       </View>
 
@@ -164,17 +164,14 @@ const TaskCard = ({
           <>
             <AppButton
               label="Continue"
-              onPress={() => {}}
+              onPress={() => onStart && onStart(task.id)}
               iconLeft="play"
               size="md"
               style={{ flex: 1, marginBottom: 0 }}
             />
-            <TouchableOpacity style={styles.btnCamera}>
-              <Ionicons name="camera-outline" size={20} color="#F59E0B" />
-            </TouchableOpacity>
           </>
         )}
-        {isUpcoming && (
+        {isNotStarted && (
           <AppButton
             label="Start Task"
             onPress={() => onStart && onStart(task.id)}
@@ -206,52 +203,35 @@ export default function TaskListScreen() {
   const [loadingTasks, setLoadingTasks] = useState(false);
   const days = getDays();
   const navigation = useNavigation();
-  const { user } = useAuth();
+  const { getWorkerProfile } = useAuth();
   const {
     getTaskAssignments,
     startTask,
     loading: hookLoading,
   } = useTaskAssignments();
   const [tasks, setTasks] = useState<TaskAssignmentDto[]>([]);
+  const [workerId, setWorkerId] = useState<string | null>(null);
+  const [loadingWorker, setLoadingWorker] = useState(false);
+
+  useEffect(() => {
+    const fetchWorkerId = async () => {
+      try {
+        setLoadingWorker(true);
+        const profile = await getWorkerProfile();
+        if (profile && profile.id) {
+          setWorkerId(profile.id);
+        }
+      } catch (error) {
+        console.error("Error fetching worker profile:", error);
+      } finally {
+        setLoadingWorker(false);
+      }
+    };
+    fetchWorkerId();
+  }, []);
 
   const handleNavigate = (screen: TabKey) => {
     navigation.navigate(screen as never);
-  };
-
-  // DEV: demo tasks map (id -> steps) to allow testing without backend
-  const [demoMap, setDemoMap] = useState<Record<string, any[]>>({});
-
-  const loadDemoTask = () => {
-    const demoId = `demo-${Date.now()}`;
-    const demoAssignment: TaskAssignmentDto = {
-      id: demoId,
-      taskScheduleId: "demo-schedule",
-      assigneeId: user?.userId || "demo-worker",
-      originalAssigneeId: user?.userId || "demo-worker",
-      status: TaskAssignmentStatus.NotStarted,
-      scheduledStartAt: new Date().toISOString(),
-      isAdhocTask: true,
-      nameAdhocTask: "Demo - Verify Floor Clean",
-      displayLocation: "Demo Building - Lobby",
-    };
-
-    const demoSteps = [
-      {
-        id: `${demoId}-s1`,
-        sopStepId: "sop-1",
-        stepOrder: 1,
-        status: "NotStarted",
-      },
-      {
-        id: `${demoId}-s2`,
-        sopStepId: "sop-2",
-        stepOrder: 2,
-        status: "NotStarted",
-      },
-    ];
-
-    setTasks([demoAssignment]);
-    setDemoMap((m) => ({ ...m, [demoId]: demoSteps }));
   };
 
   const onRefresh = async () => {
@@ -263,46 +243,58 @@ export default function TaskListScreen() {
   const buildDateForOffset = (offset: number) => {
     const d = new Date(TODAY);
     d.setDate(TODAY.getDate() + offset);
-    return d.toISOString().split("T")[0];
+
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
   };
 
-  const mapStatusToTaskStatus = (s: TaskAssignmentStatus): TaskStatus => {
-    switch (s) {
-      case TaskAssignmentStatus.InProgress:
+  const mapStatusToTaskStatus = (
+    s: TaskAssignmentStatus | string | number,
+  ): TaskStatus => {
+    const val = String(s);
+    switch (val) {
+      case "InProgress":
+      case "1":
         return "in_progress";
-      case TaskAssignmentStatus.Completed:
+      case "Completed":
+      case "2":
         return "completed";
-      case TaskAssignmentStatus.Block:
+      case "Block":
+      case "3":
         return "block";
-      case TaskAssignmentStatus.NotStarted:
+      case "NotStarted":
+      case "0":
       default:
-        return "upcoming";
+        return "not_started";
     }
   };
 
   const fetchTasks = async () => {
-    if (!user?.userId) return;
+    if (!workerId) return;
     setLoadingTasks(true);
-    const date = buildDateForOffset(selectedDay);
+
+    const baseDate = buildDateForOffset(selectedDay);
     const filterReq: any = {
-      assigneeId: user.userId,
-      fromDate: date,
-      toDate: date,
+      assigneeId: workerId,
+      fromDate: `${baseDate}T00:00:00Z`,
+      toDate: `${baseDate}T23:59:59Z`,
     };
+
     if (filter !== "all") {
-      // map filter string to numeric enum
-      if (filter === "in_progress")
-        filterReq.status = TaskAssignmentStatus.InProgress;
-      if (filter === "completed")
-        filterReq.status = TaskAssignmentStatus.Completed;
-      if (filter === "upcoming")
-        filterReq.status = TaskAssignmentStatus.NotStarted;
+      if (filter === "in_progress") filterReq.status = "InProgress";
+      if (filter === "completed") filterReq.status = "Completed";
+      if (filter === "not_started") filterReq.status = "NotStarted";
+      if (filter === "block") filterReq.status = "Block";
     }
 
     const resp = await getTaskAssignments(filterReq, {
       pageNumber: 1,
-      pageSize: 200,
+      pageSize: 20,
     });
+
     if (resp && resp.content) {
       setTasks(resp.content);
     } else {
@@ -313,33 +305,28 @@ export default function TaskListScreen() {
 
   useEffect(() => {
     fetchTasks();
-  }, [selectedDay, filter, user?.userId]);
+  }, [selectedDay, filter, workerId]);
 
   const handleStartTask = async (id: string) => {
-    if (!user?.userId) {
-      Alert.alert("User not available", "Cannot start task without user id.");
+    if (!workerId) {
+      Alert.alert(
+        "Worker not available",
+        "Cannot start task without worker id.",
+      );
       return;
     }
+
     try {
       setLoadingTasks(true);
-      // If demo task exists, navigate with demo steps without calling API
-      if (demoMap[id]) {
-        (navigation as any).navigate("TaskExecution", {
-          id,
-          steps: demoMap[id],
-        });
-        return;
-      }
+      const res = await startTask(id, workerId);
+      console.log("DỮ LIỆU API TRẢ VỀ KHI START:", res);
 
-      const res = await startTask(id, user.userId);
-      if (res) {
-        // Navigate to task execution screen and pass steps if returned
-        (navigation as any).navigate("TaskExecution", { id, steps: res.steps });
-      } else {
-        Alert.alert("Start failed", "Could not start the task.");
-      }
+      (navigation as any).navigate("TaskExecution", {
+        id,
+        steps: res?.steps || [],
+      });
     } catch (e: any) {
-      Alert.alert("Error", e?.message || "An error occurred");
+      Alert.alert("Start failed", e?.message || "Could not start the task.");
     } finally {
       setLoadingTasks(false);
     }
@@ -356,10 +343,10 @@ export default function TaskListScreen() {
       id: t.id,
       title: t.isAdhocTask
         ? t.nameAdhocTask || "Adhoc Task"
-        : `Task ${t.taskScheduleId}`,
-      location: t.displayLocation || "",
+        : `Task ${t.taskScheduleId.slice(0, 8).toUpperCase()}`,
+      location: t.displayLocation || "Unknown Location",
       sublocation: "",
-      status: mapStatusToTaskStatus(t.status) as TaskStatus,
+      status: mapStatusToTaskStatus(t.status),
       startTime: time,
       tags: [],
       dayOffset: 0,
@@ -374,11 +361,13 @@ export default function TaskListScreen() {
   const todayTasks = mappedTasks;
   const remaining = todayTasks.filter((t) => t.status !== "completed").length;
 
+  // ✅ Đã cập nhật lại tên và thêm đầy đủ các trạng thái Block, Not Started
   const FILTERS: { key: FilterType; label: string }[] = [
     { key: "all", label: "All" },
+    { key: "not_started", label: "Not Started" },
     { key: "in_progress", label: "In Progress" },
-    { key: "upcoming", label: "Upcoming" },
     { key: "completed", label: "Completed" },
+    { key: "block", label: "Block" },
   ];
 
   return (
@@ -389,23 +378,6 @@ export default function TaskListScreen() {
         onBack={() => handleNavigate("Home")}
         style={{ backgroundColor: "#F5F6FA" }}
       />
-      {__DEV__ && (
-        <View style={{ paddingHorizontal: 20, paddingTop: 10 }}>
-          <TouchableOpacity
-            onPress={loadDemoTask}
-            style={{
-              backgroundColor: "#EFF6FF",
-              padding: 8,
-              borderRadius: 8,
-              alignSelf: "flex-start",
-            }}
-          >
-            <Text style={{ color: "#2563EB", fontWeight: "700" }}>
-              Load demo task
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
       {/* ── Day Selector ── */}
       <View style={styles.dayRow}>
         {days.map((d) => {

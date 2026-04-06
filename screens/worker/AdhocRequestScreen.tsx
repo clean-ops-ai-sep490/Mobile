@@ -1,350 +1,259 @@
 import AppButton from "@/components/common/AppButton";
+import CustomDatePicker from "@/components/common/CustomDatePicker";
 import Header from "@/components/common/Header";
+import { AdHocRequestType, useAdhocRequest } from "@/hooks/useAdhocRequest";
 import { WorkerStackParamList } from "@/navigation/AppNavigator";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useState } from "react";
 import {
-    Alert,
-    Image,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import CameraScreen from "./CameraScreen";
 
 type Props = NativeStackScreenProps<WorkerStackParamList, "AdhocRequest">;
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-type RequestType = "manpower" | "weather";
-type UrgencyLevel = "low" | "medium" | "high";
-type Zone = "Zone C1" | "Zone C2" | "Zone B1" | "Zone B2";
-type Floor = "Floor 3" | "Floor 4" | "Floor 5" | "Floor 2";
+// ─── Constants & Mock Data ──────────────────────────────────────────────────
 
-// ─── Request Type Options ─────────────────────────────────────────────────────
-const REQUEST_TYPES: {
-  key: RequestType;
-  icon: string;
-  label: string;
-  sub: string;
-}[] = [
+const REQUEST_TYPES = [
   {
-    key: "manpower",
-    icon: "people-outline",
-    label: "Manpower",
-    sub: "Report shortage",
+    key: AdHocRequestType.General,
+    icon: "information-circle-outline",
+    label: "General",
+    sub: "Routine request",
+    activeColor: "#2563EB",
+    activeBg: "#EFF6FF",
   },
   {
-    key: "weather",
-    icon: "partly-sunny-outline",
-    label: "Weather",
-    sub: "Affects work",
+    key: AdHocRequestType.Urgent,
+    icon: "alert-circle-outline",
+    label: "Urgent",
+    sub: "Needs fast action",
+    activeColor: "#D97706",
+    activeBg: "#FFFBEB",
+  },
+  {
+    key: AdHocRequestType.HighPriority,
+    icon: "warning-outline",
+    label: "High Priority",
+    sub: "Critical issue",
+    activeColor: "#DC2626",
+    activeBg: "#FEF2F2",
   },
 ];
 
-interface Photo {
-  uri: string;
-}
-
-interface CapturedPhoto {
-  uri: string;
-  timestamp: string;
-}
-
-const FLOORS: Floor[] = ["Floor 2", "Floor 3", "Floor 4", "Floor 5"];
-const ZONES: Zone[] = ["Zone C1", "Zone C2", "Zone B1", "Zone B2"];
-const URGENCY: {
-  key: UrgencyLevel;
-  label: string;
-  color: string;
-  bg: string;
-}[] = [
-  { key: "low", label: "Low", color: "#16A34A", bg: "#F0FDF4" },
-  { key: "medium", label: "Medium", color: "#D97706", bg: "#FFFBEB" },
-  { key: "high", label: "High", color: "#DC2626", bg: "#FEF2F2" },
+// Mock WorkAreas - Trong thực tế bạn nên fetch từ API (VD: useWorkArea hook)
+const MOCK_WORK_AREAS = [
+  {
+    id: "11111111-1111-1111-1111-111111111111",
+    name: "Building A - Floor 2 - Zone C1",
+  },
+  {
+    id: "22222222-2222-2222-2222-222222222222",
+    name: "Building B - Floor 1 - Main Lobby",
+  },
 ];
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function AdhocRequestScreen({ navigation }: Props) {
-  const [requestType, setRequestType] = useState<RequestType>("manpower");
-  const [floor, setFloor] = useState<Floor>("Floor 2");
-  const [zone, setZone] = useState<Zone>("Zone C1");
-  const [building] = useState("Building A - Complex");
-  const [urgency, setUrgency] = useState<UrgencyLevel>("medium");
+  // Hook API
+  const { createRequest, loading } = useAdhocRequest();
+
+  // Form States
+  const [requestType, setRequestType] = useState<AdHocRequestType>(
+    AdHocRequestType.General,
+  );
+  const [workAreaId, setWorkAreaId] = useState<string>(MOCK_WORK_AREAS[0].id);
+  const [reason, setReason] = useState("");
   const [description, setDescription] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [photos, setPhotos] = useState<Photo[]>([]);
-  const [showCamera, setShowCamera] = useState(false);
+
+  const [dateFrom, setDateFrom] = useState<Date>(new Date());
+  const [dateTo, setDateTo] = useState<Date | null>(null);
+
+  const [showFromPicker, setShowFromPicker] = useState(false);
+  const [showToPicker, setShowToPicker] = useState(false);
 
   const selectedType = REQUEST_TYPES.find((t) => t.key === requestType)!;
-  const selectedUrgency = URGENCY.find((u) => u.key === urgency)!;
+  const selectedWorkArea = MOCK_WORK_AREAS.find((w) => w.id === workAreaId)!;
 
-  const handleAddPhoto = () => {
-    if (photos.length >= 3) {
-      Alert.alert("Limit reached", "You can only upload up to 3 photos.");
+  const handleSubmit = async () => {
+    if (!reason.trim()) {
+      Alert.alert("Missing Information", "Please provide a short reason.");
       return;
     }
-    setShowCamera(true);
-  };
 
-  const handleCameraSubmit = (captured: CapturedPhoto[]) => {
-    setShowCamera(false);
-    setPhotos((prev) => {
-      const remaining = 3 - prev.length;
-      const newPhotos = captured
-        .slice(0, remaining)
-        .map((p) => ({ uri: p.uri }));
-      return [...prev, ...newPhotos];
-    });
-  };
+    const payload = {
+      workAreaId,
+      requestType,
+      requestDateFrom: dateFrom.toISOString(),
+      requestDateTo: dateTo ? dateTo.toISOString() : null,
+      reason,
+      description,
+    };
 
-  const handleSubmit = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    const result = await createRequest(payload);
+
+    if (result) {
+      Alert.alert("Success", "Ad-hoc request submitted successfully!");
       navigation.goBack();
-    }, 1500);
+    } else {
+      Alert.alert("Error", "Failed to submit request. Please try again.");
+    }
   };
-
-  if (showCamera) {
-    return (
-      <CameraScreen
-        onClose={() => setShowCamera(false)}
-        onSubmit={handleCameraSubmit}
-      />
-    );
-  }
 
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
-
-      {/* Header */}
       <Header title="Adhoc Request" onBack={() => navigation.goBack()} />
 
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
-        {/* Request Type */}
-        <Text style={styles.sectionLabel}>REQUEST TYPE</Text>
+        {/* REQUEST TYPE */}
+        <Text style={styles.sectionLabel}>REQUEST TYPE (URGENCY)</Text>
         <View style={styles.typeGrid}>
-          {REQUEST_TYPES.map((t) => (
-            <TouchableOpacity
-              key={t.key}
-              style={[
-                styles.typeCard,
-                requestType === t.key && styles.typeCardActive,
-              ]}
-              onPress={() => setRequestType(t.key)}
-              activeOpacity={0.8}
-            >
-              <View
-                style={[
-                  styles.typeIconWrap,
-                  requestType === t.key && styles.typeIconWrapActive,
-                ]}
-              >
-                <Ionicons
-                  name={t.icon as any}
-                  size={22}
-                  color={requestType === t.key ? "#FFF" : "#64748B"}
-                />
-              </View>
-              <Text
-                style={[
-                  styles.typeLabel,
-                  requestType === t.key && styles.typeLabelActive,
-                ]}
-              >
-                {t.label}
-              </Text>
-              <Text
-                style={[
-                  styles.typeSub,
-                  requestType === t.key && styles.typeSubActive,
-                ]}
-              >
-                {t.sub}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Location */}
-        <Text style={styles.sectionLabel}>LOCATION</Text>
-        <View style={styles.locationCard}>
-          {/* Building */}
-          <View style={styles.locationRow}>
-            <Text style={styles.locationFieldLabel}>Building</Text>
-            <View style={styles.locationSelect}>
-              <Text style={styles.locationSelectText}>{building}</Text>
-              <Ionicons name="chevron-down" size={16} color="#64748B" />
-            </View>
-          </View>
-          {/* Floor & Zone */}
-          <View style={styles.locationRowDouble}>
-            <View style={styles.locationHalf}>
-              <Text style={styles.locationFieldLabel}>Floor</Text>
-              <View style={styles.floorZoneRow}>
-                {FLOORS.map((f) => (
-                  <TouchableOpacity
-                    key={f}
-                    style={[
-                      styles.floorZoneBtn,
-                      floor === f && styles.floorZoneBtnActive,
-                    ]}
-                    onPress={() => setFloor(f)}
-                  >
-                    <Text
-                      style={[
-                        styles.floorZoneBtnText,
-                        floor === f && styles.floorZoneBtnTextActive,
-                      ]}
-                    >
-                      {f}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-            <View style={styles.locationHalf}>
-              <Text style={styles.locationFieldLabel}>Zone</Text>
-              <View style={styles.floorZoneRow}>
-                {ZONES.map((z) => (
-                  <TouchableOpacity
-                    key={z}
-                    style={[
-                      styles.floorZoneBtn,
-                      zone === z && styles.floorZoneBtnActive,
-                    ]}
-                    onPress={() => setZone(z)}
-                  >
-                    <Text
-                      style={[
-                        styles.floorZoneBtnText,
-                        zone === z && styles.floorZoneBtnTextActive,
-                      ]}
-                    >
-                      {z}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Urgency */}
-        <Text style={styles.sectionLabel}>URGENCY LEVEL</Text>
-        <View style={styles.urgencyRow}>
-          {URGENCY.map((u) => (
-            <TouchableOpacity
-              key={u.key}
-              style={[
-                styles.urgencyBtn,
-                urgency === u.key && {
-                  backgroundColor: u.bg,
-                  borderColor: u.color,
-                },
-              ]}
-              onPress={() => setUrgency(u.key)}
-              activeOpacity={0.8}
-            >
-              {urgency === u.key && (
-                <View
-                  style={[styles.urgencyDot, { backgroundColor: u.color }]}
-                />
-              )}
-              <Text
-                style={[
-                  styles.urgencyText,
-                  urgency === u.key && { color: u.color, fontWeight: "700" },
-                ]}
-              >
-                {u.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Description */}
-        <Text style={styles.sectionLabel}>SITUATION DESCRIPTION</Text>
-        <TextInput
-          style={styles.descInput}
-          placeholder="Describe the situation in detail..."
-          placeholderTextColor="#94A3B8"
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          numberOfLines={4}
-          textAlignVertical="top"
-        />
-
-        {/* Photos */}
-        <View style={styles.photoRow}>
-          {photos.map((p, i) => (
-            <View key={i} style={styles.photoThumb}>
-              <Image source={{ uri: p.uri }} style={styles.photoImg} />
+          {REQUEST_TYPES.map((t) => {
+            const isActive = requestType === t.key;
+            return (
               <TouchableOpacity
-                style={styles.photoRemove}
-                onPress={() =>
-                  setPhotos((prev) => prev.filter((_, idx) => idx !== i))
-                }
-              >
-                <Ionicons name="close-circle" size={18} color="#EF4444" />
-              </TouchableOpacity>
-            </View>
-          ))}
-          {photos.length < 3 && (
-            <TouchableOpacity style={styles.photoAdd} onPress={handleAddPhoto}>
-              <Ionicons name="camera-outline" size={24} color="#94A3B8" />
-              <Text style={styles.photoAddText}>Add Photo</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Summary */}
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryHeader}>
-            <Ionicons name="document-text-outline" size={16} color="#2563EB" />
-            <Text style={styles.summaryTitle}>Request Summary</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryKey}>Type:</Text>
-            <Text style={styles.summaryVal}>{selectedType.label}</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryKey}>Location:</Text>
-            <Text style={styles.summaryVal}>
-              {building}, {floor}, {zone}
-            </Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryKey}>Urgency:</Text>
-            <View
-              style={[
-                styles.urgencyPill,
-                { backgroundColor: selectedUrgency.bg },
-              ]}
-            >
-              <Text
+                key={t.key}
                 style={[
-                  styles.urgencyPillText,
-                  { color: selectedUrgency.color },
+                  styles.typeCard,
+                  isActive && {
+                    borderColor: t.activeColor,
+                    backgroundColor: t.activeBg,
+                  },
                 ]}
+                onPress={() => setRequestType(t.key)}
+                activeOpacity={0.8}
               >
-                {selectedUrgency.label}
-              </Text>
-            </View>
+                <View
+                  style={[
+                    styles.typeIconWrap,
+                    isActive && { backgroundColor: t.activeColor },
+                  ]}
+                >
+                  <Ionicons
+                    name={t.icon as any}
+                    size={22}
+                    color={isActive ? "#FFF" : "#64748B"}
+                  />
+                </View>
+                <Text
+                  style={[
+                    styles.typeLabel,
+                    isActive && { color: t.activeColor },
+                  ]}
+                >
+                  {t.label}
+                </Text>
+                <Text
+                  style={[
+                    styles.typeSub,
+                    isActive && { color: t.activeColor, opacity: 0.8 },
+                  ]}
+                >
+                  {t.sub}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* WORK AREA */}
+        <Text style={styles.sectionLabel}>WORK AREA</Text>
+        <View style={styles.locationCard}>
+          <Text style={styles.locationFieldLabel}>Select Assigned Area</Text>
+          <View style={styles.locationSelectRow}>
+            {MOCK_WORK_AREAS.map((area) => (
+              <TouchableOpacity
+                key={area.id}
+                style={[
+                  styles.floorZoneBtn,
+                  workAreaId === area.id && styles.floorZoneBtnActive,
+                ]}
+                onPress={() => setWorkAreaId(area.id)}
+              >
+                <Text
+                  style={[
+                    styles.floorZoneBtnText,
+                    workAreaId === area.id && styles.floorZoneBtnTextActive,
+                  ]}
+                >
+                  {area.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
 
-        {/* Actions */}
+        {/* TIMING */}
+        <Text style={styles.sectionLabel}>TIMING</Text>
+        <View style={styles.timeRow}>
+          {/* Start Date */}
+          <View style={styles.timeBox}>
+            <Text style={styles.timeLabel}>Start Date (From)</Text>
+            <TouchableOpacity
+              style={styles.timeSelect}
+              onPress={() => setShowFromPicker(true)}
+            >
+              <Ionicons name="calendar-outline" size={16} color="#64748B" />
+              <Text style={styles.timeText}>
+                {dateFrom.toLocaleDateString()}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* End Date */}
+          <View style={styles.timeBox}>
+            <Text style={styles.timeLabel}>End Date (To - Optional)</Text>
+            <TouchableOpacity
+              style={styles.timeSelect}
+              onPress={() => setShowToPicker(true)}
+            >
+              <Ionicons name="calendar-outline" size={16} color="#64748B" />
+              <Text style={styles.timeText}>
+                {dateTo ? dateTo.toLocaleDateString() : "Not set"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* REASON & DESCRIPTION */}
+        <Text style={styles.sectionLabel}>REQUEST DETAILS</Text>
+        <View style={styles.detailsCard}>
+          <Text style={styles.locationFieldLabel}>Short Reason *</Text>
+          <TextInput
+            style={styles.reasonInput}
+            placeholder="E.g., Out of cleaning supplies"
+            placeholderTextColor="#94A3B8"
+            value={reason}
+            onChangeText={setReason}
+          />
+
+          <Text style={styles.locationFieldLabel}>Detailed Description</Text>
+          <TextInput
+            style={styles.descInput}
+            placeholder="Provide more context about the situation..."
+            placeholderTextColor="#94A3B8"
+            value={description}
+            onChangeText={setDescription}
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+          />
+        </View>
+
+        {/* ACTIONS */}
         <AppButton
           label="Submit Adhoc Request"
           onPress={handleSubmit}
@@ -356,10 +265,35 @@ export default function AdhocRequestScreen({ navigation }: Props) {
         <TouchableOpacity
           style={styles.cancelBtn}
           onPress={() => navigation.goBack()}
+          disabled={loading}
         >
           <Text style={styles.cancelText}>Cancel</Text>
         </TouchableOpacity>
       </ScrollView>
+      <CustomDatePicker
+        visible={showFromPicker}
+        value={dateFrom}
+        onConfirm={(date) => {
+          setDateFrom(date);
+          setShowFromPicker(false);
+          // UX Tốt: Nếu End Date đang được set mà Start Date mới lại lớn hơn End Date, thì reset End Date
+          if (dateTo && date > dateTo) {
+            setDateTo(null);
+          }
+        }}
+        onCancel={() => setShowFromPicker(false)}
+      />
+
+      <CustomDatePicker
+        visible={showToPicker}
+        value={dateTo || dateFrom}
+        minimumDate={dateFrom} // Logic chặt chẽ: End Date không được nhỏ hơn Start Date
+        onConfirm={(date) => {
+          setDateTo(date);
+          setShowToPicker(false);
+        }}
+        onCancel={() => setShowToPicker(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -380,12 +314,11 @@ const styles = StyleSheet.create({
   // Type Grid
   typeGrid: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
+    justifyContent: "space-between",
     marginBottom: 20,
   },
   typeCard: {
-    width: "30%",
+    width: "31%",
     backgroundColor: "#FFF",
     borderRadius: 14,
     padding: 12,
@@ -393,13 +326,8 @@ const styles = StyleSheet.create({
     gap: 6,
     borderWidth: 1.5,
     borderColor: "#F1F5F9",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
     elevation: 1,
   },
-  typeCardActive: { borderColor: "#2563EB", backgroundColor: "#EFF6FF" },
   typeIconWrap: {
     width: 44,
     height: 44,
@@ -408,16 +336,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  typeIconWrapActive: { backgroundColor: "#2563EB" },
   typeLabel: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "700",
     color: "#475569",
     textAlign: "center",
   },
-  typeLabelActive: { color: "#1E40AF" },
-  typeSub: { fontSize: 10, color: "#94A3B8", textAlign: "center" },
-  typeSubActive: { color: "#3B82F6" },
+  typeSub: { fontSize: 9, color: "#94A3B8", textAlign: "center" },
 
   // Location
   locationCard: {
@@ -427,124 +352,88 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderWidth: 1,
     borderColor: "#F1F5F9",
-    gap: 14,
   },
-  locationRow: { gap: 8 },
   locationFieldLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "600",
-    color: "#94A3B8",
-    letterSpacing: 0.5,
-    marginBottom: 6,
+    color: "#64748B",
+    marginBottom: 8,
   },
-  locationSelect: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#F8FAFC",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+  locationSelectRow: {
+    gap: 8,
   },
-  locationSelectText: { fontSize: 14, color: "#1E293B", fontWeight: "500" },
-  locationRowDouble: { flexDirection: "row", gap: 12 },
-  locationHalf: { flex: 1 },
-  floorZoneRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   floorZoneBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: "#F8FAFC",
     borderWidth: 1,
     borderColor: "#E2E8F0",
   },
   floorZoneBtnActive: { backgroundColor: "#EFF6FF", borderColor: "#2563EB" },
-  floorZoneBtnText: { fontSize: 12, color: "#64748B", fontWeight: "500" },
+  floorZoneBtnText: { fontSize: 13, color: "#64748B", fontWeight: "500" },
   floorZoneBtnTextActive: { color: "#2563EB", fontWeight: "700" },
 
-  // Urgency
-  urgencyRow: { flexDirection: "row", gap: 10, marginBottom: 20 },
-  urgencyBtn: {
-    flex: 1,
+  // Timing
+  timeRow: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: "#FFF",
-    borderWidth: 1.5,
-    borderColor: "#E2E8F0",
-  },
-  urgencyDot: { width: 8, height: 8, borderRadius: 4 },
-  urgencyText: { fontSize: 14, fontWeight: "600", color: "#64748B" },
-
-  // Description
-  descInput: {
-    backgroundColor: "#FFF",
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    padding: 14,
-    fontSize: 14,
-    color: "#1E293B",
-    minHeight: 100,
+    gap: 12,
     marginBottom: 20,
   },
-
-  // Photos
-  photoRow: { flexDirection: "row", gap: 10, marginBottom: 20 },
-  photoAdd: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
-    backgroundColor: "#FFF",
-    borderWidth: 1.5,
-    borderColor: "#E2E8F0",
-    borderStyle: "dashed",
-    justifyContent: "center",
+  timeBox: {
+    flex: 1,
+  },
+  timeLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#94A3B8",
+    marginBottom: 6,
+  },
+  timeSelect: {
+    flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 8,
+    backgroundColor: "#FFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 10,
+    padding: 12,
   },
-  photoAddText: { fontSize: 10, color: "#94A3B8", fontWeight: "600" },
-  photoThumb: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
-    overflow: "hidden",
-    position: "relative",
+  timeText: {
+    fontSize: 13,
+    color: "#1E293B",
+    fontWeight: "500",
   },
-  photoImg: { width: 80, height: 80 },
-  photoRemove: { position: "absolute", top: 2, right: 2 },
 
-  // Summary
-  summaryCard: {
-    backgroundColor: "#EFF6FF",
+  // Details
+  detailsCard: {
+    backgroundColor: "#FFF",
     borderRadius: 14,
     padding: 16,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: "#BFDBFE",
+    borderColor: "#F1F5F9",
   },
-  summaryHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 12,
+  reasonInput: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    padding: 12,
+    fontSize: 14,
+    color: "#1E293B",
+    marginBottom: 16,
   },
-  summaryTitle: { fontSize: 13, fontWeight: "700", color: "#1E40AF" },
-  summaryRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
+  descInput: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    padding: 12,
+    fontSize: 14,
+    color: "#1E293B",
+    minHeight: 100,
   },
-  summaryKey: { fontSize: 13, color: "#475569", fontWeight: "500" },
-  summaryVal: { fontSize: 13, color: "#1E293B", fontWeight: "600" },
-  urgencyPill: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20 },
-  urgencyPillText: { fontSize: 12, fontWeight: "700" },
 
   cancelBtn: { alignItems: "center", paddingVertical: 14 },
   cancelText: { fontSize: 15, color: "#64748B", fontWeight: "600" },

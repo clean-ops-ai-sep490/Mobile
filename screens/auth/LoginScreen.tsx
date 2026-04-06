@@ -100,7 +100,7 @@ export default function LoginScreen({ onNavigate }: Props) {
       console.log("=== ERROR MESSAGE ===", e?.message);
       console.log("=== ERROR CODE ===", e?.code);
       setApiError(
-        e?.response?.data?.message || "Đăng nhập thất bại. Vui lòng thử lại.",
+        e?.response?.data?.message || "Login failed. Please try again.",
       );
     } finally {
       setLoading(false);

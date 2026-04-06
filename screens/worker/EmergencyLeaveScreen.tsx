@@ -515,6 +515,7 @@ export default function EmergencyLeaveScreen({
             onPress: () => {
               onSubmitSuccess?.(result.id);
               onClose?.();
+              navigation.goBack();
             },
           },
         ],

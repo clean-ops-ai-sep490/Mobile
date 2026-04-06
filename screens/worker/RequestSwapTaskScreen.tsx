@@ -1,7 +1,9 @@
 import AppButton from "@/components/common/AppButton";
 import BottomTabBar, { TabKey } from "@/components/common/BottomTabBar";
+import FormattedDate from "@/components/common/FormattedDate";
 import Header from "@/components/common/Header";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTaskAssignments } from "@/hooks/useTaskAssignment";
 import { useTaskSwap } from "@/hooks/useTaskSwap";
 import { WorkerStackParamList } from "@/navigation/AppNavigator";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,14 +27,18 @@ type Props = NativeStackScreenProps<WorkerStackParamList, "SwapTask">;
 export default function SwapTaskScreen({ navigation, route }: Props) {
   const { create, loading, getSwapCandidates } = useTaskSwap();
   const { user } = useAuth();
+  const { getTaskAssignments } = useTaskAssignments();
 
   const currentTaskId = route.params?.taskAssignmentId;
-  const currentUserId = user?.userId || "";
+  const { getWorkerProfile } = useAuth();
+  const [workerId, setWorkerId] = useState<string | null>(null);
+  const [loadingWorker, setLoadingWorker] = useState(false);
 
   const [candidates, setCandidates] = useState<any[]>([]);
   const [selected, setSelected] = useState<any>(null);
   const [reason, setReason] = useState("");
   const [loadingCandidates, setLoadingCandidates] = useState(true);
+  const [currentTask, setCurrentTask] = useState<any>(null);
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -45,6 +51,55 @@ export default function SwapTaskScreen({ navigation, route }: Props) {
   useEffect(() => {
     fetchCandidates();
   }, [currentTaskId]);
+
+  useEffect(() => {
+    if (!currentTaskId || !workerId) return;
+
+    const fetchCurrentTask = async () => {
+      try {
+        // Lấy task assignments của chính worker
+        const res = await getTaskAssignments(
+          {
+            assigneeId: workerId,
+            fromDate: "1970-01-01T00:00:00Z", // hoặc range rộng
+          },
+          {
+            pageNumber: 1,
+            pageSize: 100,
+            sortBy: "scheduledStartAt",
+            sortDescending: false,
+          },
+        );
+
+        const task = res.content.find((t: any) => t.id === currentTaskId);
+        setCurrentTask(task || null);
+      } catch (err) {
+        console.error("Failed to fetch current task", err);
+        setCurrentTask(null);
+      }
+    };
+
+    fetchCurrentTask();
+  }, [currentTaskId, workerId]);
+
+  useEffect(() => {
+    const fetchWorkerId = async () => {
+      try {
+        setLoadingWorker(true);
+        const profile = await getWorkerProfile();
+
+        if (profile && profile.id) {
+          setWorkerId(profile.id);
+        }
+      } catch (error) {
+        console.error("Error fetching worker profile:", error);
+      } finally {
+        setLoadingWorker(false);
+      }
+    };
+
+    fetchWorkerId();
+  }, []);
 
   const fetchCandidates = async () => {
     if (!currentTaskId) return;
@@ -80,16 +135,6 @@ export default function SwapTaskScreen({ navigation, route }: Props) {
     return { valid: true };
   };
 
-  /* ================= HELPERS ================= */
-
-  const formatTime = (date: string) => {
-    const d = new Date(date);
-    return d.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
   /* ================= ANIMATION ================= */
 
   const handleSelect = (item: any) => {
@@ -109,20 +154,6 @@ export default function SwapTaskScreen({ navigation, route }: Props) {
     ]).start();
   };
 
-  /* ================= POLLING ================= */
-
-  useEffect(() => {
-    let interval: any;
-
-    if (selected) {
-      interval = setInterval(() => {
-        console.log("Checking swap status...");
-      }, 5000);
-    }
-
-    return () => clearInterval(interval);
-  }, [selected]);
-
   /* ================= SUBMIT ================= */
 
   const handleSubmit = () => {
@@ -140,20 +171,26 @@ export default function SwapTaskScreen({ navigation, route }: Props) {
         onPress: async () => {
           try {
             await create({
-              taskAssignmentId: currentTaskId,
+              taskAssignmentId: currentTaskId.slice(0, 8),
               targetTaskAssignmentId: selected.task.taskAssignmentId,
-              requesterId: currentUserId,
+              requesterId: workerId || "",
               targetWorkerId: selected.workerId,
               requesterNote: reason,
             });
 
-            navigation.goBack();
+            Alert.alert("Success", "Your swap request has been submitted.", [
+              { text: "OK", onPress: () => navigation.goBack() },
+            ]);
           } catch (e: any) {
             console.error(
               "Error submitting swap request:",
               e.response?.data || "Unknown error",
             );
-            // Alert.alert("Error", "Swap failed");
+            Alert.alert(
+              "Error",
+              e.response?.data?.message ||
+                "Failed to submit swap request. Please try again.",
+            );
           }
         },
       },
@@ -187,8 +224,15 @@ export default function SwapTaskScreen({ navigation, route }: Props) {
               <Text style={styles.name}>{item.workerName}</Text>
               <Text style={styles.location}>{item.task.displayLocation}</Text>
               <Text style={styles.time}>
-                {formatTime(item.task.scheduledStartAt)} -{" "}
-                {formatTime(item.task.scheduledEndAt)}
+                <FormattedDate
+                  dateString={item.task.scheduledStartAt}
+                  style={styles.time}
+                />{" "}
+                -{" "}
+                <FormattedDate
+                  dateString={item.task.scheduledEndAt}
+                  style={styles.time}
+                />
               </Text>
 
               {!validation.valid && (
@@ -214,9 +258,27 @@ export default function SwapTaskScreen({ navigation, route }: Props) {
       <ScrollView contentContainerStyle={styles.container}>
         {/* YOUR TASK */}
         <Text style={styles.section}>Your Task</Text>
-        <View style={styles.yourTask}>
-          <Text style={styles.bold}>Task ID: {currentTaskId}</Text>
-        </View>
+        {currentTask ? (
+          <View style={styles.taskCard}>
+            <Text style={styles.rowTitle}>
+              {currentTask.isAdhocTask && currentTask.nameAdhocTask
+                ? `Ad-hoc: ${currentTask.nameAdhocTask}`
+                : `Schedule: `}
+              <FormattedDate
+                dateString={currentTask.scheduledStartAt}
+                style={styles.rowTitle}
+              />
+            </Text>
+            <Text style={styles.rowSub}>
+              📍 {currentTask.displayLocation || "No location assigned"}
+            </Text>
+            <View style={styles.statusBadge}>
+              <Text style={styles.statusText}>{currentTask.status}</Text>
+            </View>
+          </View>
+        ) : (
+          <Text style={styles.empty}>Loading task...</Text>
+        )}
 
         {/* SELECT */}
         <Text style={styles.section}>Select Target Task</Text>
@@ -357,4 +419,26 @@ const styles = StyleSheet.create({
   },
 
   bold: { fontWeight: "700" },
+  taskCard: {
+    backgroundColor: "#FFF",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  rowTitle: { fontSize: 15, fontWeight: "700", color: "#0f172a" },
+  rowSub: { fontSize: 13, color: "#64748b", marginTop: 6 },
+  statusBadge: {
+    marginTop: 10,
+    backgroundColor: "#f0f9ff",
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#bae6fd",
+  },
+  statusText: { fontSize: 11, fontWeight: "600", color: "#0369a1" },
+  empty: { padding: 20, textAlign: "center", color: "#94a3b8" },
 });

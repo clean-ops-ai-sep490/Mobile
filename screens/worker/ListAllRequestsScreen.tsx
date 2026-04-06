@@ -22,6 +22,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import EmergencyLeaveDetailModal from "./EmergencyLeaveDetailModal";
+import EquipmentRequestDetailModal from "./EquipmentRequestDetailModal";
+import IssueReportDetailModal from "./IssueReportDetailModal";
+import TaskSwapDetailModal from "./TaskSwapDetailModal";
 
 type Props = NativeStackScreenProps<WorkerStackParamList, "ListAllRequests">;
 
@@ -239,6 +243,14 @@ export default function MyRequestsScreen({ navigation }: Props) {
   const [issItems, setIssItems] = useState<IssueReport[]>([]);
   const [swItems, setSwItems] = useState<TaskSwapRequestListItem[]>([]);
   const [elItems, setElItems] = useState<EmergencyLeaveRequestDto[]>([]);
+  const [emModalVisible, setEmModalVisible] = useState(false);
+  const [emModalId, setEmModalId] = useState<string | null>(null);
+  const [issueModalVisible, setIssueModalVisible] = useState(false);
+  const [issueModalId, setIssueModalId] = useState<string | null>(null);
+  const [swapModalVisible, setSwapModalVisible] = useState(false);
+  const [swapModalId, setSwapModalId] = useState<string | null>(null);
+  const [equipmentModalVisible, setEquipmentModalVisible] = useState(false);
+  const [equipmentModalItem, setEquipmentModalItem] = useState<any>(null);
 
   const isLoading =
     eqLoading || issLoading || swLoading || elLoading || loadingWorker;
@@ -281,10 +293,27 @@ export default function MyRequestsScreen({ navigation }: Props) {
     fetchAll();
   }, [fetchAll]);
 
+  const openEmergencyModal = (item: EmergencyLeaveRequestDto) => {
+    setEmModalId(item.id);
+    setEmModalVisible(true);
+  };
+  const openIssueModal = (item: IssueReport) => {
+    setIssueModalId(item.id);
+    setIssueModalVisible(true);
+  };
+  const openSwapModal = (item: TaskSwapRequestListItem) => {
+    setSwapModalId(item.id);
+    setSwapModalVisible(true);
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
     await fetchAll();
     setRefreshing(false);
+  };
+  const openEquipmentModal = (item: EquipmentRequestItem) => {
+    setEquipmentModalItem(item);
+    setEquipmentModalVisible(true);
   };
 
   const counts: Record<TabKey2, number> = {
@@ -376,12 +405,7 @@ export default function MyRequestsScreen({ navigation }: Props) {
                   <TouchableOpacity
                     key={item.id}
                     activeOpacity={0.8}
-                    onPress={() =>
-                      navigation.navigate("EquipmentRequestDetail", {
-                        id: item.id,
-                        item,
-                      })
-                    }
+                    onPress={() => openEquipmentModal(item)}
                   >
                     <EquipmentCard item={item} />
                   </TouchableOpacity>
@@ -396,9 +420,7 @@ export default function MyRequestsScreen({ navigation }: Props) {
                   <TouchableOpacity
                     key={item.id}
                     activeOpacity={0.8}
-                    onPress={() =>
-                      navigation.navigate("IssueReportDetail", { id: item.id })
-                    }
+                    onPress={() => openIssueModal(item)}
                   >
                     <IssueCard item={item} />
                   </TouchableOpacity>
@@ -413,9 +435,7 @@ export default function MyRequestsScreen({ navigation }: Props) {
                   <TouchableOpacity
                     key={item.id}
                     activeOpacity={0.8}
-                    onPress={() =>
-                      navigation.navigate("TaskSwapDetail", { id: item.id })
-                    }
+                    onPress={() => openSwapModal(item)}
                   >
                     <SwapCard item={item} />
                   </TouchableOpacity>
@@ -430,11 +450,7 @@ export default function MyRequestsScreen({ navigation }: Props) {
                   <TouchableOpacity
                     key={item.id}
                     activeOpacity={0.8}
-                    onPress={() =>
-                      navigation.navigate("EmergencyLeaveDetail", {
-                        id: item.id,
-                      })
-                    }
+                    onPress={() => openEmergencyModal(item)}
                   >
                     <EmergencyCard item={item} />
                   </TouchableOpacity>
@@ -443,7 +459,27 @@ export default function MyRequestsScreen({ navigation }: Props) {
           </>
         )}
       </ScrollView>
-
+      <EmergencyLeaveDetailModal
+        visible={emModalVisible}
+        leaveId={emModalId!}
+        onClose={() => setEmModalVisible(false)}
+      />
+      <IssueReportDetailModal
+        visible={issueModalVisible}
+        reportId={issueModalId!}
+        onClose={() => setIssueModalVisible(false)}
+      />
+      <EquipmentRequestDetailModal
+        visible={equipmentModalVisible}
+        requestId={equipmentModalItem?.id}
+        item={equipmentModalItem}
+        onClose={() => setEquipmentModalVisible(false)}
+      />
+      <TaskSwapDetailModal
+        visible={swapModalVisible}
+        swapId={swapModalId!}
+        onClose={() => setSwapModalVisible(false)}
+      />
       <BottomTabBar onNavigate={handleNavigate} />
     </SafeAreaView>
   );

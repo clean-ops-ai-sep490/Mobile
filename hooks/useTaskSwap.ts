@@ -47,6 +47,18 @@ export interface TaskSwapRequestListItem {
   reviewedByUserId?: string;
 }
 
+export interface SwapTaskInfo {
+  taskAssignmentId: string;
+  scheduledStartAt: string;
+  scheduledEndAt: string;
+  displayLocation?: string;
+}
+
+export interface SwapCandidate {
+  workerId: string;
+  task: SwapTaskInfo;
+}
+
 export type SwapPerspective = "All" | "Sent" | "Received";
 
 /* ================= HOOK ================= */
@@ -209,7 +221,7 @@ export const useTaskSwap = () => {
       try {
         setLoading(true);
 
-        const res = await axiosInstance.get<PaginatedResult<any>>(
+        const res = await axiosInstance.get<PaginatedResult<SwapCandidate>>(
           `/TaskSwapRequests/${taskAssignmentId}/swap-candidates`,
           {
             params: {

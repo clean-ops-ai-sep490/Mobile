@@ -1,5 +1,5 @@
+import axiosInstance from "@/config/axiosInstance";
 import { useState } from "react";
-import axiosInstance from "../config/axiosInstance";
 
 // Types
 export interface TaskStepExecutionDto {
@@ -28,16 +28,16 @@ export interface TaskAssignmentDto {
 }
 
 export enum TaskAssignmentStatus {
-  NotStarted = 0,
-  InProgress = 1,
-  Completed = 2,
-  Block = 3,
+  NotStarted = "NotStarted",
+  InProgress = "InProgress",
+  Completed = "Completed",
+  Block = "Block",
 }
 
 export interface TaskAssignmentFilter {
   assigneeId?: string;
   workAreaId?: string;
-  status?: TaskAssignmentStatus;
+  status?: TaskAssignmentStatus | string;
   fromDate?: string;
   toDate?: string;
   isAdhocTask?: boolean;
@@ -127,7 +127,6 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
     }
   };
 
-  // Start a task
   const startTask = async (
     taskAssignmentId: string,
     workerId: string,
@@ -135,17 +134,17 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
     setLoading(true);
     setError(null);
 
+    const url = `${baseUrl}/${taskAssignmentId}/start`;
+    const payload = { workerId };
+
     try {
-      const response = await axiosInstance.post(
-        `${baseUrl}/${taskAssignmentId}/start`,
-        { workerId },
-      );
+      const response = await axiosInstance.post(url, payload);
       return response.data;
     } catch (err: any) {
-      const message =
-        err?.response?.data?.message || err?.message || "An error occurred";
+      const errorData = err?.response?.data;
+      const message = errorData?.message || err?.message || "An error occurred";
       setError(message);
-      return null;
+      throw new Error(message);
     } finally {
       setLoading(false);
     }
