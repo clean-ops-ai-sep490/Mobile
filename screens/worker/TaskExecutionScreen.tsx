@@ -1,4 +1,6 @@
 // src/screens/TaskExecutionScreen.tsx
+// Chỉ thêm phần xử lý qrResult / selfieResult từ route.params
+// Các phần khác giữ nguyên
 
 import AppButton from "@/components/common/AppButton";
 import Header from "@/components/common/Header";
@@ -32,10 +34,22 @@ import {
   View,
 } from "react-native";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
 interface RouteParams {
   id: string;
+  // Kết quả trả về từ QRScannerScreen
+  qrResult?: {
+    valid: boolean;
+    raw?: string;
+    locationId?: string;
+    verifiedAt?: string;
+    message?: string;
+  };
+  // Kết quả trả về từ InspectionCameraScreen (selfie)
+  selfieResult?: {
+    uri: string;
+  };
+  // stepId để biết update step nào
+  stepId?: string;
 }
 
 enum StepStatus {
@@ -53,11 +67,9 @@ interface StepItem {
   stepState: any;
 }
 
-// ─── Screen ──────────────────────────────────────────────────────────────────
-
 export default function TaskExecutionScreen() {
-  const navigation = useNavigation();
-  const route = useRoute();
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const params = route.params as RouteParams;
   const taskAssignmentId = params?.id;
 
@@ -74,7 +86,7 @@ export default function TaskExecutionScreen() {
   const [equipmentModalVisible, setEquipmentModalVisible] = useState(false);
   const { getSteps, buildStepConfig } = useSteps();
 
-  // ─── Load worker ────────────────────────────────────────────────────────
+  // ─── Load worker ──────────────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
       try {
@@ -84,79 +96,7 @@ export default function TaskExecutionScreen() {
     })();
   }, []);
 
-  // ─── Load task data ──────────────────────────────────────────────────────
-
-  // useEffect(() => {
-  //   if (!taskAssignmentId) return;
-
-  //   const loadData = async () => {
-  //     setLoading(true);
-  //     try {
-  //       // 1. TaskAssignment
-  //       const task = await getTaskAssignmentById(taskAssignmentId);
-  //       if (!task) throw new Error("Task not found");
-
-  //       // 2. TaskSchedule → steps (mỗi step có .stepId và .configDetail)
-  //       const { schedule, steps: sopSteps } = await getTaskScheduleById(
-  //         task.taskScheduleId,
-  //       );
-  //       if (!schedule) throw new Error("Schedule not found");
-
-  //       // 3. Load tất cả step definitions một lần
-  //       const stepDefinitions = await getSteps();
-  //       // Map by stepId để lookup O(1)
-  //       const stepDefMap = new Map(stepDefinitions.map((d) => [d.id, d]));
-
-  //       // 4. Sort + build config
-  //       const sorted = [...sopSteps].sort((a, b) => a.stepOrder - b.stepOrder);
-
-  //       const mapped: StepItem[] = sorted.map((s, index) => {
-  //         const def = stepDefMap.get(s.stepId); // ← dùng stepId, không phải id
-
-  //         // Merge: runtime values + x-behavior từ step definition
-  //         const config = {
-  //           ...s.configDetail, // phase, minPhotos, method, items, ...
-  //           "x-behavior": def?.configSchema?.["x-behavior"], // checkin / photo-capture / ...
-  //           actionKey: def?.actionKey, // optional, để debug
-  //         };
-  //         return {
-  //           id: s.id,
-  //           name: def?.name || `Step ${s.stepOrder}`,
-  //           stepOrder: s.stepOrder,
-  //           config,
-  //           status: index === 0 ? StepStatus.InProgress : StepStatus.NotStarted,
-  //           stepState: buildInitialState(config),
-  //         };
-  //       });
-
-  //       // 5. Restore persisted progress
-  //       const raw = await AsyncStorage.getItem(
-  //         `taskProgress:${taskAssignmentId}`,
-  //       );
-  //       if (raw) {
-  //         const saved: Partial<StepItem>[] = JSON.parse(raw);
-  //         setSteps(
-  //           mapped.map((s) => {
-  //             const match = saved.find((x) => x.id === s.id);
-  //             return match ? { ...s, ...match, config: s.config } : s;
-  //           }),
-  //         );
-  //       } else {
-  //         setSteps(mapped);
-  //       }
-  //     } catch (err) {
-  //       console.error(err);
-  //       Alert.alert("Error", "Failed to load task");
-  //     } finally {
-  //       setLoading(false);
-  //     }
-  //   };
-
-  //   loadData();
-  // }, [taskAssignmentId]);
-
-  // ─── Derived ─────────────────────────────────────────────────────────────
-
+  // ─── Load task data ───────────────────────────────────────────────────────
   useEffect(() => {
     if (!taskAssignmentId) return;
 
@@ -175,13 +115,13 @@ export default function TaskExecutionScreen() {
           const schema = s.configSnapshot?.schema ?? {};
 
           const config = {
-            ...detail, // method, minPhotos, items, ...
-            "x-behavior": schema["x-behavior"], // checkin / photo-capture / ...
-            actionKey: s.sopStepId, // để debug nếu cần
+            ...detail,
+            "x-behavior": schema["x-behavior"],
+            actionKey: s.sopStepId,
           };
 
           return {
-            id: s.id, // ✅ TaskStepExecution ID
+            id: s.id,
             name: schema?.title || `Step ${s.stepOrder}`,
             stepOrder: s.stepOrder,
             config,
@@ -195,7 +135,6 @@ export default function TaskExecutionScreen() {
           };
         });
 
-        // Restore persisted progress
         const raw = await AsyncStorage.getItem(
           `taskProgress:${taskAssignmentId}`,
         );
@@ -223,16 +162,81 @@ export default function TaskExecutionScreen() {
     loadData();
   }, [taskAssignmentId]);
 
-  const currentStepIndex = steps.findIndex(
-    (s) => s.status === StepStatus.InProgress,
-  );
+  // ─── Nhận kết quả QR từ QRScannerScreen ──────────────────────────────────
+  useEffect(() => {
+    const qrResult = params?.qrResult;
+    const stepId = params?.stepId;
+    if (!qrResult || !stepId) return;
+
+    if (!qrResult.valid) {
+      Alert.alert("Lỗi", qrResult.message || "QR không hợp lệ");
+    } else {
+      setSteps((prev) => {
+        const updated = prev.map((s) => {
+          if (s.id !== stepId) return s;
+          return {
+            ...s,
+            stepState: {
+              ...s.stepState,
+              checkedIn: true,
+              verified: true,
+              method: "qr",
+              qrRaw: qrResult.raw,
+              locationId: qrResult.locationId,
+              verifiedAt: qrResult.verifiedAt,
+            },
+          };
+        });
+        AsyncStorage.setItem(
+          `taskProgress:${taskAssignmentId}`,
+          JSON.stringify(updated),
+        );
+        return updated;
+      });
+    }
+
+    // Clear params để tránh trigger lại
+    navigation.setParams({ qrResult: undefined, stepId: undefined });
+  }, [params?.qrResult]);
+
+  // ─── Nhận kết quả selfie từ InspectionCameraScreen ───────────────────────
+  useEffect(() => {
+    const selfieResult = params?.selfieResult;
+    const stepId = params?.stepId;
+    if (!selfieResult?.uri || !stepId) return;
+
+    setSteps((prev) => {
+      const updated = prev.map((s) => {
+        if (s.id !== stepId) return s;
+        return {
+          ...s,
+          stepState: {
+            ...s.stepState,
+            checkedIn: true,
+            method: "selfie",
+            photoUri: selfieResult.uri,
+            capturedAt: new Date().toISOString(),
+          },
+        };
+      });
+      AsyncStorage.setItem(
+        `taskProgress:${taskAssignmentId}`,
+        JSON.stringify(updated),
+      );
+      return updated;
+    });
+
+    navigation.setParams({ selfieResult: undefined, stepId: undefined });
+  }, [params?.selfieResult]);
+
+  // ─── Derived ──────────────────────────────────────────────────────────────
   const completedCount = steps.filter(
     (s) => s.status === StepStatus.Completed,
   ).length;
   const allCompleted =
     steps.length > 0 && steps.every((s) => s.status === StepStatus.Completed);
 
-  // ─── Handlers ────────────────────────────────────────────────────────────
+  // ─── Handlers ─────────────────────────────────────────────────────────────
   const handleStepStateChange = (stepId: string, newState: any) => {
     setSteps((prev) => {
       const updated = prev.map((s) =>
@@ -255,7 +259,6 @@ export default function TaskExecutionScreen() {
       return;
     }
 
-    // Guard: workerId chưa load xong
     if (!workerId) {
       Alert.alert("Lỗi", "Không xác định được worker. Vui lòng thử lại.");
       return;
@@ -291,110 +294,22 @@ export default function TaskExecutionScreen() {
     }
   };
 
-  // const processStepSuccess = (
-  //   completedStepId: string,
-  //   nextId?: string | null,
-  // ) => {
-  //   setSteps((prev) => {
-  //     const updated = prev.map((s) => {
-  //       if (s.id === completedStepId)
-  //         return { ...s, status: StepStatus.Completed };
-  //       if (nextId && s.id === nextId)
-  //         return { ...s, status: StepStatus.InProgress };
-  //       return s;
-  //     });
-  //     AsyncStorage.setItem(
-  //       `taskProgress:${taskAssignmentId}`,
-  //       JSON.stringify(updated),
-  //     );
-  //     return updated;
-  //   });
-  // };
-
-  // const handleCompleteStep = async (stepId: string) => {
-  //   const step = steps.find((s) => s.id === stepId);
-  //   if (!step) return;
-
-  //   if (!isStepFulfilled(step.stepState, step.config)) {
-  //     Alert.alert("Chưa hoàn thành", getIncompleteMessage(step.config));
-  //     return;
-  //   }
-
-  //   if (!workerId) {
-  //     Alert.alert("Lỗi", "Không xác định được worker. Vui lòng thử lại.");
-  //     return;
-  //   }
-
-  //   try {
-  //     setSubmitting(true);
-
-  //     const res: any = await completeStep(step.id, {
-  //       workerId,
-  //       resultData: serializeStepData(step.stepState, step.config),
-  //     });
-
-  //     // 1. HAPPY PATH: Nếu BE hết lỗi và trả về 200 OK mượt mà
-  //     processStepSuccess(stepId, res?.nextStepId);
-  //   } catch (err: any) {
-  //     // 2. 🚨 FAIL-SAFE (PHÒNG THỦ): Xử lý lỗi BE 500 JSON Serialization
-  //     console.warn(
-  //       "⚠️ Bắt được lỗi, đang verify xem DB thực sự đã lưu chưa...",
-  //     );
-
-  //     try {
-  //       // Fetch lại data mới nhất của task
-  //       const verifyTask = await getTaskAssignmentById(taskAssignmentId);
-  //       const currentStepFresh = verifyTask?.steps.find((s) => s.id === stepId);
-
-  //       // BE thực ra đã lưu thành công ở DB, chỉ bị crash khúc trả JSON
-  //       if (currentStepFresh?.status === "Completed") {
-  //         console.log("✅ Dù có lỗi nhưng DB đã lưu Completed, cho qua luôn!");
-
-  //         // Tính toán logic lấy step tiếp theo
-  //         const sortedSteps = [...(verifyTask?.steps || [])].sort(
-  //           (a, b) => a.stepOrder - b.stepOrder,
-  //         );
-  //         const nextPendingStep = sortedSteps.find(
-  //           (s) => s.status !== "Completed",
-  //         );
-
-  //         processStepSuccess(stepId, nextPendingStep?.id);
-  //         return;
-  //       }
-  //     } catch (verifyErr) {
-  //       console.warn("Verify thất bại", verifyErr);
-  //     }
-
-  //     // Nếu thực sự lỗi (DB chưa cập nhật)
-  //     Alert.alert("Error", "Failed to complete step: " + err?.message);
-  //   } finally {
-  //     setSubmitting(false);
-  //   }
-  // };
-
   const handleFinishTask = async () => {
-    // 1. Guard check: Phải có workerId
     if (!workerId) {
       Alert.alert("Lỗi", "Không xác định được worker. Vui lòng thử lại.");
       return;
     }
 
     try {
-      // Dùng chung state submitting để khóa UI lại
       setSubmitting(true);
-
-      // Gọi API
       const result = await completeTask(taskAssignmentId, workerId);
 
-      // 2. Xử lý kết quả trả về
       if (result) {
-        // Thành công: Xóa cache và điều hướng
         await AsyncStorage.removeItem(`taskProgress:${taskAssignmentId}`);
         Alert.alert("Thành công", "Task đã được hoàn thành!", [
           { text: "OK", onPress: () => navigation.navigate("Tasks" as never) },
         ]);
       } else {
-        // API trả về null (lỗi từ BE)
         Alert.alert(
           "Lỗi",
           "Không thể hoàn thành Task. Vui lòng kiểm tra lại kết nối.",
@@ -408,7 +323,7 @@ export default function TaskExecutionScreen() {
     }
   };
 
-  // ─── Header right ────────────────────────────────────────────────────────
+  // ─── Header right ─────────────────────────────────────────────────────────
   const headerRight = (
     <View style={s.headerActions}>
       <TouchableOpacity
@@ -438,7 +353,6 @@ export default function TaskExecutionScreen() {
       />
 
       <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent}>
-        {/* Progress */}
         <View style={s.progressRow}>
           <Text style={s.progressText}>
             {completedCount}/{steps.length} steps completed
@@ -471,7 +385,6 @@ export default function TaskExecutionScreen() {
                 key={step.id}
                 style={[s.card, isDone && s.cardDone, isActive && s.cardActive]}
               >
-                {/* Step header row */}
                 <View style={s.stepHeader}>
                   <View
                     style={[
@@ -505,14 +418,14 @@ export default function TaskExecutionScreen() {
                   )}
                 </View>
 
-                {/* Dynamic UI — chỉ hiện khi active */}
                 {isActive && (
                   <>
                     <View style={s.divider} />
                     <StepRenderer
                       stepName={step.name}
                       config={step.config}
-                      state={step.stepState}
+                      // ← Truyền __stepId vào state để CheckinComponent biết mình là step nào
+                      state={{ ...step.stepState, __stepId: step.id }}
                       onChange={(newState) =>
                         handleStepStateChange(step.id, newState)
                       }
@@ -556,8 +469,6 @@ export default function TaskExecutionScreen() {
   );
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 function getIncompleteMessage(config: any): string {
   const msgs: Record<string, string> = {
     checkin: "Vui lòng hoàn thành check-in trước.",
@@ -573,8 +484,6 @@ function getIncompleteMessage(config: any): string {
     "Vui lòng hoàn thành tất cả yêu cầu của bước này."
   );
 }
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#F8FAFC" },
@@ -592,11 +501,7 @@ const s = StyleSheet.create({
     borderRadius: 2,
     overflow: "hidden",
   },
-  progressFill: {
-    height: "100%",
-    backgroundColor: "#0F172A",
-    borderRadius: 2,
-  },
+  progressFill: { height: "100%", backgroundColor: "#0F172A", borderRadius: 2 },
 
   card: {
     backgroundColor: "#FFF",

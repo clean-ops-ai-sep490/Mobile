@@ -1,58 +1,39 @@
 // src/components/task/steps/CheckinStep.tsx
-import { useNavigation, useRoute } from "@react-navigation/native";
-import React, { useEffect } from "react";
+import { useNavigation } from "@react-navigation/native";
+import React, { useRef } from "react";
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { StepPlugin, StepPluginProps } from "../StepRegistry";
 
 function CheckinComponent({ config, state, onChange }: StepPluginProps) {
   const navigation = useNavigation<any>();
-  const route = useRoute<any>();
   const method: string = config?.method ?? "qr";
 
-  // ← Lắng nghe kết quả trả về từ QRScannerScreen
-  useEffect(() => {
-    const result = route.params?.qrResult;
-    if (!result) return;
-
-    if (!result.valid) {
-      Alert.alert("Lỗi", result.message || "QR không hợp lệ");
-    } else {
-      onChange({
-        ...state,
-        checkedIn: true,
-        verified: true,
-        method: "qr",
-        qrRaw: result.raw,
-        locationId: result.locationId,
-        verifiedAt: result.verifiedAt,
-      });
-    }
-
-    // Clear param để tránh trigger lại khi re-render
-    navigation.setParams({ qrResult: undefined });
-  }, [route.params?.qrResult]);
-
-  // ← Lắng nghe kết quả trả về từ InspectionCameraScreen (selfie)
-  useEffect(() => {
-    const photo = route.params?.selfieResult;
-    if (!photo?.uri) return;
-
-    onChange({
-      ...state,
-      checkedIn: true,
-      method: "selfie",
-      photoUri: photo.uri,
-      capturedAt: new Date().toISOString(),
-    });
-
-    navigation.setParams({ selfieResult: undefined });
-  }, [route.params?.selfieResult]);
+  // ← useRef để giữ onChange và state mới nhất, tránh stale closure
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   const handleAction = () => {
     switch (method) {
       case "qr":
         navigation.navigate("QRScannerScreen", {
-          returnScreen: route.name,
+          onScanned: (result: any) => {
+            if (!result?.valid) {
+              Alert.alert("Lỗi", result?.message || "QR không hợp lệ");
+              return;
+            }
+            // Dùng ref để lấy state và onChange mới nhất, không bị stale
+            onChangeRef.current({
+              ...stateRef.current,
+              checkedIn: true,
+              verified: true,
+              method: "qr",
+              qrRaw: result.raw,
+              locationId: result.locationId,
+              verifiedAt: result.verifiedAt,
+            });
+          },
         });
         break;
 
@@ -61,8 +42,8 @@ function CheckinComponent({ config, state, onChange }: StepPluginProps) {
           {
             text: "Kết nối",
             onPress: () =>
-              onChange({
-                ...state,
+              onChangeRef.current({
+                ...stateRef.current,
                 checkedIn: true,
                 method: "ble",
                 deviceId: "BLE-DEV-001",
@@ -75,7 +56,16 @@ function CheckinComponent({ config, state, onChange }: StepPluginProps) {
       case "selfie":
         navigation.navigate("InspectionCameraScreen", {
           mode: "selfie",
-          returnScreen: route.name,
+          onCaptured: (photo: any) => {
+            if (!photo?.uri) return;
+            onChangeRef.current({
+              ...stateRef.current,
+              checkedIn: true,
+              method: "selfie",
+              photoUri: photo.uri,
+              capturedAt: new Date().toISOString(),
+            });
+          },
         });
         break;
 
@@ -113,13 +103,11 @@ function CheckinComponent({ config, state, onChange }: StepPluginProps) {
       <View style={s.methodBadge}>
         <Text style={s.methodText}>{meta.label}</Text>
       </View>
-
       <Text style={s.instruction}>{meta.instruction}</Text>
 
       {state.checkedIn ? (
         <View style={s.success}>
           <Text style={s.successText}>✓ Đã check-in thành công</Text>
-
           {state.method === "qr" && (
             <>
               {state.locationId && (
@@ -130,11 +118,9 @@ function CheckinComponent({ config, state, onChange }: StepPluginProps) {
               )}
             </>
           )}
-
           {state.method === "ble" && state.deviceId && (
             <Text style={s.successSub}>Device: {state.deviceId}</Text>
           )}
-
           {state.method === "selfie" && state.photoUri && (
             <Text style={s.successSub}>Selfie captured ✓</Text>
           )}
@@ -166,12 +152,7 @@ const s = StyleSheet.create({
     alignItems: "center",
   },
   btnText: { color: "#FFF", fontWeight: "600", fontSize: 14 },
-  success: {
-    backgroundColor: "#DCFCE7",
-    borderRadius: 8,
-    padding: 12,
-    gap: 4,
-  },
+  success: { backgroundColor: "#DCFCE7", borderRadius: 8, padding: 12, gap: 4 },
   successText: { color: "#166534", fontWeight: "600", fontSize: 14 },
   successSub: { color: "#15803D", fontSize: 12 },
 });

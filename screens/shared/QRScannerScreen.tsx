@@ -18,7 +18,7 @@ const MOCK_VALID: Record<string, { locationId: string; name: string }> = {
   "LOC-LOBBY-01": { locationId: "lobby-01", name: "Sảnh chính" },
 };
 
-interface QRScanResult {
+export interface QRScanResult {
   valid: boolean;
   message?: string;
   raw?: string;
@@ -43,7 +43,7 @@ function mockVerifyQR(raw: string): QRScanResult {
   };
 }
 
-// ─── Scan line animation ──────────────────────────────────────────────────────
+// ─── Scan line ────────────────────────────────────────────────────────────────
 function ScanLine() {
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -84,13 +84,16 @@ function Corners() {
   );
 }
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
+// ─── Main ─────────────────────────────────────────────────────────────────────
 export default function QRScannerScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
 
-  // returnScreen: tên screen cần navigate về để trả kết quả
-  const returnScreen = route.params?.returnScreen;
+  // onScanned callback được truyền trực tiếp qua params — KHÔNG serialize,
+  // chỉ dùng trong cùng JS runtime nên an toàn khi gọi trước goBack()
+  const onScanned: ((result: QRScanResult) => void) | undefined =
+    route.params?.onScanned;
+  const stepId: string | undefined = route.params?.stepId;
 
   const [scanning, setScanning] = useState(false);
   const [lastResult, setLastResult] = useState<QRScanResult | null>(null);
@@ -106,12 +109,9 @@ export default function QRScannerScreen() {
 
       if (result.valid) {
         setTimeout(() => {
-          if (returnScreen) {
-            // ← Trả kết quả về màn hình gọi qua params thay vì callback
-            navigation.navigate(returnScreen, { qrResult: result });
-          } else {
-            navigation.goBack();
-          }
+          // Gọi callback TRƯỚC khi goBack để caller cập nhật state
+          onScanned?.(result);
+          navigation.goBack();
         }, 900);
       }
     }, 800);
@@ -124,7 +124,6 @@ export default function QRScannerScreen() {
 
   return (
     <SafeAreaView style={styles.root}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.closeBtn}
@@ -136,7 +135,6 @@ export default function QRScannerScreen() {
         <View style={{ width: 36 }} />
       </View>
 
-      {/* Viewfinder */}
       <View style={styles.viewfinderWrapper}>
         <View style={styles.viewfinder}>
           <Corners />
@@ -169,7 +167,6 @@ export default function QRScannerScreen() {
         </Text>
       </View>
 
-      {/* Demo buttons */}
       {!scanning && !lastResult?.valid && (
         <View style={styles.demoBox}>
           <Text style={styles.demoTitle}>
@@ -196,7 +193,6 @@ export default function QRScannerScreen() {
         </View>
       )}
 
-      {/* Retry nếu invalid */}
       {lastResult && !lastResult.valid && (
         <TouchableOpacity
           style={styles.retryBtn}
@@ -209,13 +205,11 @@ export default function QRScannerScreen() {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
 const CORNER_SIZE = 24;
 const CORNER_THICKNESS = 3;
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0A0F1E" },
-
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -240,7 +234,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   closeBtnText: { color: "#94A3B8", fontSize: 15, fontWeight: "600" },
-
   viewfinderWrapper: {
     alignItems: "center",
     paddingTop: 48,
@@ -267,7 +260,6 @@ const styles = StyleSheet.create({
     marginTop: 16,
     textAlign: "center",
   },
-
   scanLine: {
     position: "absolute",
     top: 0,
@@ -281,7 +273,6 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 4,
   },
-
   corner: {
     position: "absolute",
     width: CORNER_SIZE,
@@ -316,7 +307,6 @@ const styles = StyleSheet.create({
     borderRightWidth: CORNER_THICKNESS,
     borderBottomRightRadius: 4,
   },
-
   resultOverlay: { alignItems: "center", gap: 8 },
   resultIcon: { fontSize: 40, fontWeight: "700" },
   resultText: {
@@ -327,7 +317,6 @@ const styles = StyleSheet.create({
   },
   resultValid: { color: "#4ADE80" },
   resultInvalid: { color: "#F87171" },
-
   demoBox: {
     marginHorizontal: 20,
     marginTop: 4,
@@ -369,7 +358,6 @@ const styles = StyleSheet.create({
     fontFamily: "monospace",
   },
   demoBtnSub: { color: "#64748B", fontSize: 11, marginTop: 2 },
-
   retryBtn: {
     marginHorizontal: 20,
     marginTop: 12,
