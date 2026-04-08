@@ -1,13 +1,16 @@
-// src/screens/EquipmentRequestDetailModal.tsx
-import Header from "@/components/common/Header";
-import React from "react";
+import FormattedDate from "@/components/common/FormattedDate";
+import useEquipment, { EquipmentRequestItem } from "@/hooks/useEquipment";
+import { useTaskAssignments } from "@/hooks/useTaskAssignment";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Modal,
   SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 
@@ -15,7 +18,7 @@ interface EquipmentRequestDetailModalProps {
   visible: boolean;
   onClose: () => void;
   requestId: string;
-  item?: any; // có thể là EquipmentRequestItem
+  item?: EquipmentRequestItem;
 }
 
 export default function EquipmentRequestDetailModal({
@@ -26,33 +29,259 @@ export default function EquipmentRequestDetailModal({
 }: EquipmentRequestDetailModalProps) {
   const data = item || {};
 
+  const { getTaskAssignmentById } = useTaskAssignments();
+  const { getEquipmentById } = useEquipment();
+
+  // States
+  const [displayLocation, setDisplayLocation] = useState<string | null>(null);
+  const [equipmentName, setEquipmentName] = useState<string | null>(null);
+
+  const [isLoadingTask, setIsLoadingTask] = useState(false);
+  const [isLoadingEq, setIsLoadingEq] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    // Fetch Task Location
+    const fetchTaskDetails = async () => {
+      if (!data.taskAssignmentId) return;
+      setIsLoadingTask(true);
+      try {
+        const taskData = await getTaskAssignmentById(data.taskAssignmentId);
+        if (isMounted)
+          setDisplayLocation(taskData?.displayLocation || "Unknown Location");
+      } catch (error) {
+        if (isMounted) setDisplayLocation("Failed to load location");
+      } finally {
+        if (isMounted) setIsLoadingTask(false);
+      }
+    };
+
+    // Fetch Equipment Name
+    const fetchEquipmentDetails = async () => {
+      if (!data.equipmentId) return;
+      setIsLoadingEq(true);
+      try {
+        const eqData = await getEquipmentById(data.equipmentId);
+        if (isMounted) setEquipmentName(eqData?.name || "Unknown Equipment");
+      } catch (error) {
+        if (isMounted) setEquipmentName("Failed to load equipment");
+      } finally {
+        if (isMounted) setIsLoadingEq(false);
+      }
+    };
+
+    if (visible) {
+      fetchTaskDetails();
+      fetchEquipmentDetails();
+    }
+
+    return () => {
+      isMounted = false;
+      if (!visible) {
+        setDisplayLocation(null);
+        setEquipmentName(null);
+      }
+    };
+  }, [visible, data.taskAssignmentId, data.equipmentId]);
+
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView style={styles.safe}>
+    <Modal
+      visible={visible}
+      animationType="fade"
+      onRequestClose={onClose}
+      transparent={true}
+    >
+      <SafeAreaView style={styles.overlay}>
         <StatusBar barStyle="dark-content" />
-        <Header title="Equipment Request" onBack={onClose} />
-        <ScrollView contentContainerStyle={styles.container}>
-          <View style={styles.card}>
-            <Text style={styles.title}>Request #{requestId}</Text>
-            <Text style={styles.row}>
-              Task Assignment: {data.taskAssignmentId ?? "—"}
-            </Text>
-            <Text style={styles.row}>Equipment: {data.equipmentId ?? "—"}</Text>
-            <Text style={styles.row}>Quantity: {data.quantity ?? "—"}</Text>
-            <Text style={styles.row}>Reason: {data.reason ?? "—"}</Text>
-            <Text style={styles.row}>Status: {data.status ?? "—"}</Text>
-            <Text style={styles.row}>Created: {data.createdAt ?? "—"}</Text>
+        <View style={styles.modalContainer}>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Equipment Request</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Text style={styles.closeBtn}>✖️</Text>
+            </TouchableOpacity>
           </View>
-        </ScrollView>
+
+          <ScrollView contentContainerStyle={styles.container}>
+            <View style={styles.card}>
+              {/* 1. ROW LOCATION (Fixed wrapping) */}
+              <View style={styles.rowContainer}>
+                <Text style={styles.rowLabel}>Location:</Text>
+                <View style={styles.rowValueContainer}>
+                  {isLoadingTask ? (
+                    <ActivityIndicator
+                      size="small"
+                      color="#1e90ff"
+                      style={styles.loader}
+                    />
+                  ) : (
+                    <Text style={styles.rowValue}>
+                      {displayLocation ?? "—"}
+                    </Text>
+                  )}
+                </View>
+              </View>
+
+              {/* 2. ROW EQUIPMENT (Hiển thị Name thay vì ID) */}
+              <View style={styles.rowContainer}>
+                <Text style={styles.rowLabel}>Equipment:</Text>
+                <View style={styles.rowValueContainer}>
+                  {isLoadingEq ? (
+                    <ActivityIndicator
+                      size="small"
+                      color="#1e90ff"
+                      style={styles.loader}
+                    />
+                  ) : (
+                    <Text style={styles.rowValue}>
+                      {equipmentName ?? data.equipmentId ?? "—"}
+                    </Text>
+                  )}
+                </View>
+              </View>
+
+              {/* 3. ROW REASON */}
+              <View style={styles.rowContainer}>
+                <Text style={styles.rowLabel}>Reason:</Text>
+                <View style={styles.rowValueContainer}>
+                  <Text style={styles.rowValue}>{data.reason ?? "—"}</Text>
+                </View>
+              </View>
+
+              {/* 4. ROW QUANTITY */}
+              <View style={styles.rowContainer}>
+                <Text style={styles.rowLabel}>Quantity:</Text>
+                <View style={styles.rowValueContainer}>
+                  <Text style={styles.rowValue}>{data.quantity ?? "—"}</Text>
+                </View>
+              </View>
+
+              {/* 5. ROW STATUS */}
+              <View style={styles.rowContainer}>
+                <Text style={styles.rowLabel}>Status:</Text>
+                <View style={styles.rowValueContainer}>
+                  <Text
+                    style={[
+                      styles.rowValue,
+                      data.status === "Pending"
+                        ? styles.pending
+                        : styles.status,
+                    ]}
+                  >
+                    {data.status ?? "—"}
+                  </Text>
+                </View>
+              </View>
+
+              {/* 6. ROW CREATED */}
+              {/* ROW: Created */}
+              <View style={styles.rowContainer}>
+                <Text style={styles.rowLabel}>Created:</Text>
+                <View style={styles.rowValueContainer}>
+                  <Text style={styles.rowValue}>
+                    {item?.created ? (
+                      <FormattedDate dateString={item?.created} />
+                    ) : (
+                      "—"
+                    )}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </ScrollView>
+        </View>
       </SafeAreaView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f5f6fa" },
-  container: { padding: 16 },
-  card: { backgroundColor: "#fff", padding: 16, borderRadius: 8 },
-  title: { fontSize: 16, fontWeight: "700", marginBottom: 8 },
-  row: { marginTop: 6, color: "#333" },
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContainer: {
+    width: "90%",
+    maxHeight: "80%",
+    backgroundColor: "#f5f6fa",
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderColor: "#ddd",
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1e90ff",
+  },
+  closeBtn: {
+    fontSize: 20,
+    color: "#1e90ff",
+  },
+  container: {
+    padding: 16,
+  },
+  card: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 12,
+    color: "#1e90ff",
+  },
+  // 🔥 FIX BỂ LAYOUT
+  rowContainer: {
+    flexDirection: "row",
+    alignItems: "flex-start", // Quan trọng: Đẩy chữ lên top thay vì center nếu có 2 dòng
+    marginTop: 8,
+  },
+  rowLabel: {
+    fontWeight: "600",
+    color: "#444",
+    width: 85, // Cố định chiều rộng Label để cột Value thẳng hàng nhau
+  },
+  rowValueContainer: {
+    flex: 1, // Quan trọng: Cho phép phần Value chiếm toàn bộ không gian còn lại
+    flexDirection: "row",
+  },
+  rowValue: {
+    color: "#333",
+    fontSize: 14,
+    flexWrap: "wrap", // Cho phép text rớt dòng
+  },
+  row: {
+    marginTop: 8,
+    color: "#333",
+    fontSize: 14,
+    flexDirection: "row",
+  },
+  loader: {
+    marginLeft: 4,
+  },
+  status: {
+    fontWeight: "600",
+    color: "#28a745",
+  },
+  pending: {
+    fontWeight: "600",
+    color: "#ffc107",
+  },
 });

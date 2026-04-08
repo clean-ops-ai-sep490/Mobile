@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import FormattedDate from "./common/FormattedDate";
+import FormattedDate from "../common/FormattedDate";
 
 interface Props {
   visible: boolean;

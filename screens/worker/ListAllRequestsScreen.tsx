@@ -126,14 +126,10 @@ function EquipmentCard({ item }: { item: EquipmentRequestItem }) {
   return (
     <Card>
       <CardHeader
-        title={`Equipment · ${item.equipmentId}`}
+        title={`Equipment Request`}
         status={item.status ?? "Pending"}
-        date={item.createdAt}
+        date={item?.created}
       />
-      <View style={styles.divider} />
-      <CardRow label="Task Assignment" value={item.taskAssignmentId} />
-      <CardRow label="Quantity" value={String(item.quantity)} />
-      <CardRow label="Reason" value={item.reason} />
     </Card>
   );
 }
@@ -141,15 +137,11 @@ function EquipmentCard({ item }: { item: EquipmentRequestItem }) {
 // ─── Issue card ───────────────────────────────────────────────────────────────
 
 function IssueCard({ item }: { item: IssueReport }) {
-  const preview =
-    item.description.length > 70
-      ? item.description.slice(0, 70) + "…"
-      : item.description;
+  const preview = "Issue Report";
   return (
     <Card>
       <CardHeader title={preview} status={item.status} date={item.created} />
       <View style={styles.divider} />
-      <CardRow label="Task Assignment" value={item.taskAssignmentId} />
       {item.resolvedAt && (
         <CardRow
           label="Resolved At"
@@ -167,7 +159,7 @@ function EmergencyCard({ item }: { item: EmergencyLeaveRequestDto }) {
     ? item.transcription.length > 70
       ? item.transcription.slice(0, 70) + "…"
       : item.transcription
-    : `Emergency Leave · #${item.id.slice(0, 8)}`;
+    : `Emergency Leave`;
   return (
     <Card>
       <CardHeader title={preview} status={item.status} date={item.created} />

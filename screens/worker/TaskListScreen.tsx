@@ -23,6 +23,7 @@ import {
   TaskAssignmentStatus,
   useTaskAssignments,
 } from "@/hooks/useTaskAssignment";
+import { useTaskSchedules } from "@/hooks/useTaskSchedule";
 
 // ─── Mock Data ───────────────────────────────────────────────────────────────
 const TODAY = new Date();
@@ -122,13 +123,17 @@ const TagBadge = ({ tag }: { tag: string }) => {
 const TaskCard = ({
   task,
   onStart,
+  onContinue,
 }: {
   task: Task;
   onStart?: (id: string) => void;
+  onContinue?: (id: string) => void;
 }) => {
   const isInProgress = task.status === "in_progress";
   const isCompleted = task.status === "completed";
   const isNotStarted = task.status === "not_started";
+
+  const hasActions = isInProgress || isNotStarted;
 
   return (
     <View style={[styles.card, isInProgress && styles.cardActive]}>
@@ -158,37 +163,28 @@ const TaskCard = ({
         </Text>
       </View>
 
-      {/* Action buttons */}
-      <View style={styles.cardActions}>
-        {isInProgress && (
-          <>
+      {/* 🚀 Action buttons: Chỉ hiển thị khi task In Progress hoặc Not Started */}
+      {hasActions && (
+        <View style={styles.cardActions}>
+          {isInProgress && (
             <AppButton
               label="Continue"
-              onPress={() => onStart && onStart(task.id)}
+              onPress={() => onContinue && onContinue(task.id)}
               iconLeft="play"
               size="md"
               style={{ flex: 1, marginBottom: 0 }}
             />
-          </>
-        )}
-        {isNotStarted && (
-          <AppButton
-            label="Start Task"
-            onPress={() => onStart && onStart(task.id)}
-            size="md"
-            style={{ flex: 1, marginBottom: 0 }}
-          />
-        )}
-        {isCompleted && (
-          <AppButton
-            label="View Status"
-            onPress={() => {}}
-            variant="secondary"
-            size="md"
-            style={{ flex: 1, marginBottom: 0 }}
-          />
-        )}
-      </View>
+          )}
+          {isNotStarted && (
+            <AppButton
+              label="Start Task"
+              onPress={() => onStart && onStart(task.id)}
+              size="md"
+              style={{ flex: 1, marginBottom: 0 }}
+            />
+          )}
+        </View>
+      )}
     </View>
   );
 };
@@ -208,10 +204,12 @@ export default function TaskListScreen() {
     getTaskAssignments,
     startTask,
     loading: hookLoading,
+    getTaskAssignmentById,
   } = useTaskAssignments();
   const [tasks, setTasks] = useState<TaskAssignmentDto[]>([]);
   const [workerId, setWorkerId] = useState<string | null>(null);
   const [loadingWorker, setLoadingWorker] = useState(false);
+  const { getTaskScheduleById } = useTaskSchedules();
 
   useEffect(() => {
     const fetchWorkerId = async () => {
@@ -327,6 +325,42 @@ export default function TaskListScreen() {
       });
     } catch (e: any) {
       Alert.alert("Start failed", e?.message || "Could not start the task.");
+    } finally {
+      setLoadingTasks(false);
+    }
+  };
+
+  const handleContinue = async (taskId: string) => {
+    if (!workerId) {
+      Alert.alert(
+        "Worker not available",
+        "Cannot continue task without worker id.",
+      );
+      return;
+    }
+
+    try {
+      setLoadingTasks(true);
+
+      // 1️⃣ Lấy task assignment
+      const task = await getTaskAssignmentById(taskId);
+      if (!task) throw new Error("Task not found");
+
+      const taskScheduleId = task.taskScheduleId;
+      if (!taskScheduleId) throw new Error("Task schedule ID missing");
+
+      // 2️⃣ Lấy schedule + steps từ hook useTaskSchedules
+      const { schedule, steps } = await getTaskScheduleById(taskScheduleId);
+      if (!schedule) throw new Error("Task schedule not found");
+
+      // 3️⃣ Navigate sang màn TaskExecution/ConfigDetail
+      (navigation as any).navigate("TaskExecution", {
+        id: taskId,
+        schedule, // gửi luôn schedule để build UI chi tiết nếu cần
+        steps,
+      });
+    } catch (e: any) {
+      Alert.alert("Continue failed", e?.message || "Cannot continue the task.");
     } finally {
       setLoadingTasks(false);
     }
@@ -490,7 +524,12 @@ export default function TaskListScreen() {
             </View>
           ) : (
             filtered.map((task) => (
-              <TaskCard key={task.id} task={task} onStart={handleStartTask} />
+              <TaskCard
+                key={task.id}
+                task={task}
+                onStart={handleStartTask}
+                onContinue={handleContinue}
+              />
             ))
           )}
         </View>

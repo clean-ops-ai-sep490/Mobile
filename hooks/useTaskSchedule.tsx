@@ -2,14 +2,11 @@
 import axiosInstance from "@/config/axiosInstance";
 import { useState } from "react";
 
-// ── TYPES ─────────────────────────────────────────────
-
 export interface SopStepDto {
-  id: string;
-  name: string;
-  description?: string;
+  id: string; // ID của SopStepConfig (dùng để completeStep)
+  stepId: string; // ID của Step definition (dùng để lookup actionKey/x-behavior)
   stepOrder: number;
-  config?: any;
+  configDetail: any; // runtime values — đã parse từ JSON string
 }
 
 export interface TaskScheduleDto {
@@ -30,42 +27,35 @@ export interface TaskScheduleDto {
   isActive: boolean;
 }
 
-// Response chuẩn backend
-export interface ApiResponse<T> {
-  success: boolean;
-  data: T | null;
-  error: string | null;
-}
-
-// ── HOOK ─────────────────────────────────────────────
-
 export const useTaskSchedules = (baseUrl: string = "/TaskSchedules") => {
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ── Helper: parse metadata safely ─────────────────────
+  // Parse metadata — giữ đúng StepId để loadData lookup được step definition
   const parseMetadata = (metadata: any[]): SopStepDto[] => {
     if (!Array.isArray(metadata)) return [];
 
-    return metadata.map((step: any) => ({
-      id: step.Id,
-      name: `Step ${step.StepOrder}`,
-      description: "",
-      stepOrder: step.StepOrder,
-      config: step.ConfigDetail ? JSON.parse(step.ConfigDetail) : {},
-    }));
+    return metadata.map((item: any) => {
+      let configDetail = {};
+      try {
+        configDetail = item.ConfigDetail ? JSON.parse(item.ConfigDetail) : {};
+      } catch {
+        console.warn("⚠️ Invalid ConfigDetail JSON", item.ConfigDetail);
+      }
+
+      return {
+        id: item.Id, // SopStepConfig ID → dùng khi gọi completeStep
+        stepId: item.StepId, // Step definition ID → dùng để lookup actionKey + x-behavior
+        stepOrder: item.StepOrder,
+        configDetail, // runtime values đã parse sẵn
+      };
+    });
   };
 
-  // ── Get schedule by ID ───────────────────────────────
   const getTaskScheduleById = async (
     id: string | null | undefined,
-  ): Promise<{
-    schedule: TaskScheduleDto | null;
-    steps: SopStepDto[];
-  }> => {
-    if (!id) {
-      return { schedule: null, steps: [] };
-    }
+  ): Promise<{ schedule: TaskScheduleDto | null; steps: SopStepDto[] }> => {
+    if (!id) return { schedule: null, steps: [] };
 
     setLoading(true);
     setError(null);
@@ -74,54 +64,24 @@ export const useTaskSchedules = (baseUrl: string = "/TaskSchedules") => {
       const response = await axiosInstance.get<TaskScheduleDto>(
         `${baseUrl}/${id}`,
       );
-
       const schedule = response.data;
-
       const steps = parseMetadata(schedule.metadata);
-
       return { schedule, steps };
-    } catch (err: unknown) {
-      let message = "Failed to load task schedule";
-
-      if (typeof err === "object" && err !== null) {
-        const e = err as {
-          response?: { data?: { message?: string }; status?: number };
-          message?: string;
-        };
-
-        if (e.response?.status === 404) {
-          message = "Task schedule not found";
-        } else if (e.response?.data?.message) {
-          message = e.response.data.message;
-        } else if (e.message) {
-          message = e.message;
-        }
-      }
+    } catch (err: any) {
+      const message =
+        err?.response?.status === 404
+          ? "Task schedule not found"
+          : (err?.response?.data?.message ??
+            err?.message ??
+            "Failed to load task schedule");
 
       console.error("❌ [TaskSchedule] getById error:", message);
       setError(message);
-
       return { schedule: null, steps: [] };
     } finally {
       setLoading(false);
     }
   };
 
-  // ── MAIN FLOW: từ TaskAssignment → lấy steps ──────────
-  const getStepsFromTaskAssignment = async (
-    taskScheduleId: string | null | undefined,
-  ): Promise<SopStepDto[]> => {
-    // Guard
-    if (!taskScheduleId) return [];
-
-    const { steps } = await getTaskScheduleById(taskScheduleId);
-    return steps;
-  };
-
-  return {
-    loading,
-    error,
-    getTaskScheduleById,
-    getStepsFromTaskAssignment,
-  };
+  return { loading, error, getTaskScheduleById };
 };

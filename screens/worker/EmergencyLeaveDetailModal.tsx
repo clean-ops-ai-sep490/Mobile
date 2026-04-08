@@ -86,8 +86,6 @@ export default function EmergencyLeaveDetailModal({
               <Text style={styles.info}>No data available.</Text>
             ) : (
               <View style={styles.card}>
-                <Text style={styles.title}>Request #{item.id}</Text>
-                <Text style={styles.row}>Worker: {item.workerId}</Text>
                 <Text style={styles.row}>
                   Task Assignment: {item.taskAssignmentId ?? "—"}
                 </Text>
@@ -179,7 +177,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     color: "#1e90ff",
   },
-  row: { marginTop: 8, color: "#333", fontSize: 14 },
+  row: { marginTop: 8, color: "#333", fontSize: 14, fontWeight: 600 },
   status: { fontWeight: "600", color: "#28a745" },
   pending: { fontWeight: "600", color: "#ffc107" },
   error: { color: "red", textAlign: "center", marginTop: 20 },

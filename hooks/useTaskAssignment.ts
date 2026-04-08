@@ -15,6 +15,19 @@ export interface StartTaskDto {
   steps: TaskStepExecutionDto[];
 }
 
+export interface TaskStepSnapshotDto {
+  id: string; // TaskStepExecution ID
+  sopStepId: string;
+  stepOrder: number;
+  status: string; // "InProgress" | "NotStarted" | "Completed"
+  configSnapshot: {
+    detail: any;
+    schema: any;
+  };
+  resultData: any;
+  nextStepId: string | null;
+}
+
 export interface TaskAssignmentDto {
   id: string;
   taskScheduleId: string;
@@ -25,6 +38,7 @@ export interface TaskAssignmentDto {
   isAdhocTask: boolean;
   nameAdhocTask?: string;
   displayLocation?: string;
+  steps: TaskStepSnapshotDto[];
 }
 
 export enum TaskAssignmentStatus {
@@ -222,6 +236,28 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
     }
   };
 
+  const completeTask = async (
+    taskAssignmentId: string,
+    workerId: string,
+  ): Promise<StartTaskDto | null> => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const url = `${baseUrl}/${taskAssignmentId}/complete`;
+      const payload = { workerId };
+      const response = await axiosInstance.post<StartTaskDto>(url, payload);
+      return response.data;
+    } catch (err: any) {
+      const errorData = err?.response?.data;
+      const message = errorData?.message || err?.message || "An error occurred";
+      setError(message);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     loading,
     error,
@@ -231,5 +267,6 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
     updateTaskAssignment,
     updateTaskAssignmentStatus,
     deleteTaskAssignment,
+    completeTask,
   };
 };

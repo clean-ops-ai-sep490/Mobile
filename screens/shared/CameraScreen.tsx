@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { CameraView, FlashMode, useCameraPermissions } from "expo-camera";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
@@ -41,7 +42,16 @@ const MAX_ZOOM = 1;
 const ZOOM_SENSITIVITY = 0.005;
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
-export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
+export default function InspectionCameraScreen(props: Props) {
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+
+  const { mode, onCaptured } = route.params || {};
+
+  const isSelfie = mode === "selfie";
+
+  const onClose = props.onClose;
+  const onSubmit = props.onSubmit;
   const [permission, requestPermission] = useCameraPermissions();
   const [flash, setFlash] = useState<FlashMode>("off");
   const [gridVisible, setGridVisible] = useState(true);
@@ -55,8 +65,15 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
   const [zoomBarVisible, setZoomBarVisible] = useState(false);
   const zoomBarOpacity = useRef(new Animated.Value(0)).current;
   const zoomBarTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [facing, setFacing] = useState<"back" | "front">("back");
 
   const cameraRef = useRef<CameraView>(null);
+
+  useEffect(() => {
+    if (isSelfie) {
+      setFacing("front");
+    }
+  }, [isSelfie]);
 
   // ── No permission yet ──────────────────────────────────────────────────────
   if (!permission) return <View style={styles.container} />;
@@ -142,23 +159,27 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
       setCapturing(true);
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
       if (!photo) return;
-      setPhotos((prev) => [
-        ...prev,
-        {
-          uri: photo.uri,
-          timestamp: new Date().toLocaleTimeString("en-US", {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-        },
-      ]);
+
+      const newPhoto = {
+        uri: photo.uri,
+        timestamp: new Date().toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      };
+
+      // 🔥 SELFIE → overwrite (1 ảnh)
+      if (isSelfie) {
+        setPhotos([newPhoto]);
+      } else {
+        setPhotos((prev) => [...prev, newPhoto]);
+      }
     } catch {
       Alert.alert("Error", "Failed to capture photo. Please try again.");
     } finally {
       setCapturing(false);
     }
   };
-
   const handleDelete = (index: number) => {
     setPhotos((prev) => prev.filter((_, i) => i !== index));
   };
@@ -171,7 +192,15 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
       );
       return;
     }
+    if (isSelfie) {
+      onCaptured?.(photos[0]);
+      navigation.goBack();
+      return;
+    }
+
+    // 🔥 INSPECTION FLOW (Modal)
     onSubmit?.(photos);
+    onClose?.();
   };
 
   // ── UI ─────────────────────────────────────────────────────────────────────
@@ -191,7 +220,7 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
           <CameraView
             ref={cameraRef}
             style={styles.camera}
-            facing="back"
+            facing={facing}
             flash={flash}
             zoom={zoom}
           >
@@ -227,7 +256,13 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
 
             {/* ── Top bar ── */}
             <SafeAreaView style={styles.topBar}>
-              <TouchableOpacity style={styles.iconBtn} onPress={onClose}>
+              <TouchableOpacity
+                style={styles.iconBtn}
+                onPress={() => {
+                  if (onClose) onClose();
+                  else navigation.goBack();
+                }}
+              >
                 <Ionicons name="close" size={18} color="#FFF" />
               </TouchableOpacity>
 
@@ -241,6 +276,18 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
               )}
 
               <View style={styles.topRight}>
+                <TouchableOpacity
+                  style={styles.iconBtn}
+                  onPress={() =>
+                    setFacing((prev) => (prev === "back" ? "front" : "back"))
+                  }
+                >
+                  <Ionicons
+                    name="camera-reverse-outline"
+                    size={18}
+                    color="#FFF"
+                  />
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.iconBtn}
                   onPress={() => setGridVisible((v) => !v)}
@@ -386,8 +433,9 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
             onPress={handleSubmit}
           >
             <Text style={styles.drawerSubmitText}>
-              Submit {photos.length} photo{photos.length > 1 ? "s" : ""} for AI
-              Review
+              {isSelfie
+                ? "Confirm Check-in"
+                : `Submit ${photos.length} photo${photos.length > 1 ? "s" : ""} for AI Review`}
             </Text>
           </TouchableOpacity>
         </View>

@@ -1,5 +1,5 @@
 import BottomTabBar, { TabKey } from "@/components/common/BottomTabBar";
-import TaskPickerModal from "@/components/TaskPickerModal";
+import TaskPickerModal from "@/components/modals/TaskPickerModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSelectedTask } from "@/contexts/SelectedTaskContext";
 import { Ionicons } from "@expo/vector-icons";

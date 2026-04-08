@@ -34,7 +34,7 @@ export const useIssueReport = () => {
     try {
       setLoading(true);
       const res = await axiosInstance.get<PaginatedResult<IssueReport>>(
-        "/issueReports",
+        "/IssueReports",
         { params },
       );
       return res.data;
@@ -50,7 +50,7 @@ export const useIssueReport = () => {
   const getById = useCallback(async (id: string) => {
     try {
       setLoading(true);
-      const res = await axiosInstance.get<IssueReport>(`/issueReports/${id}`);
+      const res = await axiosInstance.get<IssueReport>(`/IssueReports/${id}`);
       return res.data;
     } catch (err: any) {
       setError(err.message);
@@ -66,7 +66,7 @@ export const useIssueReport = () => {
       try {
         setLoading(true);
         const res = await axiosInstance.get<PaginatedResult<IssueReport>>(
-          `/issueReports/worker/${workerId}`,
+          `/IssueReports/worker/${workerId}`,
           { params },
         );
         return res.data;
@@ -86,7 +86,7 @@ export const useIssueReport = () => {
       try {
         setLoading(true);
         const res = await axiosInstance.get<PaginatedResult<IssueReport>>(
-          `/issueReports/task-assignment/${taskAssignmentId}`,
+          `/IssueReports/task-assignment/${taskAssignmentId}`,
           { params },
         );
         return res.data;
@@ -109,7 +109,7 @@ export const useIssueReport = () => {
       try {
         setLoading(true);
         const res = await axiosInstance.get<PaginatedResult<IssueReport>>(
-          `/issueReports/status/${status}`,
+          `/IssueReports/status/${status}`,
           { params },
         );
         return res.data;
@@ -133,7 +133,7 @@ export const useIssueReport = () => {
       try {
         setLoading(true);
         const res = await axiosInstance.post<IssueReport>(
-          "/issueReports",
+          "/IssueReports",
           data,
         );
         return res.data;
@@ -158,7 +158,7 @@ export const useIssueReport = () => {
       try {
         setLoading(true);
         const res = await axiosInstance.put<IssueReport>(
-          `/issueReports/${id}`,
+          `/IssueReports/${id}`,
           data,
         );
         return res.data;
@@ -184,7 +184,7 @@ export const useIssueReport = () => {
       try {
         setLoading(true);
         const res = await axiosInstance.patch<IssueReport>(
-          `/issueReports/${id}/resolve`,
+          `/IssueReports/${id}/resolve`,
           data,
         );
         return res.data;
@@ -202,7 +202,7 @@ export const useIssueReport = () => {
   const remove = useCallback(async (id: string) => {
     try {
       setLoading(true);
-      await axiosInstance.delete(`/issueReports/${id}`);
+      await axiosInstance.delete(`/IssueReports/${id}`);
       return true;
     } catch (err: any) {
       setError(err.message);
