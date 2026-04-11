@@ -7,7 +7,11 @@ import {
 } from "@/hooks/useEmergencyLeave";
 import useEquipment, { EquipmentRequestItem } from "@/hooks/useEquipment";
 import { IssueReport, useIssueReport } from "@/hooks/useIssueReport";
-import { TaskSwapRequestListItem, useTaskSwap } from "@/hooks/useTaskSwap";
+import {
+  SwapRequest,
+  TaskSwapRequestListItem,
+  useTaskSwap,
+} from "@/hooks/useTaskSwap";
 import { WorkerStackParamList } from "@/navigation/AppNavigator";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -40,10 +44,14 @@ interface TabConfig {
 }
 
 const TABS: TabConfig[] = [
-  { key: "equipment", label: "Equipment", icon: "cube-outline" },
-  { key: "issue", label: "Issue Reports", icon: "warning-outline" },
-  { key: "swap", label: "Task Swaps", icon: "swap-horizontal-outline" },
-  { key: "emergency", label: "Emergency Leave", icon: "medkit-outline" },
+  { key: "equipment", label: "Yêu cầu thiết bị", icon: "cube-outline" },
+  { key: "issue", label: "Báo cáo sự cố", icon: "warning-outline" },
+  {
+    key: "swap",
+    label: "Yêu cầu đổi công việc",
+    icon: "swap-horizontal-outline",
+  },
+  { key: "emergency", label: "Nghỉ khẩn cấp", icon: "medkit-outline" },
 ];
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
@@ -126,8 +134,8 @@ function EquipmentCard({ item }: { item: EquipmentRequestItem }) {
   return (
     <Card>
       <CardHeader
-        title={`Equipment Request`}
-        status={item.status ?? "Pending"}
+        title={`Yêu cầu thiết bị`}
+        status={item.status ?? "Đang chờ"}
         date={item?.created}
       />
     </Card>
@@ -137,14 +145,14 @@ function EquipmentCard({ item }: { item: EquipmentRequestItem }) {
 // ─── Issue card ───────────────────────────────────────────────────────────────
 
 function IssueCard({ item }: { item: IssueReport }) {
-  const preview = "Issue Report";
+  const preview = "Báo cáo sự cố";
   return (
     <Card>
       <CardHeader title={preview} status={item.status} date={item.created} />
       <View style={styles.divider} />
       {item.resolvedAt && (
         <CardRow
-          label="Resolved At"
+          label="Đã xử lý vào"
           value={new Date(item.resolvedAt).toLocaleDateString("vi-VN")}
         />
       )}
@@ -159,33 +167,28 @@ function EmergencyCard({ item }: { item: EmergencyLeaveRequestDto }) {
     ? item.transcription.length > 70
       ? item.transcription.slice(0, 70) + "…"
       : item.transcription
-    : `Emergency Leave`;
+    : `Nghỉ khẩn cấp`;
   return (
     <Card>
       <CardHeader title={preview} status={item.status} date={item.created} />
       <View style={styles.divider} />
-      <CardRow label="Task Assignment" value={item.taskAssignmentId} />
+      <CardRow label="Công việc" value={item.taskAssignmentId} />
       {item.transcription && (
-        <CardRow label="Transcription" value={item.transcription} />
+        <CardRow label="Bản ghi" value={item.transcription} />
       )}
-      <CardRow label="Reviewed By" value={item.reviewedByUserId ?? undefined} />
+      <CardRow label="Đã xem bởi" value={item.reviewedByUserId ?? undefined} />
     </Card>
   );
 }
 
 // ─── Swap card ────────────────────────────────────────────────────────────────
 
-function SwapCard({ item }: { item: TaskSwapRequestListItem }) {
+function SwapCard({ item }: { item: SwapRequest }) {
   return (
     <Card>
-      <CardHeader
-        title={`Swap · #${item.id.slice(0, 8)}`}
-        status={item.status}
-      />
+      <CardHeader title={`Đổi công việc`} status={item.status} />
       <View style={styles.divider} />
-      <CardRow label="Task Assignment" value={item.taskAssignmentId} />
-      <CardRow label="Target Worker" value={item.targetWorkerId ?? "—"} />
-      <CardRow label="Reviewed By" value={item.reviewedByUserId ?? undefined} />
+      <CardRow label="Người nhận" value={item.targetWorkerName ?? "—"} />
     </Card>
   );
 }
@@ -208,7 +211,7 @@ function Empty({ label }: { label: string }) {
   return (
     <View style={styles.emptyWrap}>
       <Ionicons name="document-outline" size={40} color="#CBD5E1" />
-      <Text style={styles.emptyText}>No {label} found</Text>
+      <Text style={styles.emptyText}>Không tìm thấy {label}</Text>
     </View>
   );
 }
@@ -323,7 +326,7 @@ export default function MyRequestsScreen({ navigation }: Props) {
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" />
 
-      <Header title="My Requests" onBack={() => navigation.goBack()} />
+      <Header title="Yêu cầu của tôi" onBack={() => navigation.goBack()} />
 
       {/* ── Tab bar ── */}
       <View style={styles.tabBar}>

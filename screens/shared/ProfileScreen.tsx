@@ -13,12 +13,9 @@ import {
   ScrollView,
   StatusBar,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from "react-native";
-
-const APP_VERSION = "2.4.1 (Build 882)";
 
 // ─── Avatar từ tên thật ───────────────────────────────────────────────────────
 const getInitials = (fullName: string): string => {
@@ -107,7 +104,7 @@ export default function ProfileScreen() {
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       <Header
-        title="My Profile"
+        title="Hồ sơ của tôi"
         onBack={() => handleNavigate("Home")}
         style={{ backgroundColor: "#F5F6FA" }}
       />
@@ -124,7 +121,7 @@ export default function ProfileScreen() {
           <Text
             style={[styles.userRole, isSupervisor && styles.userRoleSupervisor]}
           >
-            {isSupervisor ? "Operations Supervisor" : "Worker"}
+            {isSupervisor ? "Supervisor" : "Worker"}
           </Text>
           <Text style={styles.userMeta}>{user?.email ?? "—"}</Text>
 
@@ -153,11 +150,11 @@ export default function ProfileScreen() {
 
         {/* ── Account Info ── */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>ACCOUNT INFORMATION</Text>
+          <Text style={styles.sectionTitle}>THÔNG TIN TÀI KHOẢN</Text>
           <View style={styles.infoCard}>
             <InfoRow
               icon="person-outline"
-              label="Full Name"
+              label="Họ và tên"
               value={user?.fullName ?? "—"}
             />
             <View style={styles.infoDivider} />
@@ -169,60 +166,18 @@ export default function ProfileScreen() {
             <View style={styles.infoDivider} />
             <InfoRow
               icon="shield-outline"
-              label="Role"
+              label="Vai trò"
               value={user?.role ?? "—"}
             />
-            <View style={styles.infoDivider} />
-            <InfoRow
-              icon="finger-print-outline"
-              label="User ID"
-              value={user?.userId ? `#${user.userId.slice(0, 8)}...` : "—"}
-            />
-          </View>
-        </View>
-
-        {/* ── Settings ── */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>SETTINGS</Text>
-          <View style={styles.settingsList}>
-            <View style={styles.settingRow}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="location-outline" size={18} color="#64748B" />
-                <Text style={styles.settingLabel}>Share Location</Text>
-              </View>
-              <Switch
-                value={shareLocation}
-                onValueChange={setShareLocation}
-                trackColor={{ false: "#E2E8F0", true: "#2563EB" }}
-                thumbColor="#FFFFFF"
-              />
-            </View>
-            <View style={styles.settingDivider} />
-            <View style={styles.settingRow}>
-              <View style={styles.settingLeft}>
-                <Ionicons
-                  name="notifications-outline"
-                  size={18}
-                  color="#64748B"
-                />
-                <Text style={styles.settingLabel}>Push Notifications</Text>
-              </View>
-              <Switch
-                value={pushNotifications}
-                onValueChange={setPushNotifications}
-                trackColor={{ false: "#E2E8F0", true: "#2563EB" }}
-                thumbColor="#FFFFFF"
-              />
-            </View>
           </View>
         </View>
 
         {/* ── Logout ── */}
         <AppButton
-          label="Log Out"
+          label="Đăng xuất"
           onPress={handleLogout}
           loading={submitting}
-          loadingLabel="Logging out..."
+          loadingLabel="Đang đăng xuất..."
           iconLeft="log-out"
           style={{
             width: "90%",
@@ -231,8 +186,6 @@ export default function ProfileScreen() {
             backgroundColor: "#db0614",
           }}
         />
-
-        <Text style={styles.version}>Version {APP_VERSION}</Text>
       </ScrollView>
     </SafeAreaView>
   );

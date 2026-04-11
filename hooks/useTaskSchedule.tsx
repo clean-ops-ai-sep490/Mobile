@@ -40,7 +40,7 @@ export const useTaskSchedules = (baseUrl: string = "/TaskSchedules") => {
       try {
         configDetail = item.ConfigDetail ? JSON.parse(item.ConfigDetail) : {};
       } catch {
-        console.warn("⚠️ Invalid ConfigDetail JSON", item.ConfigDetail);
+        console.warn("⚠️ JSON ConfigDetail không hợp lệ", item.ConfigDetail);
       }
 
       return {
@@ -70,10 +70,10 @@ export const useTaskSchedules = (baseUrl: string = "/TaskSchedules") => {
     } catch (err: any) {
       const message =
         err?.response?.status === 404
-          ? "Task schedule not found"
+          ? "Không tìm thấy lịch công việc"
           : (err?.response?.data?.message ??
             err?.message ??
-            "Failed to load task schedule");
+            "Tải lịch công việc thất bại");
 
       console.error("❌ [TaskSchedule] getById error:", message);
       setError(message);

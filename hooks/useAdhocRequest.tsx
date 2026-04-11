@@ -100,7 +100,7 @@ export const useAdhocRequest = () => {
       setError(
         err.response?.data?.message ||
           err.message ||
-          "Failed to fetch requests",
+          "Lấy danh sách yêu cầu thất bại",
       );
       return null;
     } finally {
@@ -120,7 +120,7 @@ export const useAdhocRequest = () => {
       setError(
         err.response?.data?.message ||
           err.message ||
-          "Failed to fetch request by ID",
+          "Lấy yêu cầu theo ID thất bại",
       );
       return null;
     } finally {
@@ -143,7 +143,7 @@ export const useAdhocRequest = () => {
       setError(
         err.response?.data?.message ||
           err.message ||
-          "Failed to fetch worker requests",
+          "Lấy yêu cầu của nhân viên thất bại",
       );
       return null;
     } finally {
@@ -166,7 +166,7 @@ export const useAdhocRequest = () => {
       setError(
         err.response?.data?.message ||
           err.message ||
-          "Failed to fetch requests by status",
+          "Lấy yêu cầu theo trạng thái thất bại",
       );
       return null;
     } finally {
@@ -184,9 +184,7 @@ export const useAdhocRequest = () => {
       return response.data;
     } catch (err: any) {
       setError(
-        err.response?.data?.message ||
-          err.message ||
-          "Failed to create request",
+        err.response?.data?.message || err.message || "Tạo yêu cầu thất bại",
       );
       return null;
     } finally {
@@ -207,7 +205,7 @@ export const useAdhocRequest = () => {
       setError(
         err.response?.data?.message ||
           err.message ||
-          "Failed to update request",
+          "Cập nhật yêu cầu thất bại",
       );
       return null;
     } finally {
@@ -229,9 +227,7 @@ export const useAdhocRequest = () => {
       return response.data;
     } catch (err: any) {
       setError(
-        err.response?.data?.message ||
-          err.message ||
-          "Failed to review request",
+        err.response?.data?.message || err.message || "Duyệt yêu cầu thất bại",
       );
       return null;
     } finally {
@@ -247,9 +243,7 @@ export const useAdhocRequest = () => {
       return true;
     } catch (err: any) {
       setError(
-        err.response?.data?.message ||
-          err.message ||
-          "Failed to delete request",
+        err.response?.data?.message || err.message || "Xóa yêu cầu thất bại",
       );
       return false;
     } finally {

@@ -1,7 +1,3 @@
-// src/screens/TaskExecutionScreen.tsx
-// Chỉ thêm phần xử lý qrResult / selfieResult từ route.params
-// Các phần khác giữ nguyên
-
 import AppButton from "@/components/common/AppButton";
 import Header from "@/components/common/Header";
 import EquipmentRequestModal from "@/components/modals/EquipmentRequestModal";
@@ -26,17 +22,17 @@ import {
   ActivityIndicator,
   Alert,
   SafeAreaView,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+// 👉 1. IMPORT THƯ VIỆN Ở ĐÂY
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
 interface RouteParams {
   id: string;
-  // Kết quả trả về từ QRScannerScreen
   qrResult?: {
     valid: boolean;
     raw?: string;
@@ -44,18 +40,16 @@ interface RouteParams {
     verifiedAt?: string;
     message?: string;
   };
-  // Kết quả trả về từ InspectionCameraScreen (selfie)
   selfieResult?: {
     uri: string;
   };
-  // stepId để biết update step nào
   stepId?: string;
 }
 
 enum StepStatus {
-  NotStarted = "NotStarted",
-  InProgress = "InProgress",
-  Completed = "Completed",
+  NotStarted = "Chưa bắt đầu",
+  InProgress = "Đang thực hiện",
+  Completed = "Hoàn thành",
 }
 
 interface StepItem {
@@ -153,7 +147,7 @@ export default function TaskExecutionScreen() {
         }
       } catch (err) {
         console.error(err);
-        Alert.alert("Error", "Failed to load task");
+        Alert.alert("Lỗi", "Tải công việc thất bại");
       } finally {
         setLoading(false);
       }
@@ -195,7 +189,6 @@ export default function TaskExecutionScreen() {
       });
     }
 
-    // Clear params để tránh trigger lại
     navigation.setParams({ qrResult: undefined, stepId: undefined });
   }, [params?.qrResult]);
 
@@ -288,7 +281,7 @@ export default function TaskExecutionScreen() {
         return updated;
       });
     } catch (err: any) {
-      Alert.alert("Error", "Failed to complete step: " + err?.message);
+      Alert.alert("Lỗi", "Hoàn thành bước thất bại: " + err?.message);
     } finally {
       setSubmitting(false);
     }
@@ -306,13 +299,13 @@ export default function TaskExecutionScreen() {
 
       if (result) {
         await AsyncStorage.removeItem(`taskProgress:${taskAssignmentId}`);
-        Alert.alert("Thành công", "Task đã được hoàn thành!", [
+        Alert.alert("Thành công", "Công việc đã được hoàn thành!", [
           { text: "OK", onPress: () => navigation.navigate("Tasks" as never) },
         ]);
       } else {
         Alert.alert(
           "Lỗi",
-          "Không thể hoàn thành Task. Vui lòng kiểm tra lại kết nối.",
+          "Không thể hoàn thành công việc. Vui lòng kiểm tra lại kết nối.",
         );
       }
     } catch (err) {
@@ -347,15 +340,23 @@ export default function TaskExecutionScreen() {
       <StatusBar barStyle="dark-content" />
 
       <Header
-        title="Task Execution"
+        title="Thực thi công việc"
         onBack={() => navigation.goBack()}
         rightElement={headerRight}
       />
 
-      <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent}>
+      {/* 👉 2. THAY THẾ SCROLLVIEW THÀNH KEYBOARDAWARESCROLLVIEW */}
+      <KeyboardAwareScrollView
+        style={s.scroll}
+        contentContainerStyle={s.scrollContent}
+        enableOnAndroid={true}
+        extraScrollHeight={80} // Đẩy input lên cao thêm 80px để nhìn rõ nút Complete bên dưới
+        keyboardShouldPersistTaps="handled" // Giúp bấm nút ko cần 2 lần chạm khi bàn phím đang bật
+        showsVerticalScrollIndicator={false}
+      >
         <View style={s.progressRow}>
           <Text style={s.progressText}>
-            {completedCount}/{steps.length} steps completed
+            {completedCount}/{steps.length} bước đã hoàn thành
           </Text>
           <View style={s.progressTrack}>
             <View
@@ -413,7 +414,7 @@ export default function TaskExecutionScreen() {
 
                   {isDone && (
                     <View style={s.donePill}>
-                      <Text style={s.donePillText}>Done</Text>
+                      <Text style={s.donePillText}>Hoàn thành</Text>
                     </View>
                   )}
                 </View>
@@ -424,7 +425,6 @@ export default function TaskExecutionScreen() {
                     <StepRenderer
                       stepName={step.name}
                       config={step.config}
-                      // ← Truyền __stepId vào state để CheckinComponent biết mình là step nào
                       state={{ ...step.stepState, __stepId: step.id }}
                       onChange={(newState) =>
                         handleStepStateChange(step.id, newState)
@@ -432,7 +432,7 @@ export default function TaskExecutionScreen() {
                     />
                     <View style={s.completeBtn}>
                       <AppButton
-                        label={submitting ? "Đang xử lý..." : "Complete Step"}
+                        label={submitting ? "Đang xử lý..." : "Hoàn thành bước"}
                         onPress={() => handleCompleteStep(step.id)}
                         disabled={!fulfilled || submitting}
                       />
@@ -447,13 +447,13 @@ export default function TaskExecutionScreen() {
         {allCompleted && (
           <View style={s.finishWrap}>
             <AppButton
-              label={submitting ? "Đang xử lý..." : "Finish Task"}
+              label={submitting ? "Đang xử lý..." : "Hoàn tất công việc"}
               onPress={handleFinishTask}
               disabled={submitting}
             />
           </View>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       <IssueReportModal
         visible={issueModalVisible}
@@ -469,6 +469,7 @@ export default function TaskExecutionScreen() {
   );
 }
 
+// Hàm getIncompleteMessage và StyleSheet giữ nguyên...
 function getIncompleteMessage(config: any): string {
   const msgs: Record<string, string> = {
     checkin: "Vui lòng hoàn thành check-in trước.",

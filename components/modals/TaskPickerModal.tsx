@@ -55,11 +55,6 @@ export default function TaskPickerModal({ visible, onClose, onSelect }: Props) {
       try {
         const { fromDate, toDate } = buildLocalDateRange(new Date());
 
-        console.log("🕒 [TASK_PICKER] Date Range", {
-          fromDate,
-          toDate,
-        });
-
         const res = await getTaskAssignments(
           {
             assigneeId: workerId,
@@ -68,8 +63,6 @@ export default function TaskPickerModal({ visible, onClose, onSelect }: Props) {
           {
             pageNumber: 1,
             pageSize: 20,
-            sortBy: "scheduledStartAt",
-            sortDescending: false,
           },
         );
 
@@ -87,7 +80,7 @@ export default function TaskPickerModal({ visible, onClose, onSelect }: Props) {
     <Modal visible={visible} transparent animationType="slide">
       <View style={styles.backdrop}>
         <View style={styles.container}>
-          <Text style={styles.title}>Select Task</Text>
+          <Text style={styles.title}>Chọn công việc</Text>
 
           <FlatList
             data={tasks}
@@ -102,8 +95,8 @@ export default function TaskPickerModal({ visible, onClose, onSelect }: Props) {
               >
                 <Text style={styles.rowTitle}>
                   {item.isAdhocTask && item.nameAdhocTask
-                    ? `Ad-hoc: ${item.nameAdhocTask}`
-                    : "Schedule: "}
+                    ? `Tự phát: ${item.nameAdhocTask}`
+                    : "Lịch trình: "}
                   <FormattedDate
                     dateString={item.scheduledStartAt}
                     style={styles.rowTitle}
@@ -111,7 +104,7 @@ export default function TaskPickerModal({ visible, onClose, onSelect }: Props) {
                 </Text>
 
                 <Text style={styles.rowSub}>
-                  📍 {item.displayLocation || "No location assigned"}
+                  {item.displayLocation || "Chưa gán vị trí"}
                 </Text>
 
                 <View style={styles.statusBadge}>
@@ -121,13 +114,15 @@ export default function TaskPickerModal({ visible, onClose, onSelect }: Props) {
             )}
             ListEmptyComponent={
               <Text style={styles.empty}>
-                {loading ? "Loading tasks..." : "No upcoming tasks found"}
+                {loading
+                  ? "Đang tải công việc..."
+                  : "Không có công việc sắp tới"}
               </Text>
             }
           />
 
           <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-            <Text style={styles.closeText}>Cancel</Text>
+            <Text style={styles.closeText}>Hủy</Text>
           </TouchableOpacity>
         </View>
       </View>

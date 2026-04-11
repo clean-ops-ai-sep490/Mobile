@@ -42,10 +42,10 @@ export interface TaskAssignmentDto {
 }
 
 export enum TaskAssignmentStatus {
-  NotStarted = "NotStarted",
-  InProgress = "InProgress",
-  Completed = "Completed",
-  Block = "Block",
+  NotStarted = "Chưa bắt đầu",
+  InProgress = "Đang thực hiện",
+  Completed = "Hoàn thành",
+  Block = "Bị chặn",
 }
 
 export interface TaskAssignmentFilter {
@@ -109,7 +109,7 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
       return response.data;
     } catch (err: any) {
       const message =
-        err?.response?.data?.message || err?.message || "An error occurred";
+        err?.response?.data?.message || err?.message || "Đã xảy ra lỗi";
       setError(message);
       return null;
     } finally {
@@ -129,11 +129,11 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
       return response.data;
     } catch (err: any) {
       if (err?.response?.status === 404) {
-        setError("Task assignment not found");
+        setError("Không tìm thấy công việc");
         return null;
       }
       const message =
-        err?.response?.data?.message || err?.message || "An error occurred";
+        err?.response?.data?.message || err?.message || "Đã xảy ra lỗi";
       setError(message);
       return null;
     } finally {
@@ -156,7 +156,7 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
       return response.data;
     } catch (err: any) {
       const errorData = err?.response?.data;
-      const message = errorData?.message || err?.message || "An error occurred";
+      const message = errorData?.message || err?.message || "Đã xảy ra lỗi";
       setError(message);
       throw new Error(message);
     } finally {
@@ -177,11 +177,11 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
       return response.data;
     } catch (err: any) {
       if (err?.response?.status === 404) {
-        setError("Task assignment not found");
+        setError("Không tìm thấy công việc");
         return null;
       }
       const message =
-        err?.response?.data?.message || err?.message || "An error occurred";
+        err?.response?.data?.message || err?.message || "Đã xảy ra lỗi";
       setError(message);
       return null;
     } finally {
@@ -202,11 +202,11 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
       return true;
     } catch (err: any) {
       if (err?.response?.status === 404) {
-        setError("Task assignment not found");
+        setError("Không tìm thấy công việc");
         return false;
       }
       const message =
-        err?.response?.data?.message || err?.message || "An error occurred";
+        err?.response?.data?.message || err?.message || "Đã xảy ra lỗi";
       setError(message);
       return false;
     } finally {
@@ -224,11 +224,11 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
       return true;
     } catch (err: any) {
       if (err?.response?.status === 404) {
-        setError("Task assignment not found");
+        setError("Không tìm thấy công việc");
         return false;
       }
       const message =
-        err?.response?.data?.message || err?.message || "An error occurred";
+        err?.response?.data?.message || err?.message || "Đã xảy ra lỗi";
       setError(message);
       return false;
     } finally {

@@ -33,7 +33,7 @@ const getDays = () => {
     d.setDate(TODAY.getDate() + offset);
     return {
       offset,
-      label: d.toLocaleDateString("en-US", { weekday: "short" }),
+      label: d.toLocaleDateString("vi-VN", { weekday: "short" }),
       date: d.getDate(),
       full: d.toISOString().split("T")[0],
     };
@@ -61,25 +61,25 @@ const STATUS_CONFIG: Record<
   { label: string; color: string; bg: string; dot: string }
 > = {
   in_progress: {
-    label: "In Progress",
+    label: "Đang thực hiện",
     color: "#F59E0B",
     bg: "#FEF3C7",
     dot: "#F59E0B",
   },
   not_started: {
-    label: "Not Started",
+    label: "Chưa bắt đầu",
     color: "#3B82F6",
     bg: "#EFF6FF",
     dot: "#3B82F6",
   },
   completed: {
-    label: "Completed",
+    label: "Đã hoàn thành",
     color: "#10B981",
     bg: "#ECFDF5",
     dot: "#10B981",
   },
   block: {
-    label: "Block",
+    label: "Bị chặn",
     color: "#DC2626",
     bg: "#FEF2F2",
     dot: "#DC2626",
@@ -124,16 +124,21 @@ const TaskCard = ({
   task,
   onStart,
   onContinue,
+  canAct = true,
 }: {
   task: Task;
   onStart?: (id: string) => void;
   onContinue?: (id: string) => void;
+  canAct?: boolean;
 }) => {
   const isInProgress = task.status === "in_progress";
   const isCompleted = task.status === "completed";
   const isNotStarted = task.status === "not_started";
 
-  const hasActions = isInProgress || isNotStarted;
+  // Only allow actions (Start/Continue) when the screen allows acting
+  // (e.g., selected day is today). This prevents starting/continuing
+  // tasks on past/future days where buttons should be view-only.
+  const hasActions = canAct && (isInProgress || isNotStarted);
 
   return (
     <View style={[styles.card, isInProgress && styles.cardActive]}>
@@ -147,7 +152,7 @@ const TaskCard = ({
         </View>
         <Text style={styles.cardTime}>
           {isCompleted
-            ? `Finished ${task.finishedAt || ""}`
+            ? `Hoàn thành ${task.finishedAt || ""}`
             : `${task.startTime} ${task.endTime ? `– ${task.endTime}` : ""}`}
         </Text>
       </View>
@@ -168,7 +173,7 @@ const TaskCard = ({
         <View style={styles.cardActions}>
           {isInProgress && (
             <AppButton
-              label="Continue"
+              label="Tiếp tục"
               onPress={() => onContinue && onContinue(task.id)}
               iconLeft="play"
               size="md"
@@ -177,7 +182,7 @@ const TaskCard = ({
           )}
           {isNotStarted && (
             <AppButton
-              label="Start Task"
+              label="Bắt đầu công việc"
               onPress={() => onStart && onStart(task.id)}
               size="md"
               style={{ flex: 1, marginBottom: 0 }}
@@ -308,8 +313,8 @@ export default function TaskListScreen() {
   const handleStartTask = async (id: string) => {
     if (!workerId) {
       Alert.alert(
-        "Worker not available",
-        "Cannot start task without worker id.",
+        "Người lao động không có sẵn",
+        "Không thể bắt đầu công việc khi thiếu ID người lao động.",
       );
       return;
     }
@@ -324,7 +329,10 @@ export default function TaskListScreen() {
         steps: res?.steps || [],
       });
     } catch (e: any) {
-      Alert.alert("Start failed", e?.message || "Could not start the task.");
+      Alert.alert(
+        "Bắt đầu thất bại",
+        e?.message || "Không thể bắt đầu công việc.",
+      );
     } finally {
       setLoadingTasks(false);
     }
@@ -333,8 +341,8 @@ export default function TaskListScreen() {
   const handleContinue = async (taskId: string) => {
     if (!workerId) {
       Alert.alert(
-        "Worker not available",
-        "Cannot continue task without worker id.",
+        "Người lao động không có sẵn",
+        "Không thể tiếp tục công việc khi thiếu ID người lao động.",
       );
       return;
     }
@@ -360,7 +368,10 @@ export default function TaskListScreen() {
         steps,
       });
     } catch (e: any) {
-      Alert.alert("Continue failed", e?.message || "Cannot continue the task.");
+      Alert.alert(
+        "Tiếp tục thất bại",
+        e?.message || "Không thể tiếp tục công việc.",
+      );
     } finally {
       setLoadingTasks(false);
     }
@@ -376,9 +387,9 @@ export default function TaskListScreen() {
     return {
       id: t.id,
       title: t.isAdhocTask
-        ? t.nameAdhocTask || "Adhoc Task"
-        : `Task ${t.taskScheduleId.slice(0, 8).toUpperCase()}`,
-      location: t.displayLocation || "Unknown Location",
+        ? t.nameAdhocTask || "Công việc linh động"
+        : `Công việc ${t.taskScheduleId.slice(0, 8).toUpperCase()}`,
+      location: t.displayLocation || "Không rõ địa điểm",
       sublocation: "",
       status: mapStatusToTaskStatus(t.status),
       startTime: time,
@@ -397,18 +408,18 @@ export default function TaskListScreen() {
 
   // ✅ Đã cập nhật lại tên và thêm đầy đủ các trạng thái Block, Not Started
   const FILTERS: { key: FilterType; label: string }[] = [
-    { key: "all", label: "All" },
-    { key: "not_started", label: "Not Started" },
-    { key: "in_progress", label: "In Progress" },
-    { key: "completed", label: "Completed" },
-    { key: "block", label: "Block" },
+    { key: "all", label: "Tất cả" },
+    { key: "not_started", label: "Chưa bắt đầu" },
+    { key: "in_progress", label: "Đang thực hiện" },
+    { key: "completed", label: "Đã hoàn thành" },
+    { key: "block", label: "Bị chặn" },
   ];
 
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor="#f5f6fa" />
       <Header
-        title="My Tasks"
+        title="Công việc của tôi"
         onBack={() => handleNavigate("Home")}
         style={{ backgroundColor: "#F5F6FA" }}
       />
@@ -452,15 +463,15 @@ export default function TaskListScreen() {
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>
             {selectedDay === 0
-              ? "Today's Schedule"
+              ? "Lịch hôm nay"
               : selectedDay < 0
-                ? "Past Schedule"
-                : "Upcoming Schedule"}
+                ? "Lịch trước"
+                : "Lịch sắp tới"}
           </Text>
           <Text style={styles.sectionSub}>
             {remaining > 0
-              ? `${remaining} tasks remaining`
-              : "All tasks completed"}
+              ? `${remaining} công việc còn lại`
+              : "Tất cả công việc đã hoàn thành"}
           </Text>
         </View>
 
@@ -517,9 +528,9 @@ export default function TaskListScreen() {
               <View style={styles.emptyIconWrap}>
                 <Ionicons name="clipboard-outline" size={36} color="#CBD5E1" />
               </View>
-              <Text style={styles.emptyTitle}>No tasks found</Text>
+              <Text style={styles.emptyTitle}>Không tìm thấy công việc</Text>
               <Text style={styles.emptyText}>
-                No tasks match this filter for the selected day.
+                Không có công việc phù hợp với bộ lọc cho ngày đã chọn.
               </Text>
             </View>
           ) : (
@@ -529,6 +540,7 @@ export default function TaskListScreen() {
                 task={task}
                 onStart={handleStartTask}
                 onContinue={handleContinue}
+                canAct={selectedDay === 0}
               />
             ))
           )}

@@ -58,6 +58,7 @@ export default function InspectionCameraScreen(props: Props) {
   const [photos, setPhotos] = useState<CapturedPhoto[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const [zoom, setZoom] = useState(MIN_ZOOM);
   const zoomRef = useRef(MIN_ZOOM);
@@ -84,18 +85,18 @@ export default function InspectionCameraScreen(props: Props) {
         <View style={styles.permissionIconWrap}>
           <Ionicons name="camera-outline" size={52} color="#94A3B8" />
         </View>
-        <Text style={styles.permissionTitle}>Camera Access Required</Text>
+        <Text style={styles.permissionTitle}>Cần quyền truy cập Camera</Text>
         <Text style={styles.permissionText}>
-          CleanOps needs camera access to capture inspection photos.
+          CleanOps cần quyền truy cập camera để chụp ảnh kiểm tra.
         </Text>
         <TouchableOpacity
           style={styles.permissionBtn}
           onPress={requestPermission}
         >
-          <Text style={styles.permissionBtnText}>Grant Permission</Text>
+          <Text style={styles.permissionBtnText}>Cho phép truy cập</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.permissionCancel} onPress={onClose}>
-          <Text style={styles.permissionCancelText}>Cancel</Text>
+          <Text style={styles.permissionCancelText}>Hủy</Text>
         </TouchableOpacity>
       </View>
     );
@@ -175,7 +176,7 @@ export default function InspectionCameraScreen(props: Props) {
         setPhotos((prev) => [...prev, newPhoto]);
       }
     } catch {
-      Alert.alert("Error", "Failed to capture photo. Please try again.");
+      Alert.alert("Lỗi", "Chụp ảnh thất bại. Vui lòng thử lại.");
     } finally {
       setCapturing(false);
     }
@@ -183,6 +184,50 @@ export default function InspectionCameraScreen(props: Props) {
   const handleDelete = (index: number) => {
     setPhotos((prev) => prev.filter((_, i) => i !== index));
   };
+
+  // const handleSubmit = () => {
+  //   if (photos.length === 0) {
+  //     Alert.alert(
+  //       "Không có ảnh",
+  //       "Vui lòng chụp ít nhất một ảnh trước khi gửi.",
+  //     );
+  //     return;
+  //   }
+  //   if (isSelfie) {
+  //     // Upload selfie first, then return server URL
+  //     (async () => {
+  //       try {
+  //         setUploading(true);
+  //         const uploaded = await uploadPhotos(photos);
+  //         const p = uploaded[0] ?? photos[0];
+  //         onCaptured?.(p as CapturedPhoto);
+  //         navigation.goBack();
+  //       } catch (err) {
+  //         Alert.alert("Lỗi", "Upload ảnh thất bại. Vui lòng thử lại.");
+  //       } finally {
+  //         setUploading(false);
+  //       }
+  //     })();
+  //     return;
+  //   }
+
+  //   // 🔥 INSPECTION FLOW (Modal)
+  //   (async () => {
+  //     try {
+  //       setUploading(true);
+  //       const uploaded = await uploadPhotos(photos);
+  //       onSubmit?.(uploaded);
+  //       onClose?.();
+  //     } catch (err) {
+  //       Alert.alert("Lỗi", "Upload ảnh thất bại. Vui lòng thử lại.");
+  //     } finally {
+  //       setUploading(false);
+  //     }
+  //   })();
+  // };
+
+  // Upload photos to backend endpoint. Backend must accept multipart/form-data
+  // and return an array of uploaded file URLs (or array of objects with `url`).
 
   const handleSubmit = () => {
     if (photos.length === 0) {
@@ -202,6 +247,46 @@ export default function InspectionCameraScreen(props: Props) {
     onSubmit?.(photos);
     onClose?.();
   };
+
+  // const getFilenameFromUri = (uri: string) => {
+  //   const parts = uri.split("/");
+  //   return parts[parts.length - 1] || `photo-${Date.now()}.jpg`;
+  // };
+
+  // const uploadPhotos = async (
+  //   items: CapturedPhoto[],
+  // ): Promise<CapturedPhoto[]> => {
+  //   if (!items || items.length === 0) return [];
+
+  //   const formData = new FormData();
+  //   items.forEach((p, i) => {
+  //     // name must include extension
+  //     formData.append("files", {
+  //       uri: p.uri,
+  //       name: getFilenameFromUri(p.uri),
+  //       type: "image/jpeg",
+  //     } as any);
+  //   });
+
+  //   // Adjust endpoint path to your backend upload route
+  //   const res = await axiosInstance.post("/files/upload", formData, {
+  //     headers: { "Content-Type": "multipart/form-data" },
+  //   });
+
+  //   // Expect response.data to be an array of urls or objects { url }
+  //   const data = res.data;
+  //   if (!Array.isArray(data)) return items;
+
+  //   const urls: string[] = data
+  //     .map((it: any) => (typeof it === "string" ? it : it.url || it.uri))
+  //     .filter(Boolean);
+
+  //   // Map back to CapturedPhoto shape with timestamp preserved
+  //   return urls.map((u, idx) => ({
+  //     uri: u,
+  //     timestamp: items[idx]?.timestamp ?? new Date().toISOString(),
+  //   }));
+  // };
 
   // ── UI ─────────────────────────────────────────────────────────────────────
   return (
@@ -269,9 +354,7 @@ export default function InspectionCameraScreen(props: Props) {
               {photos.length > 0 && (
                 <View style={styles.countPill}>
                   <Ionicons name="camera" size={13} color="#FFF" />
-                  <Text style={styles.countPillText}>
-                    {photos.length} photo{photos.length > 1 ? "s" : ""}
-                  </Text>
+                  <Text style={styles.countPillText}>{photos.length} ảnh</Text>
                 </View>
               )}
 
@@ -400,7 +483,7 @@ export default function InspectionCameraScreen(props: Props) {
         <View style={styles.drawer}>
           <View style={styles.drawerHandle} />
           <View style={styles.drawerHeader}>
-            <Text style={styles.drawerTitle}>Photos ({photos.length})</Text>
+            <Text style={styles.drawerTitle}>Ảnh ({photos.length})</Text>
             <TouchableOpacity onPress={() => setShowPreview(false)}>
               <Ionicons name="close" size={18} color="#64748B" />
             </TouchableOpacity>
@@ -434,8 +517,8 @@ export default function InspectionCameraScreen(props: Props) {
           >
             <Text style={styles.drawerSubmitText}>
               {isSelfie
-                ? "Confirm Check-in"
-                : `Submit ${photos.length} photo${photos.length > 1 ? "s" : ""} for AI Review`}
+                ? "Xác nhận điểm danh"
+                : `Gửi ${photos.length} ảnh để AI kiểm tra`}
             </Text>
           </TouchableOpacity>
         </View>

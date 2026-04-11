@@ -49,9 +49,11 @@ export default function EquipmentRequestDetailModal({
       try {
         const taskData = await getTaskAssignmentById(data.taskAssignmentId);
         if (isMounted)
-          setDisplayLocation(taskData?.displayLocation || "Unknown Location");
+          setDisplayLocation(
+            taskData?.displayLocation || "Vị trí không xác định",
+          );
       } catch (error) {
-        if (isMounted) setDisplayLocation("Failed to load location");
+        if (isMounted) setDisplayLocation("Không thể tải vị trí");
       } finally {
         if (isMounted) setIsLoadingTask(false);
       }
@@ -63,9 +65,10 @@ export default function EquipmentRequestDetailModal({
       setIsLoadingEq(true);
       try {
         const eqData = await getEquipmentById(data.equipmentId);
-        if (isMounted) setEquipmentName(eqData?.name || "Unknown Equipment");
+        if (isMounted)
+          setEquipmentName(eqData?.name || "Thiết bị không xác định");
       } catch (error) {
-        if (isMounted) setEquipmentName("Failed to load equipment");
+        if (isMounted) setEquipmentName("Không thể tải thiết bị");
       } finally {
         if (isMounted) setIsLoadingEq(false);
       }
@@ -97,7 +100,7 @@ export default function EquipmentRequestDetailModal({
         <View style={styles.modalContainer}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Equipment Request</Text>
+            <Text style={styles.headerTitle}>Yêu cầu thiết bị</Text>
             <TouchableOpacity onPress={onClose}>
               <Text style={styles.closeBtn}>✖️</Text>
             </TouchableOpacity>
@@ -107,7 +110,7 @@ export default function EquipmentRequestDetailModal({
             <View style={styles.card}>
               {/* 1. ROW LOCATION (Fixed wrapping) */}
               <View style={styles.rowContainer}>
-                <Text style={styles.rowLabel}>Location:</Text>
+                <Text style={styles.rowLabel}>Vị trí:</Text>
                 <View style={styles.rowValueContainer}>
                   {isLoadingTask ? (
                     <ActivityIndicator
@@ -125,7 +128,7 @@ export default function EquipmentRequestDetailModal({
 
               {/* 2. ROW EQUIPMENT (Hiển thị Name thay vì ID) */}
               <View style={styles.rowContainer}>
-                <Text style={styles.rowLabel}>Equipment:</Text>
+                <Text style={styles.rowLabel}>Thiết bị:</Text>
                 <View style={styles.rowValueContainer}>
                   {isLoadingEq ? (
                     <ActivityIndicator
@@ -143,7 +146,7 @@ export default function EquipmentRequestDetailModal({
 
               {/* 3. ROW REASON */}
               <View style={styles.rowContainer}>
-                <Text style={styles.rowLabel}>Reason:</Text>
+                <Text style={styles.rowLabel}>Lý do:</Text>
                 <View style={styles.rowValueContainer}>
                   <Text style={styles.rowValue}>{data.reason ?? "—"}</Text>
                 </View>
@@ -151,7 +154,7 @@ export default function EquipmentRequestDetailModal({
 
               {/* 4. ROW QUANTITY */}
               <View style={styles.rowContainer}>
-                <Text style={styles.rowLabel}>Quantity:</Text>
+                <Text style={styles.rowLabel}>Số lượng:</Text>
                 <View style={styles.rowValueContainer}>
                   <Text style={styles.rowValue}>{data.quantity ?? "—"}</Text>
                 </View>
@@ -159,7 +162,7 @@ export default function EquipmentRequestDetailModal({
 
               {/* 5. ROW STATUS */}
               <View style={styles.rowContainer}>
-                <Text style={styles.rowLabel}>Status:</Text>
+                <Text style={styles.rowLabel}>Trạng thái:</Text>
                 <View style={styles.rowValueContainer}>
                   <Text
                     style={[
@@ -177,7 +180,7 @@ export default function EquipmentRequestDetailModal({
               {/* 6. ROW CREATED */}
               {/* ROW: Created */}
               <View style={styles.rowContainer}>
-                <Text style={styles.rowLabel}>Created:</Text>
+                <Text style={styles.rowLabel}>Ngày tạo:</Text>
                 <View style={styles.rowValueContainer}>
                   <Text style={styles.rowValue}>
                     {item?.created ? (

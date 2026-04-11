@@ -1,14 +1,18 @@
 // src/components/task/steps/ListStep.tsx
+import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { StepPlugin, StepPluginProps } from "../StepRegistry";
 
 function ListComponent({ config, state, onChange }: StepPluginProps) {
   const items: string[] = config?.items ?? [];
+  const isConfirmed = state.confirmed;
 
   return (
-    <View>
-      <Text style={s.instruction}>Đọc kỹ danh sách bên dưới và xác nhận</Text>
+    <View style={s.container}>
+      <View style={s.header}>
+        <Text style={s.label}>Đọc kỹ danh sách bên dưới và xác nhận</Text>
+      </View>
 
       <View style={s.listBox}>
         {items.map((item, index) => (
@@ -23,14 +27,15 @@ function ListComponent({ config, state, onChange }: StepPluginProps) {
       </View>
 
       <TouchableOpacity
-        style={[s.confirmBtn, state.confirmed && s.confirmBtnDone]}
-        onPress={() => onChange({ confirmed: !state.confirmed })}
+        style={[s.row, isConfirmed && s.rowDone]}
+        onPress={() => onChange({ confirmed: !isConfirmed })}
+        activeOpacity={0.7}
       >
-        <View style={[s.confirmCheck, state.confirmed && s.confirmCheckDone]}>
-          {state.confirmed && <Text style={s.confirmCheckMark}>✓</Text>}
+        <View style={[s.box, isConfirmed && s.boxDone]}>
+          {isConfirmed && <Ionicons name="checkmark" size={16} color="#FFF" />}
         </View>
-        <Text style={[s.confirmText, state.confirmed && s.confirmTextDone]}>
-          {state.confirmed ? "Đã xác nhận" : "Xác nhận đã đọc"}
+        <Text style={[s.text, isConfirmed && s.textDone]}>
+          {isConfirmed ? "Đã xác nhận" : "Xác nhận đã đọc"}
         </Text>
       </TouchableOpacity>
     </View>
@@ -38,63 +43,98 @@ function ListComponent({ config, state, onChange }: StepPluginProps) {
 }
 
 const s = StyleSheet.create({
-  instruction: { fontSize: 13, color: "#64748B", marginBottom: 10 },
+  container: {
+    paddingVertical: 4,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+    gap: 8,
+  },
+  label: {
+    fontSize: 14,
+    color: "#64748B",
+    fontWeight: "600",
+  },
+  // ─── List Box Styles (Read-only) ─────────────
   listBox: {
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: "#E2E8F0",
-    borderRadius: 8,
-    marginBottom: 14,
+    borderRadius: 12,
+    marginBottom: 16, // Cách một khoảng so với nút xác nhận
     overflow: "hidden",
+    backgroundColor: "#FFFFFF",
   },
   listRow: {
     flexDirection: "row",
     alignItems: "flex-start",
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    gap: 10,
-    backgroundColor: "#FAFAFA",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 12,
   },
   listRowBorder: {
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#E2E8F0",
+    borderBottomWidth: 1.5,
+    borderBottomColor: "#F1F5F9", // Màu viền ngăn cách nhạt hơn viền ngoài
   },
   bullet: {
     width: 6,
     height: 6,
     borderRadius: 3,
     backgroundColor: "#94A3B8",
-    marginTop: 5,
+    marginTop: 7, // Căn giữa theo dòng text đầu tiên
   },
-  listText: { fontSize: 14, color: "#1E293B", flex: 1, lineHeight: 20 },
-  confirmBtn: {
+  listText: {
+    fontSize: 14.5,
+    color: "#334155",
+    flex: 1,
+    lineHeight: 22,
+  },
+  // ─── Confirm Button Styles (Đồng bộ Checklist) ─
+  row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 8,
-    padding: 12,
-  },
-  confirmBtnDone: {
-    borderColor: "#166534",
-    backgroundColor: "#DCFCE7",
-  },
-  confirmCheck: {
-    width: 22,
-    height: 22,
-    borderRadius: 4,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: "#FFFFFF",
     borderWidth: 1.5,
+    borderColor: "#E2E8F0",
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  rowDone: {
+    backgroundColor: "#F0FDF4",
+    borderColor: "#BBF7D0",
+  },
+  box: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
     borderColor: "#CBD5E1",
+    marginRight: 12,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "#F8FAFC",
   },
-  confirmCheckDone: {
-    backgroundColor: "#166534",
-    borderColor: "#166534",
+  boxDone: {
+    backgroundColor: "#16A34A",
+    borderColor: "#16A34A",
   },
-  confirmCheckMark: { color: "#FFF", fontSize: 13, fontWeight: "700" },
-  confirmText: { fontSize: 14, color: "#475569", fontWeight: "500" },
-  confirmTextDone: { color: "#166534" },
+  text: {
+    fontSize: 15,
+    color: "#1E293B",
+    flex: 1,
+    fontWeight: "500",
+  },
+  textDone: {
+    color: "#166534",
+    fontWeight: "600",
+  },
 });
 
 export const ListStepPlugin: StepPlugin = {

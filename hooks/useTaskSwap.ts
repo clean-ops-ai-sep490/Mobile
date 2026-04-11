@@ -56,6 +56,7 @@ export interface SwapTaskInfo {
 
 export interface SwapCandidate {
   workerId: string;
+  assigneeName: string;
   task: SwapTaskInfo;
 }
 
@@ -230,10 +231,14 @@ export const useTaskSwap = () => {
             },
           },
         );
-
         return res.data;
       } catch (err: any) {
-        setError(err.message);
+        console.error("Lỗi lấy danh sách Swap Candidates:", err);
+        const errorMsg =
+          err?.response?.data?.message ||
+          err.message ||
+          "Lấy danh sách ứng viên thất bại";
+        setError(errorMsg);
         throw err;
       } finally {
         setLoading(false);

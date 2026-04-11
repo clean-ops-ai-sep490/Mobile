@@ -75,7 +75,7 @@ const useEquipment = () => {
       );
       setEquipmentList(res.data.content ?? []);
     } catch (e: any) {
-      setError(e?.response?.data?.message || "Failed to load equipment list");
+      setError(e?.response?.data?.message || "Tải danh sách thiết bị thất bại");
     } finally {
       setLoading(false);
     }
@@ -104,7 +104,8 @@ const useEquipment = () => {
   const createEquipmentRequest = async (
     payload: CreateEquipmentRequestPayload,
   ) => {
-    if (!workerId) throw new Error("User not found. Please login again.");
+    if (!workerId)
+      throw new Error("Không tìm thấy người dùng. Vui lòng đăng nhập lại.");
 
     try {
       setSubmitting(true);
@@ -118,7 +119,7 @@ const useEquipment = () => {
       });
       return res.data;
     } catch (e: any) {
-      setError(e?.response?.data?.message || "Failed to submit request");
+      setError(e?.response?.data?.message || "Gửi yêu cầu thất bại");
       throw e;
     } finally {
       setSubmitting(false);
@@ -135,9 +136,7 @@ const useEquipment = () => {
       >(`/EquipmentRequests/worker/${workerId}`, { params });
       return res.data;
     } catch (e: any) {
-      setError(
-        e?.response?.data?.message || "Failed to fetch equipment requests",
-      );
+      setError(e?.response?.data?.message || "Lấy yêu cầu thiết bị thất bại");
       throw e;
     } finally {
       setLoading(false);

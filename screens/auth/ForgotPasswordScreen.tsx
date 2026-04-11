@@ -28,7 +28,7 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const error =
-    touched && !emailRegex.test(email) ? "Invalid email format" : "";
+    touched && !emailRegex.test(email) ? "Định dạng email không hợp lệ" : "";
 
   const handleSubmit = async () => {
     setTouched(true);
@@ -76,10 +76,10 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
             <Ionicons name="key-outline" size={32} color="#4F6EF7" />
           </View>
 
-          <Text style={styles.title}>Reset Password</Text>
+          <Text style={styles.title}>Đặt lại mật khẩu</Text>
           <Text style={styles.subtitle}>
-            Enter your email address and we will send you{"\n"}instructions to
-            reset your password.
+            Nhập địa chỉ email của bạn, chúng tôi sẽ gửi hướng dẫn đặt lại mật
+            khẩu.
           </Text>
 
           {/* Card */}
@@ -113,7 +113,7 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
             ) : null}
 
             <AppButton
-              label="Send"
+              label="Gửi"
               onPress={handleSubmit}
               iconRight="arrow-forward"
               style={{
@@ -122,7 +122,7 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
                 shadowColor: "#4F6EF7",
               }}
               loading={loading}
-              loadingLabel="Sending..."
+              loadingLabel="Đang gửi..."
             />
           </View>
 
@@ -130,7 +130,7 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
             style={styles.loginLink}
             onPress={() => navigation.goBack()}
           >
-            <Text style={styles.loginLinkText}>← Back to Sign In</Text>
+            <Text style={styles.loginLinkText}>← Quay lại Đăng nhập</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>

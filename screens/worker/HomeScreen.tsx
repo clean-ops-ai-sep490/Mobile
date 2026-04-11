@@ -2,6 +2,7 @@ import BottomTabBar, { TabKey } from "@/components/common/BottomTabBar";
 import TaskPickerModal from "@/components/modals/TaskPickerModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSelectedTask } from "@/contexts/SelectedTaskContext";
+import { useNotificationStore } from "@/store/notification.store";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import React, { useEffect, useRef, useState } from "react";
@@ -134,6 +135,7 @@ export default function HomeScreen({ onNavigate }: Props) {
   const { selectedTaskId, setSelectedTaskId } = useSelectedTask();
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const { unreadCount, fetchUnreadCount } = useNotificationStore();
 
   const handleNavigate = (screen: TabKey) => {
     navigation.navigate(screen as never);
@@ -152,9 +154,10 @@ export default function HomeScreen({ onNavigate }: Props) {
         useNativeDriver: true,
       }),
     ]).start();
+    fetchUnreadCount();
   }, []);
 
-  const today = new Date().toLocaleDateString("en-US", {
+  const today = new Date().toLocaleDateString("vi-VN", {
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -169,7 +172,7 @@ export default function HomeScreen({ onNavigate }: Props) {
         <View style={styles.topBar}>
           <View style={styles.topBarLeft}>
             <View>
-              <Text style={styles.greeting}>Have a good day,</Text>
+              <Text style={styles.greeting}>Chúc bạn một ngày tốt lành,</Text>
               <Text style={styles.userName}>{userName}</Text>
               <Text style={styles.date}>{today}</Text>
             </View>
@@ -184,11 +187,23 @@ export default function HomeScreen({ onNavigate }: Props) {
                 size={18}
                 color="#334155"
               />
-              <View style={styles.notifDot} />
+              {unreadCount > 0 && (
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeText}>
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.iconBtn}
-              onPress={() => onNavigate?.("Profile")}
+              onPress={() => {
+                if (user?.role === "Worker") {
+                  (navigation as any).navigate("WorkerProfile");
+                } else {
+                  onNavigate?.("Profile");
+                }
+              }}
             >
               <Ionicons name="person-outline" size={18} color="#334155" />
             </TouchableOpacity>
@@ -216,7 +231,7 @@ export default function HomeScreen({ onNavigate }: Props) {
                   />
                 </View>
                 <View>
-                  <Text style={styles.tasksTitle}>My Tasks</Text>
+                  <Text style={styles.tasksTitle}>Công việc của tôi</Text>
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
@@ -224,7 +239,7 @@ export default function HomeScreen({ onNavigate }: Props) {
           </Animated.View>
 
           {/* ── Quick Actions ── */}
-          <Text style={styles.sectionLabel}>Quick Actions</Text>
+          <Text style={styles.sectionLabel}>Tác vụ nhanh</Text>
           <View
             style={[
               styles.quickGrid,
@@ -232,21 +247,9 @@ export default function HomeScreen({ onNavigate }: Props) {
             ]}
           >
             <QuickCard
-              icon="add-circle-outline"
-              label="Ad-hoc Request"
-              subtitle="Support, additional supplies"
-              iconBg="#DCFCE7"
-              iconColor="#22C55E"
-              delay={180}
-              onPress={() => {
-                setPendingAction("AdhocRequest");
-                setPickerVisible(true);
-              }}
-            />
-            <QuickCard
               icon="swap-horizontal-outline"
-              label="Request Swap Task"
-              subtitle="Request task swap"
+              label="Yêu cầu đổi công việc"
+              subtitle="Gửi yêu cầu đổi công việc"
               iconBg="#F3F4F6"
               iconColor="#6B7280"
               delay={340}
@@ -256,11 +259,33 @@ export default function HomeScreen({ onNavigate }: Props) {
               }}
             />
           </View>
+          <View
+            style={[
+              styles.quickGrid,
+              { gap: CARD_GAP, marginBottom: CARD_GAP },
+            ]}
+          >
+            <QuickCard
+              icon="person-outline"
+              label="Hồ sơ của tôi"
+              subtitle="Xem và quản lý thông tin của bạn"
+              iconBg="#F3E8FF"
+              iconColor="#9333EA"
+              delay={180}
+              onPress={() => {
+                if (user?.role === "Worker") {
+                  (navigation as any).navigate("WorkerProfile");
+                } else {
+                  onNavigate?.("Profile");
+                }
+              }}
+            />
+          </View>
           <View style={styles.quickGrid}>
             <QuickCard
               icon="list-outline"
-              label="List All Requests"
-              subtitle="View and manage all requests"
+              label="Danh sách yêu cầu"
+              subtitle="Xem và quản lý tất cả yêu cầu"
               iconBg="#FFF7ED"
               iconColor="#F97316"
               delay={260}
@@ -288,9 +313,9 @@ export default function HomeScreen({ onNavigate }: Props) {
                 "SwapTask" as never,
                 { taskAssignmentId: id } as never,
               );
-            } else if (action === "AdhocRequest") {
+            } else if (action === "EmergencyLeave") {
               navigation.navigate(
-                "AdhocRequest" as never,
+                "EmergencyLeave" as never,
                 { taskAssignmentId: id } as never,
               );
             } else {
@@ -471,5 +496,25 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: "#2563EB",
+  },
+  // Xóa class notifDot cũ và thêm 2 class này vào:
+  notifBadge: {
+    position: "absolute",
+    top: -2,
+    right: -4,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "#EF4444",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: "#FFF",
+  },
+  notifBadgeText: {
+    color: "#FFF",
+    fontSize: 9,
+    fontWeight: "bold",
   },
 });

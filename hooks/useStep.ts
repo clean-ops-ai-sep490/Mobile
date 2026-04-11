@@ -103,7 +103,7 @@ export function useSteps() {
           try {
             step.configSchema = JSON.parse(step.configSchema);
           } catch {
-            console.warn("⚠️ Failed to parse configSchema");
+            console.warn("⚠️ Không thể phân tích configSchema");
           }
         }
 
@@ -145,7 +145,7 @@ export function useSteps() {
       try {
         configDetail = configDetailRaw ? JSON.parse(configDetailRaw) : {};
       } catch (err) {
-        console.warn("⚠️ Invalid configDetail JSON", configDetailRaw);
+        console.warn("⚠️ JSON ConfigDetail không hợp lệ", configDetailRaw);
       }
 
       return {

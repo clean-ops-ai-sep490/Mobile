@@ -43,8 +43,8 @@ export default function EmergencyLeaveDetailModal({
         const res = await getById(leaveId);
         setItem(res);
       } catch (err: any) {
-        console.error("Failed to load emergency leave", err);
-        setError("Failed to load emergency leave. Please try again.");
+        console.error("Không tải được nghỉ khẩn cấp", err);
+        setError("Tải dữ liệu nghỉ khẩn cấp thất bại. Vui lòng thử lại.");
       } finally {
         setLoading(false);
       }
@@ -72,7 +72,7 @@ export default function EmergencyLeaveDetailModal({
         <StatusBar barStyle="dark-content" />
         <View style={styles.modalContainer}>
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Emergency Leave</Text>
+            <Text style={styles.headerTitle}>Nghỉ khẩn cấp</Text>
             <TouchableOpacity onPress={onClose}>
               <Text style={styles.closeBtn}>✖️</Text>
             </TouchableOpacity>
@@ -83,18 +83,19 @@ export default function EmergencyLeaveDetailModal({
             ) : error ? (
               <Text style={styles.error}>{error}</Text>
             ) : !item ? (
-              <Text style={styles.info}>No data available.</Text>
+              <Text style={styles.info}>Không có dữ liệu</Text>
             ) : (
               <View style={styles.card}>
                 <Text style={styles.row}>
-                  Task Assignment: {item.taskAssignmentId ?? "—"}
+                  Công việc: {item.taskAssignmentId ?? "—"}
                 </Text>
 
                 <Text style={styles.row}>
-                  Leave From: <FormattedDate dateString={item.leaveDateFrom} />
+                  Ngày bắt đầu:{" "}
+                  <FormattedDate dateString={item.leaveDateFrom} />
                 </Text>
                 <Text style={styles.row}>
-                  Leave To: <FormattedDate dateString={item.leaveDateTo} />
+                  Ngày kết thúc: <FormattedDate dateString={item.leaveDateTo} />
                 </Text>
 
                 <Text
@@ -103,7 +104,7 @@ export default function EmergencyLeaveDetailModal({
                     item.status === "Pending" ? styles.pending : styles.status,
                   ]}
                 >
-                  Status: {item.status}
+                  Trạng thái: {item.status}
                 </Text>
 
                 {item.audioUrl && (
@@ -111,20 +112,20 @@ export default function EmergencyLeaveDetailModal({
                     onPress={() => openAudio(item.audioUrl)}
                     style={styles.audioContainer}
                   >
-                    <Text style={styles.audioLabel}>▶️ Play Recording</Text>
+                    <Text style={styles.audioLabel}>▶️ Phát ghi âm</Text>
                     <Text style={styles.audioUrl}>{item.audioUrl}</Text>
                   </TouchableOpacity>
                 )}
 
                 {item.transcription && (
                   <View style={styles.transcription}>
-                    <Text style={styles.transLabel}>Transcription:</Text>
+                    <Text style={styles.transLabel}>Bản ghi:</Text>
                     <Text style={styles.transText}>{item.transcription}</Text>
                   </View>
                 )}
 
                 <Text style={styles.row}>
-                  Created: <FormattedDate dateString={item.created} />
+                  Ngày tạo: <FormattedDate dateString={item.created} />
                 </Text>
               </View>
             )}

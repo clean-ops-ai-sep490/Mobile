@@ -4,18 +4,18 @@ import { useIssueReport } from "@/hooks/useIssueReport";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Keyboard,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  ActivityIndicator,
+  Alert,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from "react-native";
 
 interface IssueReportModalProps {
@@ -64,14 +64,14 @@ export default function IssueReportModal({
 
   const handleSubmit = async () => {
     if (!description.trim()) {
-      Alert.alert("Error", "Please enter a description of the issue.");
+      Alert.alert("Lỗi", "Vui lòng nhập mô tả sự cố.");
       return;
     }
 
     if (!workerId) {
       Alert.alert(
-        "Error",
-        "Worker information not found. Please log in again.",
+        "Lỗi",
+        "Không tìm thấy thông tin nhân viên. Vui lòng đăng nhập lại.",
       );
       return;
     }
@@ -84,15 +84,13 @@ export default function IssueReportModal({
         description: description.trim(),
       });
 
-      Alert.alert(
-        "Success",
-        "Your issue report has been submitted successfully.",
-        [{ text: "OK", onPress: handleClose }],
-      );
+      Alert.alert("Thành công", "Báo cáo sự cố đã được gửi thành công.", [
+        { text: "OK", onPress: handleClose },
+      ]);
     } catch (err: any) {
       Alert.alert(
-        "Failed",
-        err?.message ?? "An error occurred. Please try again.",
+        "Thất bại",
+        err?.message ?? "Đã xảy ra lỗi. Vui lòng thử lại.",
       );
     } finally {
       setSubmitting(false);
@@ -117,7 +115,7 @@ export default function IssueReportModal({
               <View style={styles.header}>
                 <View style={styles.headerTitleWrap}>
                   <Ionicons name="warning" size={24} color="#EF4444" />
-                  <Text style={styles.title}>Report Issue</Text>
+                  <Text style={styles.title}>Báo cáo sự cố</Text>
                 </View>
                 <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
                   <Ionicons name="close" size={24} color="#64748B" />
@@ -125,8 +123,8 @@ export default function IssueReportModal({
               </View>
 
               <Text style={styles.subtitle}>
-                Please provide a detailed description of the issue you
-                encountered while performing the task.
+                Vui lòng mô tả chi tiết sự cố bạn gặp phải khi thực hiện công
+                việc.
               </Text>
 
               {loadingWorker ? (
@@ -138,7 +136,7 @@ export default function IssueReportModal({
               ) : (
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Enter issue description..."
+                  placeholder="Nhập mô tả sự cố..."
                   placeholderTextColor="#94A3B8"
                   multiline
                   numberOfLines={4}
@@ -151,10 +149,10 @@ export default function IssueReportModal({
 
               <View style={styles.footer}>
                 <AppButton
-                  label="Submit Report"
+                  label="Gửi báo cáo"
                   onPress={handleSubmit}
                   loading={submitting}
-                  loadingLabel="Submitting..."
+                  loadingLabel="Đang gửi..."
                   style={styles.submitBtn}
                 />
               </View>

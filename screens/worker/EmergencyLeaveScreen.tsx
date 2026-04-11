@@ -317,7 +317,7 @@ export default function EmergencyLeaveScreen({
     try {
       const { granted } = await Audio.requestPermissionsAsync();
       if (!granted) {
-        Alert.alert("Permission required", "Microphone permission is needed.");
+        Alert.alert("Cần quyền", "Cần quyền truy cập micro.");
         return;
       }
       await Audio.setAudioModeAsync({
@@ -338,7 +338,7 @@ export default function EmergencyLeaveScreen({
         1000,
       );
     } catch {
-      Alert.alert("Error", "Could not start recording.");
+      Alert.alert("Lỗi", "Không thể bắt đầu ghi âm.");
     }
   };
 
@@ -355,7 +355,7 @@ export default function EmergencyLeaveScreen({
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
       setRecordState("recorded");
     } catch {
-      Alert.alert("Error", "Could not stop recording.");
+      Alert.alert("Lỗi", "Không thể dừng ghi âm.");
     }
   };
 
@@ -409,7 +409,7 @@ export default function EmergencyLeaveScreen({
           }
         });
       } catch {
-        Alert.alert("Error", "Could not play recording.");
+        Alert.alert("Lỗi", "Không thể phát bản ghi.");
       }
     } else if (playState === "playing") {
       await soundRef.current?.pauseAsync();
@@ -429,27 +429,26 @@ export default function EmergencyLeaveScreen({
   // ── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (loadingWorker) {
-      Alert.alert("Loading", "Fetching your profile. Please wait a moment.");
+      Alert.alert("Đang tải", "Đang lấy thông tin cá nhân. Vui lòng đợi.");
       return;
     }
     if (!workerId) {
       Alert.alert(
-        "Session Expired",
-        "Your session has expired. Please log in again to submit an emergency leave request.",
+        "Phiên hết hạn",
+        "Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại để gửi yêu cầu.",
       );
       return;
     }
-
     if (!isRecorded || !recordingUri) {
-      Alert.alert("No Recording", "Please record your reason first.");
+      Alert.alert("Chưa có bản ghi", "Vui lòng ghi âm lý do trước khi gửi.");
       return;
     }
 
     // ✅ Validate: nếu không có taskAssignmentId thì phải có dates
     if (!taskAssignmentId && (!leaveDateFrom || !leaveDateTo)) {
       Alert.alert(
-        "Missing Dates",
-        "Please select both start and end dates for your leave.",
+        "Thiếu ngày",
+        "Vui lòng chọn cả ngày bắt đầu và kết thúc cho kỳ nghỉ.",
       );
       return;
     }
@@ -471,15 +470,18 @@ export default function EmergencyLeaveScreen({
 
       // Validate: không được ở quá khứ
       if (fromDate < today) {
-        Alert.alert("Invalid Date", "Leave start date cannot be in the past.");
+        Alert.alert(
+          "Ngày không hợp lệ",
+          "Ngày bắt đầu không được trước ngày hiện tại.",
+        );
         return;
       }
 
       // Validate: fromDate <= toDate
       if (fromDate > toDate) {
         Alert.alert(
-          "Invalid Dates",
-          "Start date must be before or equal to end date.",
+          "Ngày không hợp lệ",
+          "Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.",
         );
         return;
       }
@@ -507,8 +509,8 @@ export default function EmergencyLeaveScreen({
       setSubmittedStatus(result.status);
 
       Alert.alert(
-        "Request Submitted",
-        "Your emergency leave request has been sent to your manager. Status: Pending.",
+        "Đã gửi yêu cầu",
+        "Yêu cầu nghỉ khẩn cấp đã được gửi tới quản lý. Trạng thái: Đang chờ.",
         [
           {
             text: "OK",
@@ -527,11 +529,18 @@ export default function EmergencyLeaveScreen({
         err?.response?.data?.errors?.[0] ||
         err?.message ||
         "Could not submit the request. Please try again.";
-      Alert.alert("Submission Failed", beErr);
+      Alert.alert("Gửi thất bại", beErr);
     }
   };
   const handleConfirmDate = (selectedDate: Date) => {
     // Component con đã đảm bảo selectedDate là 00:00:00
+    console.debug("[EmergencyLeave] handleConfirmDate called", {
+      showDatePicker,
+      selectedDateIso: selectedDate?.toISOString(),
+      leaveDateFromIso: leaveDateFrom?.toISOString(),
+      leaveDateToIso: leaveDateTo?.toISOString(),
+    });
+
     if (showDatePicker === "from") {
       setLeaveDateFrom(selectedDate);
 
@@ -543,8 +552,23 @@ export default function EmergencyLeaveScreen({
       setLeaveDateTo(selectedDate);
     }
 
+    // Log after state updates (note: state updates are async; log current values)
+    console.debug("[EmergencyLeave] after handleConfirmDate (post set)", {
+      selectedDateIso: selectedDate?.toISOString(),
+      leaveDateFromIso: leaveDateFrom?.toISOString(),
+      leaveDateToIso: leaveDateTo?.toISOString(),
+    });
+
     // Đóng Modal/Dialog
     setShowDatePicker(null);
+  };
+  // Thêm helper này trong EmergencyLeaveScreen
+  const toLocalMidnight = (date: Date): Date => {
+    return new Date(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate(),
+    );
   };
 
   // ── Mic icon ───────────────────────────────────────────────────────────────
@@ -559,7 +583,7 @@ export default function EmergencyLeaveScreen({
       <StatusBar barStyle="light-content" backgroundColor="#db0614" />
 
       <Header
-        title="Emergency Leave Request"
+        title="Yêu cầu nghỉ khẩn cấp"
         onBack={() => handleNavigate("Home")}
         style={{ backgroundColor: "#db0614" }}
         titleStyle={{ color: "#FFFFFF" }}
@@ -574,22 +598,22 @@ export default function EmergencyLeaveScreen({
         {/* ── Title ── */}
         <Text style={styles.title}>
           {isRecording
-            ? "Recording..."
+            ? "Đang ghi âm..."
             : isRecorded
-              ? "Recording Complete"
-              : "Tap to Start Recording"}
+              ? "Đã ghi âm"
+              : "Chạm để bắt đầu ghi âm"}
         </Text>
 
         <Text style={styles.subtitle}>
           {isRecorded
-            ? "Play back your recording or re-record if needed."
-            : "State your reason clearly. Your manager\nwill be notified immediately."}
+            ? "Nghe lại hoặc ghi lại nếu cần."
+            : "Nêu rõ lý do. Quản lý của bạn\nsẽ được thông báo ngay lập tức."}
         </Text>
 
         {/* ── Status badge (shown after submit) ── */}
         {submittedStatus && (
           <View style={styles.statusRow}>
-            <Text style={styles.statusLabel}>Request status: </Text>
+            <Text style={styles.statusLabel}>Trạng thái yêu cầu: </Text>
             <StatusBadge status={submittedStatus} />
           </View>
         )}
@@ -646,7 +670,7 @@ export default function EmergencyLeaveScreen({
                 />
               </TouchableOpacity>
               <View style={styles.playbackInfo}>
-                <Text style={styles.playbackTitle}>Your Recording</Text>
+                <Text style={styles.playbackTitle}>Bản ghi của bạn</Text>
                 <Text style={styles.playbackDuration}>
                   {pad(Math.floor(playSeconds / 60))}:{pad(playSeconds % 60)}
                   {" / "}
@@ -657,10 +681,10 @@ export default function EmergencyLeaveScreen({
             <ProgressBar progress={progress} />
             <Text style={styles.playbackHint}>
               {isPlaying
-                ? "Playing..."
+                ? "Đang phát..."
                 : isPaused
-                  ? "Paused"
-                  : "Tap play to listen back"}
+                  ? "Tạm dừng"
+                  : "Chạm phát để nghe lại"}
             </Text>
           </View>
         )}
@@ -669,22 +693,22 @@ export default function EmergencyLeaveScreen({
         {isRecorded && (
           <TouchableOpacity onPress={handleReRecord} style={styles.reRecordBtn}>
             <Ionicons name="refresh" size={13} color="#6B7280" />
-            <Text style={styles.reRecordText}>Re-record</Text>
+            <Text style={styles.reRecordText}>Ghi lại</Text>
           </TouchableOpacity>
         )}
 
         {/* ── Audio size note ── */}
         {isRecorded && (
           <Text style={styles.audioNote}>
-            Audio will be sent to your manager for review (max 10 MB
-            recommended).
+            Âm thanh sẽ được gửi tới quản lý để xem xét (khuyến nghị tối đa 10
+            MB).
           </Text>
         )}
 
         {/* ── Leave Dates (chỉ hiện khi không có taskAssignmentId) ── */}
         {!taskAssignmentId && (
           <View style={styles.datesSection}>
-            <Text style={styles.datesSectionTitle}>Leave Period</Text>
+            <Text style={styles.datesSectionTitle}>Thời gian nghỉ</Text>
 
             {/* Nút bấm From Date */}
             <TouchableOpacity
@@ -693,15 +717,15 @@ export default function EmergencyLeaveScreen({
             >
               <Ionicons name="calendar-outline" size={18} color="#6B7280" />
               <View style={styles.dateInputContent}>
-                <Text style={styles.dateInputLabel}>From Date *</Text>
+                <Text style={styles.dateInputLabel}>Ngày bắt đầu *</Text>
                 <Text style={styles.dateInputValue}>
                   {leaveDateFrom
-                    ? leaveDateFrom.toLocaleDateString("en-US", {
+                    ? leaveDateFrom.toLocaleDateString("vi-VN", {
                         month: "short",
                         day: "numeric",
                         year: "numeric",
                       })
-                    : "Select start date"}
+                    : "Chọn ngày bắt đầu"}
                 </Text>
               </View>
               <Ionicons name="chevron-down" size={18} color="#9CA3AF" />
@@ -722,7 +746,7 @@ export default function EmergencyLeaveScreen({
                 color={!leaveDateFrom ? "#9CA3AF" : "#6B7280"}
               />
               <View style={styles.dateInputContent}>
-                <Text style={styles.dateInputLabel}>To Date *</Text>
+                <Text style={styles.dateInputLabel}>Ngày kết thúc *</Text>
                 <Text
                   style={[
                     styles.dateInputValue,
@@ -730,24 +754,31 @@ export default function EmergencyLeaveScreen({
                   ]}
                 >
                   {leaveDateTo
-                    ? leaveDateTo.toLocaleDateString("en-US", {
+                    ? leaveDateTo.toLocaleDateString("vi-VN", {
                         month: "short",
                         day: "numeric",
                         year: "numeric",
                       })
-                    : "Select end date"}
+                    : "Chọn ngày kết thúc"}
                 </Text>
               </View>
               <Ionicons name="chevron-down" size={18} color="#9CA3AF" />
             </TouchableOpacity>
 
             <CustomDatePicker
+              key={showDatePicker ?? "closed"}
               visible={showDatePicker !== null}
-              // Truyền giá trị hiện tại tương ứng với trường đang chọn
-              value={showDatePicker === "from" ? leaveDateFrom : leaveDateTo}
-              // MinimumDate:
-              // Nếu chọn "To Date", min date phải là "From Date"
-              // Nếu chọn "From Date", CustomDatePicker đã tự xử lý min date là "hôm nay"
+              value={
+                showDatePicker === "from"
+                  ? leaveDateFrom
+                    ? toLocalMidnight(leaveDateFrom)
+                    : new Date()
+                  : leaveDateTo
+                    ? toLocalMidnight(leaveDateTo)
+                    : leaveDateFrom
+                      ? toLocalMidnight(leaveDateFrom)
+                      : new Date()
+              }
               minimumDate={showDatePicker === "to" ? leaveDateFrom : null}
               onConfirm={handleConfirmDate}
               onCancel={() => setShowDatePicker(null)}
@@ -757,10 +788,10 @@ export default function EmergencyLeaveScreen({
 
         {/* ── Submit ── */}
         <AppButton
-          label="Submit Emergency Request"
+          label="Gửi yêu cầu nghỉ khẩn cấp"
           onPress={handleSubmit}
           loading={submitting}
-          loadingLabel="Submitting..."
+          loadingLabel="Đang gửi..."
           iconLeft="send"
           style={{ backgroundColor: "#db0614" }}
           disabled={!isRecorded || submitting}

@@ -3,17 +3,17 @@ import useEquipment, { EquipmentItem } from "@/hooks/useEquipment";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 interface Props {
@@ -65,14 +65,11 @@ export default function EquipmentRequestModal({
 
   const handleSubmit = async () => {
     if (!selectedEquipment) {
-      Alert.alert("Lack of information", "Please select an equipment.");
+      Alert.alert("Thiếu thông tin", "Vui lòng chọn thiết bị.");
       return;
     }
     if (!reason.trim()) {
-      Alert.alert(
-        "Lack of information",
-        "Please enter the reason for the request.",
-      );
+      Alert.alert("Thiếu thông tin", "Vui lòng nhập lý do yêu cầu.");
       return;
     }
 
@@ -84,7 +81,7 @@ export default function EquipmentRequestModal({
         reason,
       });
 
-      Alert.alert("Success!", "Your equipment request has been submitted.", [
+      Alert.alert("Thành công", "Yêu cầu thiết bị đã được gửi.", [
         { text: "OK", onPress: onClose },
       ]);
     } catch (e: any) {
@@ -92,8 +89,8 @@ export default function EquipmentRequestModal({
         e?.response?.data?.errors?.[0] ||
         e?.response?.data?.message ||
         e?.message ||
-        "Failed to submit equipment request.";
-      Alert.alert("Error", String(beErr));
+        "Gửi yêu cầu thiết bị thất bại.";
+      Alert.alert("Lỗi", String(beErr));
     }
   };
 
@@ -112,7 +109,7 @@ export default function EquipmentRequestModal({
           <View style={styles.modalContent}>
             {/* Header */}
             <View style={styles.header}>
-              <Text style={styles.headerTitle}>Request Equipment</Text>
+              <Text style={styles.headerTitle}>Yêu cầu thiết bị</Text>
               <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
                 <Ionicons name="close" size={24} color="#64748B" />
               </TouchableOpacity>
@@ -125,7 +122,7 @@ export default function EquipmentRequestModal({
               {/* Select Equipment + Quantity */}
               <View style={styles.fieldRow}>
                 <View style={styles.leftCol}>
-                  <Text style={styles.sectionTitle}>Select Equipment</Text>
+                  <Text style={styles.sectionTitle}>Chọn thiết bị</Text>
                   {equipmentLoading ? (
                     <ActivityIndicator
                       color="#2563EB"
@@ -143,7 +140,7 @@ export default function EquipmentRequestModal({
                       >
                         <TextInput
                           style={styles.dropdownInput}
-                          placeholder="Search equipment..."
+                          placeholder="Tìm thiết bị..."
                           placeholderTextColor="#CBD5E1"
                           value={
                             equipmentSearch
@@ -197,7 +194,7 @@ export default function EquipmentRequestModal({
                           ) : (
                             <View style={styles.dropdownEmpty}>
                               <Text style={styles.dropdownEmptyText}>
-                                No equipment found
+                                Không tìm thấy thiết bị
                               </Text>
                             </View>
                           )}
@@ -208,7 +205,7 @@ export default function EquipmentRequestModal({
                 </View>
 
                 <View style={styles.rightCol}>
-                  <Text style={styles.sectionTitle}>Quantity</Text>
+                  <Text style={styles.sectionTitle}>Số lượng</Text>
                   <View style={styles.quantityControl}>
                     <TouchableOpacity
                       style={[
@@ -232,11 +229,11 @@ export default function EquipmentRequestModal({
 
               {/* Reason */}
               <Text style={[styles.sectionTitle, { marginTop: 16 }]}>
-                Reason for Request
+                Lý do yêu cầu
               </Text>
               <TextInput
                 style={styles.textInput}
-                placeholder="Explain why you need this..."
+                placeholder="Giải thích lý do yêu cầu..."
                 placeholderTextColor="#CBD5E1"
                 multiline
                 numberOfLines={4}
@@ -248,10 +245,10 @@ export default function EquipmentRequestModal({
 
             <View style={styles.footer}>
               <AppButton
-                label="Submit Request"
+                label="Gửi yêu cầu"
                 onPress={handleSubmit}
                 loading={submitting}
-                loadingLabel="Submitting..."
+                loadingLabel="Đang gửi..."
                 iconLeft="send"
               />
             </View>

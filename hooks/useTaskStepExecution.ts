@@ -29,7 +29,7 @@ export const useTaskStepExecution = () => {
           err?.response?.data?.detail || // ✅ đúng field
             err?.response?.data?.title ||
             err?.message ||
-            "Failed to complete step",
+            "Hoàn thành bước thất bại",
         );
         throw err;
       } finally {
@@ -48,7 +48,7 @@ export const useTaskStepExecution = () => {
       return res.data;
     } catch (err: any) {
       setError(
-        err?.response?.data?.message || err?.message || "Failed to fetch step",
+        err?.response?.data?.message || err?.message || "Lấy bước thất bại",
       );
       throw err;
     } finally {

@@ -129,7 +129,7 @@ export default function SwapTaskScreen({ navigation, route }: Props) {
     const diffHours = (start.getTime() - now.getTime()) / (1000 * 60 * 60);
 
     if (diffHours < 12) {
-      return { valid: false, reason: "Less than 12h" };
+      return { valid: false, reason: "Ít hơn 12 giờ" };
     }
 
     return { valid: true };
@@ -160,25 +160,25 @@ export default function SwapTaskScreen({ navigation, route }: Props) {
     if (!selected) return;
 
     if (!reason.trim()) {
-      Alert.alert("Missing reason", "Please enter a reason.");
+      Alert.alert("Thiếu lý do", "Vui lòng nhập lý do.");
       return;
     }
 
-    Alert.alert("Confirm Swap", `Swap with ${selected.workerName}?`, [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert("Xác nhận đổi ca", `Đổi với ${selected.assigneeName}?`, [
+      { text: "Hủy", style: "cancel" },
       {
-        text: "Confirm",
+        text: "Xác nhận",
         onPress: async () => {
           try {
             await create({
-              taskAssignmentId: currentTaskId.slice(0, 8),
+              taskAssignmentId: currentTaskId,
               targetTaskAssignmentId: selected.task.taskAssignmentId,
               requesterId: workerId || "",
               targetWorkerId: selected.workerId,
               requesterNote: reason,
             });
 
-            Alert.alert("Success", "Your swap request has been submitted.", [
+            Alert.alert("Thành công", "Yêu cầu đổi ca đã được gửi.", [
               { text: "OK", onPress: () => navigation.goBack() },
             ]);
           } catch (e: any) {
@@ -187,9 +187,9 @@ export default function SwapTaskScreen({ navigation, route }: Props) {
               e.response?.data || "Unknown error",
             );
             Alert.alert(
-              "Error",
+              "Lỗi",
               e.response?.data?.message ||
-                "Failed to submit swap request. Please try again.",
+                "Gửi yêu cầu đổi ca thất bại. Vui lòng thử lại.",
             );
           }
         },
@@ -221,7 +221,7 @@ export default function SwapTaskScreen({ navigation, route }: Props) {
         >
           <View style={styles.rowBetween}>
             <View>
-              <Text style={styles.name}>{item.workerName}</Text>
+              <Text style={styles.name}>{item.assigneeName}</Text>
               <Text style={styles.location}>{item.task.displayLocation}</Text>
               <Text style={styles.time}>
                 <FormattedDate
@@ -253,11 +253,14 @@ export default function SwapTaskScreen({ navigation, route }: Props) {
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" />
 
-      <Header title="Swap Task" onBack={() => navigation.goBack()} />
+      <Header
+        title="Yêu cầu đổi công việc"
+        onBack={() => navigation.goBack()}
+      />
 
       <ScrollView contentContainerStyle={styles.container}>
         {/* YOUR TASK */}
-        <Text style={styles.section}>Your Task</Text>
+        <Text style={styles.section}>Công việc của bạn</Text>
         {currentTask ? (
           <View style={styles.taskCard}>
             <Text style={styles.rowTitle}>
@@ -270,7 +273,7 @@ export default function SwapTaskScreen({ navigation, route }: Props) {
               />
             </Text>
             <Text style={styles.rowSub}>
-              📍 {currentTask.displayLocation || "No location assigned"}
+              {currentTask.displayLocation || "No location assigned"}
             </Text>
             <View style={styles.statusBadge}>
               <Text style={styles.statusText}>{currentTask.status}</Text>
@@ -281,7 +284,7 @@ export default function SwapTaskScreen({ navigation, route }: Props) {
         )}
 
         {/* SELECT */}
-        <Text style={styles.section}>Select Target Task</Text>
+        <Text style={styles.section}>Chọn công việc thay thế</Text>
 
         {loadingCandidates ? (
           <>
@@ -290,26 +293,16 @@ export default function SwapTaskScreen({ navigation, route }: Props) {
             ))}
           </>
         ) : candidates.length === 0 ? (
-          <Text style={styles.empty}>No available tasks to swap</Text>
+          <Text style={styles.empty}>Không có công việc khả dụng để đổi</Text>
         ) : (
           candidates.map(renderCandidate)
         )}
 
-        {/* PREVIEW */}
-        {selected && (
-          <View style={styles.preview}>
-            <Text style={styles.previewTitle}>Swap Preview</Text>
-            <Text>Your Task → {currentTaskId}</Text>
-            <Text>With → {selected.workerName}</Text>
-            <Text>Target → {selected.task.displayLocation}</Text>
-          </View>
-        )}
-
         {/* REASON */}
-        <Text style={styles.section}>Reason</Text>
+        <Text style={styles.section}>Lý do</Text>
         <TextInput
           style={styles.input}
-          placeholder="Enter reason..."
+          placeholder="Nhập lý do..."
           value={reason}
           onChangeText={setReason}
           multiline
@@ -317,7 +310,7 @@ export default function SwapTaskScreen({ navigation, route }: Props) {
 
         {/* ACTION */}
         <AppButton
-          label="Submit Swap Request"
+          label="Gửi yêu cầu đổi"
           onPress={handleSubmit}
           loading={loading}
           disabled={!selected || !reason.trim() || loading}

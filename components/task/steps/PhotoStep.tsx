@@ -13,23 +13,31 @@ import {
 import { StepPlugin, StepPluginProps } from "../StepRegistry";
 
 function PhotoComponent({ config, state, onChange }: StepPluginProps) {
+  // `photos` stores server-accessible URLs (strings). CameraScreen now
+  // uploads local files and returns server URLs, so this component
+  // should treat URIs as remote https URLs.
   const minPhotos: number = config?.minPhotos ?? 1;
+  const maxPhotos: number = config?.maxPhotos ?? 5;
   const phase: string = config?.phase ?? "";
-  const photos: string[] = state.photos ?? [];
+  const photos: string[] = Array.isArray(state.photos) ? state.photos : [];
 
   const [isCameraVisible, setCameraVisible] = useState(false);
 
   const handleCameraSubmit = (
+    // CameraScreen returns an array of objects with `uri` pointing to
+    // uploaded server URLs (or local file URIs for older flows).
     capturedPhotos: { uri: string; timestamp: string }[],
   ) => {
-    const newUris = capturedPhotos.map((p) => p.uri);
-    onChange({ photos: [...photos, ...newUris] });
+    const newUris = capturedPhotos.map((p) => String(p.uri));
+    const combinedPhotos = [...photos, ...newUris];
+
+    const limitedPhotos = combinedPhotos.slice(0, maxPhotos);
+
+    onChange({ photos: limitedPhotos });
     setCameraVisible(false);
   };
 
-  // 🚀 Thêm hàm xử lý xóa ảnh
   const handleDeletePhoto = (indexToRemove: number) => {
-    // Lọc bỏ ảnh tại vị trí indexToRemove
     const updatedPhotos = photos.filter((_, index) => index !== indexToRemove);
     onChange({ photos: updatedPhotos });
   };
@@ -37,18 +45,17 @@ function PhotoComponent({ config, state, onChange }: StepPluginProps) {
   return (
     <View>
       <Text style={s.label}>
-        {phase.toUpperCase()} photos — {photos.length}/{minPhotos} required
+        {/* 🚀 Cập nhật text để user biết giới hạn */}
+        {phase.toUpperCase()} photos (Max {maxPhotos})
       </Text>
 
       <View style={s.grid}>
         {photos.map((uri, i) => (
-          // 🚀 Bọc thumbnail trong một View relative để đặt nút X absolute
           <View key={i} style={s.thumbWrapper}>
             <View style={s.thumb}>
               <Image source={{ uri }} style={s.thumbImage} />
             </View>
 
-            {/* 🚀 Nút Xóa */}
             <TouchableOpacity
               style={s.deleteBtn}
               onPress={() => handleDeletePhoto(i)}
@@ -59,12 +66,15 @@ function PhotoComponent({ config, state, onChange }: StepPluginProps) {
           </View>
         ))}
 
-        <TouchableOpacity
-          style={s.addBtn}
-          onPress={() => setCameraVisible(true)}
-        >
-          <Ionicons name="camera-outline" size={24} color="#94A3B8" />
-        </TouchableOpacity>
+        {/* 🚀 Chỉ render nút Add khi số ảnh hiện tại nhỏ hơn maxPhotos */}
+        {photos.length < maxPhotos && (
+          <TouchableOpacity
+            style={s.addBtn}
+            onPress={() => setCameraVisible(true)}
+          >
+            <Ionicons name="camera-outline" size={24} color="#94A3B8" />
+          </TouchableOpacity>
+        )}
       </View>
 
       <Modal
@@ -83,9 +93,8 @@ function PhotoComponent({ config, state, onChange }: StepPluginProps) {
 
 const s = StyleSheet.create({
   label: { fontSize: 13, color: "#64748B", marginBottom: 10 },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 }, // Tăng gap lên xíu để có không gian cho nút X
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
 
-  // Wrapper cho ảnh và nút xóa
   thumbWrapper: {
     position: "relative",
   },
@@ -102,7 +111,6 @@ const s = StyleSheet.create({
     resizeMode: "cover",
   },
 
-  // 🚀 Style cho nút xóa
   deleteBtn: {
     position: "absolute",
     top: -6,
@@ -110,12 +118,11 @@ const s = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: "#EF4444", // Màu đỏ cảnh báo
+    backgroundColor: "#EF4444",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: "#FFF", // Viền trắng giúp tách biệt khỏi nền ảnh
-    // Đổ bóng nhẹ cho đẹp
+    borderColor: "#FFF",
     elevation: 2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },

@@ -73,10 +73,12 @@ export default function IssueReportDetailModal({
         try {
           const taskData = await getTaskAssignmentById(item.taskAssignmentId);
           if (isMounted) {
-            setDisplayLocation(taskData?.displayLocation || "Unknown Location");
+            setDisplayLocation(
+              taskData?.displayLocation || "Vị trí không xác định",
+            );
           }
         } catch (error) {
-          if (isMounted) setDisplayLocation("Failed to load location");
+          if (isMounted) setDisplayLocation("Không thể tải vị trí");
         } finally {
           if (isMounted) setIsLoadingTask(false);
         }
@@ -102,7 +104,7 @@ export default function IssueReportDetailModal({
         <View style={styles.modalContainer}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Issue Report</Text>
+            <Text style={styles.headerTitle}>Báo cáo sự cố</Text>
             <TouchableOpacity onPress={onClose}>
               <Text style={styles.closeBtn}>✖️</Text>
             </TouchableOpacity>
@@ -116,12 +118,12 @@ export default function IssueReportDetailModal({
                 style={styles.loaderCenter}
               />
             ) : !item ? (
-              <Text style={styles.info}>No data available.</Text>
+              <Text style={styles.info}>Không có dữ liệu</Text>
             ) : (
               <View style={styles.card}>
                 {/* ROW: Location (Sử dụng cấu trúc đồng nhất) */}
                 <View style={styles.rowContainer}>
-                  <Text style={styles.rowLabel}>Location:</Text>
+                  <Text style={styles.rowLabel}>Vị trí:</Text>
                   <View style={styles.rowValueContainer}>
                     {isLoadingTask ? (
                       <ActivityIndicator size="small" color="#1e90ff" />
@@ -152,7 +154,7 @@ export default function IssueReportDetailModal({
 
                 {/* ROW: Created */}
                 <View style={styles.rowContainer}>
-                  <Text style={styles.rowLabel}>Created:</Text>
+                  <Text style={styles.rowLabel}>Ngày tạo:</Text>
                   <View style={styles.rowValueContainer}>
                     <Text style={styles.rowValue}>
                       {item.created ? (
@@ -166,9 +168,9 @@ export default function IssueReportDetailModal({
 
                 {/* KHỐI DESCRIPTION: Đặt riêng ra vì văn bản thường dài */}
                 <View style={styles.descriptionBlock}>
-                  <Text style={styles.rowLabel}>Description:</Text>
+                  <Text style={styles.rowLabel}>Mô tả:</Text>
                   <Text style={styles.descriptionText}>
-                    {item.description ?? "No description provided."}
+                    {item.description ?? "Không có mô tả."}
                   </Text>
                 </View>
               </View>
