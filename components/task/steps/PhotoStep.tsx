@@ -1,8 +1,11 @@
 // src/components/task/steps/PhotoStep.tsx
+import { useTaskStepExecutionImage } from "@/hooks/useTaskStepExecutionImage";
 import InspectionCameraScreen from "@/screens/shared/CameraScreen";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Image,
   Modal,
   StyleSheet,
@@ -13,28 +16,81 @@ import {
 import { StepPlugin, StepPluginProps } from "../StepRegistry";
 
 function PhotoComponent({ config, state, onChange }: StepPluginProps) {
-  // `photos` stores server-accessible URLs (strings). CameraScreen now
-  // uploads local files and returns server URLs, so this component
-  // should treat URIs as remote https URLs.
   const minPhotos: number = config?.minPhotos ?? 1;
   const maxPhotos: number = config?.maxPhotos ?? 5;
   const phase: string = config?.phase ?? "";
   const photos: string[] = Array.isArray(state.photos) ? state.photos : [];
 
-  const [isCameraVisible, setCameraVisible] = useState(false);
+  const stepExecutionId: string = state.__stepId;
+  const taskAssignmentId: string = state.__taskAssignmentId; // 👈 thêm
 
-  const handleCameraSubmit = (
-    // CameraScreen returns an array of objects with `uri` pointing to
-    // uploaded server URLs (or local file URIs for older flows).
+  const { uploadImages, reUploadImages, getImagesByStep } =
+    useTaskStepExecutionImage();
+
+  const [isCameraVisible, setCameraVisible] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadSession] = useState(() => ({
+    id: Date.now(),
+    time: Date.now(),
+  }));
+
+  const resolveImageType = (): 0 | 1 | 2 => {
+    const p = phase.toLowerCase();
+    if (p === "after") return 1;
+    if (p === "ppe") return 2;
+    return 0;
+  };
+
+  const handleCameraSubmit = async (
     capturedPhotos: { uri: string; timestamp: string }[],
   ) => {
-    const newUris = capturedPhotos.map((p) => String(p.uri));
-    const combinedPhotos = [...photos, ...newUris];
-
-    const limitedPhotos = combinedPhotos.slice(0, maxPhotos);
-
-    onChange({ photos: limitedPhotos });
     setCameraVisible(false);
+    if (capturedPhotos.length === 0) return;
+
+    try {
+      setIsUploading(true);
+
+      const imageType = resolveImageType();
+
+      try {
+        // 👈 Luôn thử POST trước
+        await uploadImages(
+          stepExecutionId,
+          imageType,
+          capturedPhotos,
+          minPhotos,
+        );
+      } catch (postErr: any) {
+        const status = postErr?.response?.status;
+        // 👈 Nếu BE báo đã có ảnh (400) thì fallback PUT
+        if (status === 400) {
+          console.log("⚠️ POST thất bại, fallback sang PUT...");
+          await reUploadImages(
+            stepExecutionId,
+            imageType,
+            capturedPhotos,
+            minPhotos,
+          );
+        } else {
+          throw postErr; // lỗi khác (404, 500...) thì throw lên trên
+        }
+      }
+
+      const serverUrls = await getImagesByStep(
+        taskAssignmentId,
+        stepExecutionId,
+        imageType,
+      );
+
+      onChange({
+        photos: Array.from(new Set(serverUrls)).slice(-maxPhotos),
+        lastUploadTime: uploadSession.time,
+      });
+    } catch (err: any) {
+      Alert.alert("Lỗi", "Upload ảnh thất bại: " + (err?.message ?? ""));
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleDeletePhoto = (indexToRemove: number) => {
@@ -45,9 +101,15 @@ function PhotoComponent({ config, state, onChange }: StepPluginProps) {
   return (
     <View>
       <Text style={s.label}>
-        {/* 🚀 Cập nhật text để user biết giới hạn */}
         {phase.toUpperCase()} photos (Max {maxPhotos})
       </Text>
+
+      {isUploading && (
+        <View style={s.uploadingRow}>
+          <ActivityIndicator size="small" color="#2563EB" />
+          <Text style={s.uploadingText}>Đang tải ảnh lên...</Text>
+        </View>
+      )}
 
       <View style={s.grid}>
         {photos.map((uri, i) => (
@@ -55,7 +117,6 @@ function PhotoComponent({ config, state, onChange }: StepPluginProps) {
             <View style={s.thumb}>
               <Image source={{ uri }} style={s.thumbImage} />
             </View>
-
             <TouchableOpacity
               style={s.deleteBtn}
               onPress={() => handleDeletePhoto(i)}
@@ -66,8 +127,7 @@ function PhotoComponent({ config, state, onChange }: StepPluginProps) {
           </View>
         ))}
 
-        {/* 🚀 Chỉ render nút Add khi số ảnh hiện tại nhỏ hơn maxPhotos */}
-        {photos.length < maxPhotos && (
+        {photos.length < maxPhotos && !isUploading && (
           <TouchableOpacity
             style={s.addBtn}
             onPress={() => setCameraVisible(true)}
@@ -94,10 +154,14 @@ function PhotoComponent({ config, state, onChange }: StepPluginProps) {
 const s = StyleSheet.create({
   label: { fontSize: 13, color: "#64748B", marginBottom: 10 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-
-  thumbWrapper: {
-    position: "relative",
+  uploadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
   },
+  uploadingText: { fontSize: 13, color: "#2563EB" },
+  thumbWrapper: { position: "relative" },
   thumb: {
     width: 72,
     height: 72,
@@ -105,12 +169,7 @@ const s = StyleSheet.create({
     backgroundColor: "#E2E8F0",
     overflow: "hidden",
   },
-  thumbImage: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
-  },
-
+  thumbImage: { width: "100%", height: "100%", resizeMode: "cover" },
   deleteBtn: {
     position: "absolute",
     top: -6,
@@ -129,7 +188,6 @@ const s = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 1.41,
   },
-
   addBtn: {
     width: 72,
     height: 72,

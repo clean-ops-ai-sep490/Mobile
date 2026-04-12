@@ -425,7 +425,11 @@ export default function TaskExecutionScreen() {
                     <StepRenderer
                       stepName={step.name}
                       config={step.config}
-                      state={{ ...step.stepState, __stepId: step.id }}
+                      state={{
+                        ...step.stepState,
+                        __stepId: step.id,
+                        __taskAssignmentId: taskAssignmentId,
+                      }}
                       onChange={(newState) =>
                         handleStepStateChange(step.id, newState)
                       }

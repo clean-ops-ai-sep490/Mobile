@@ -232,8 +232,8 @@ export default function InspectionCameraScreen(props: Props) {
   const handleSubmit = () => {
     if (photos.length === 0) {
       Alert.alert(
-        "No Photos",
-        "Please capture at least one photo before submitting.",
+        "Không có ảnh",
+        "Vui lòng chụp ít nhất một ảnh trước khi gửi.",
       );
       return;
     }
@@ -243,7 +243,6 @@ export default function InspectionCameraScreen(props: Props) {
       return;
     }
 
-    // 🔥 INSPECTION FLOW (Modal)
     onSubmit?.(photos);
     onClose?.();
   };

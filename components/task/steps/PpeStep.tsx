@@ -1,5 +1,6 @@
 // src/components/task/steps/PpeStep.tsx
-import InspectionCameraScreen from "@/screens/shared/CameraScreen"; // Import Camera của bạn
+import { useTaskStepExecutionImage } from "@/hooks/useTaskStepExecutionImage";
+import InspectionCameraScreen from "@/screens/shared/CameraScreen";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
@@ -19,44 +20,71 @@ function PpeComponent({ config, state, onChange }: StepPluginProps) {
   const checkedItems = state.checkedItems || {};
   const photoUri = state.photoUri;
 
-  // Local UI States
+  const stepExecutionId: string = state.__stepId;
+  const taskAssignmentId: string = state.__taskAssignmentId;
+
+  const { uploadImages, reUploadImages, getImagesByStep } =
+    useTaskStepExecutionImage();
+
   const [isCameraVisible, setCameraVisible] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // ─── 1. XỬ LÝ CHỤP ẢNH & GỌI AI ──────────────────────────────────────
   const handleCameraSubmit = async (capturedPhotos: { uri: string }[]) => {
-    setCameraVisible(false); // Đóng camera ngay lập tức
-
+    setCameraVisible(false);
     if (capturedPhotos.length === 0) return;
-    // CameraScreen now uploads and returns server URLs; coerce to string
-    const uri = String(capturedPhotos[0].uri);
 
-    // Cập nhật state có ảnh, nhưng reset lại các tick về false để bắt đầu phân tích
+    const localUri = String(capturedPhotos[0].uri);
     const resetTicks = Object.fromEntries(items.map((item) => [item, false]));
-    onChange({ photoUri: uri, checkedItems: resetTicks });
 
-    // Bắt đầu gọi AI (backend should accept a public URL for analysis)
-    await analyzeImageWithAI(uri);
+    let serverUri = localUri; // fallback
+
+    try {
+      setIsUploading(true);
+
+      // 👈 Luôn thử POST trước, nếu BE báo 400 thì fallback PUT
+      try {
+        await uploadImages(stepExecutionId, 2, [{ uri: localUri }], 1);
+      } catch (postErr: any) {
+        const status = postErr?.response?.status;
+        if (status === 400) {
+          console.log("⚠️ POST thất bại, fallback sang PUT...");
+          await reUploadImages(stepExecutionId, 2, [{ uri: localUri }], 1);
+        } else {
+          throw postErr;
+        }
+      }
+
+      // Lấy server URL thật
+      const serverUrls = await getImagesByStep(
+        taskAssignmentId,
+        stepExecutionId,
+        2,
+      );
+      serverUri = serverUrls[0] ?? localUri;
+
+      onChange({ photoUri: serverUri, checkedItems: resetTicks });
+    } catch (err: any) {
+      Alert.alert("Lỗi", "Upload ảnh thất bại: " + (err?.message ?? ""));
+      return;
+    } finally {
+      setIsUploading(false);
+    }
+
+    // Upload xong mới gọi AI với serverUri
+    await analyzeImageWithAI(serverUri);
   };
 
-  // ─── 2. MOCK API GỌI AI (Giả lập delay 2 giây) ──────────────────────
   const analyzeImageWithAI = async (uri: string) => {
     setIsAnalyzing(true);
     try {
-      // Recommended: call your backend analysis endpoint with the server URL
-      // Example (backend should accept { imageUrl } and return detected items):
-      // const res = await axiosInstance.post('/ai/ppe-analyze', { imageUrl: uri });
-      // const result = res.data; // expect { itemName: boolean }
-
-      // Fallback mock (keeps current behavior while backend is not ready)
       await new Promise((resolve) => setTimeout(resolve, 1200));
       const mockAiResult: Record<string, boolean> = {};
       items.forEach((item) => {
         mockAiResult[item] = Math.random() > 0.3;
       });
-
       onChange({ photoUri: uri, checkedItems: mockAiResult });
-    } catch (error) {
+    } catch {
       Alert.alert(
         "Lỗi phân tích",
         "Không thể phân tích hình ảnh. Vui lòng thử lại.",
@@ -66,9 +94,7 @@ function PpeComponent({ config, state, onChange }: StepPluginProps) {
     }
   };
 
-  // ─── 3. MANUAL OVERRIDE (Dự phòng khi AI sai) ───────────────────────
   const toggleItem = (item: string) => {
-    // Chỉ cho phép user tự tick khi ĐÃ có ảnh chụp (Không cho ăn gian tick chay)
     if (!photoUri) {
       Alert.alert(
         "Lỗi",
@@ -76,18 +102,12 @@ function PpeComponent({ config, state, onChange }: StepPluginProps) {
       );
       return;
     }
-
-    const updated = {
+    onChange({
       ...state,
-      checkedItems: {
-        ...checkedItems,
-        [item]: !checkedItems[item],
-      },
-    };
-    onChange(updated);
+      checkedItems: { ...checkedItems, [item]: !checkedItems[item] },
+    });
   };
 
-  // ─── 4. XÓA ẢNH (RESET STATE) ────────────────────────────────────────
   const handleDeletePhoto = () => {
     Alert.alert(
       "Remove Photo",
@@ -98,10 +118,7 @@ function PpeComponent({ config, state, onChange }: StepPluginProps) {
           text: "Remove",
           style: "destructive",
           onPress: () => {
-            // Reset ảnh về null và clear toàn bộ tick
-            const resetTicks = Object.fromEntries(
-              items.map((item) => [item, false]),
-            );
+            const resetTicks = Object.fromEntries(items.map((i) => [i, false]));
             onChange({ photoUri: null, checkedItems: resetTicks });
           },
         },
@@ -109,22 +126,26 @@ function PpeComponent({ config, state, onChange }: StepPluginProps) {
     );
   };
 
+  const isBusy = isUploading || isAnalyzing;
+
+  // phần return và styles giữ nguyên hoàn toàn
   return (
     <View>
       <Text style={s.label}>Take a photo for AI PPE verification</Text>
 
-      {/* KHU VỰC ẢNH & LOADING */}
       <View style={s.photoArea}>
         {photoUri ? (
           <View style={s.imageWrapper}>
             <Image source={{ uri: photoUri }} style={s.image} />
-            {isAnalyzing && (
+            {isBusy && (
               <View style={s.analyzingOverlay}>
                 <ActivityIndicator size="large" color="#FFF" />
-                <Text style={s.analyzingText}>AI is analyzing...</Text>
+                <Text style={s.analyzingText}>
+                  {isUploading ? "Đang tải ảnh lên..." : "AI is analyzing..."}
+                </Text>
               </View>
             )}
-            {!isAnalyzing && (
+            {!isBusy && (
               <View style={s.photoActions}>
                 <TouchableOpacity
                   style={s.retakeBtn}
@@ -133,7 +154,6 @@ function PpeComponent({ config, state, onChange }: StepPluginProps) {
                   <Ionicons name="refresh" size={16} color="#FFF" />
                   <Text style={s.actionText}>Retake</Text>
                 </TouchableOpacity>
-
                 <TouchableOpacity
                   style={s.deleteBtn}
                   onPress={handleDeletePhoto}
@@ -147,6 +167,7 @@ function PpeComponent({ config, state, onChange }: StepPluginProps) {
           <TouchableOpacity
             style={s.cameraBtnPlaceholder}
             onPress={() => setCameraVisible(true)}
+            disabled={isUploading}
           >
             <Ionicons name="camera-outline" size={32} color="#94A3B8" />
             <Text style={s.cameraText}>Open Camera</Text>
@@ -154,7 +175,6 @@ function PpeComponent({ config, state, onChange }: StepPluginProps) {
         )}
       </View>
 
-      {/* KHU VỰC CHECKLIST */}
       <View style={s.checklistContainer}>
         {items.map((item) => {
           const isChecked = checkedItems[item];
@@ -163,7 +183,7 @@ function PpeComponent({ config, state, onChange }: StepPluginProps) {
               key={item}
               style={[s.row, isChecked && s.rowDone]}
               onPress={() => toggleItem(item)}
-              disabled={isAnalyzing} // Khoá nút khi đang load
+              disabled={isBusy}
               activeOpacity={0.7}
             >
               <View style={[s.box, isChecked && s.boxDone]}>
@@ -175,7 +195,6 @@ function PpeComponent({ config, state, onChange }: StepPluginProps) {
         })}
       </View>
 
-      {/* MODAL CAMERA */}
       <Modal
         visible={isCameraVisible}
         animationType="slide"
@@ -192,8 +211,6 @@ function PpeComponent({ config, state, onChange }: StepPluginProps) {
 
 const s = StyleSheet.create({
   label: { fontSize: 13, color: "#64748B", marginBottom: 12 },
-
-  // Photo Area Styles
   photoArea: { marginBottom: 16 },
   cameraBtnPlaceholder: {
     height: 120,
@@ -220,7 +237,6 @@ const s = StyleSheet.create({
     alignItems: "center",
   },
   analyzingText: { color: "#FFF", marginTop: 8, fontWeight: "600" },
-  // Thay thế các style của retakeBtn cũ bằng cụm này:
   photoActions: {
     position: "absolute",
     bottom: 10,
@@ -238,8 +254,7 @@ const s = StyleSheet.create({
     gap: 4,
   },
   deleteBtn: {
-    backgroundColor: "rgba(220, 38, 38, 0.8)", // Màu đỏ bordeaux (Red-600)
-    flexDirection: "row",
+    backgroundColor: "rgba(220, 38, 38, 0.8)",
     alignItems: "center",
     justifyContent: "center",
     width: 36,
@@ -247,8 +262,6 @@ const s = StyleSheet.create({
     borderRadius: 18,
   },
   actionText: { color: "#FFF", fontSize: 12, fontWeight: "600" },
-
-  // Checklist Styles
   checklistContainer: { marginTop: 8 },
   row: {
     flexDirection: "row",
@@ -273,7 +286,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "#FFF",
   },
-  boxDone: { backgroundColor: "#16A34A", borderColor: "#16A34A" }, // Màu xanh lá Success
+  boxDone: { backgroundColor: "#16A34A", borderColor: "#16A34A" },
   check: { color: "#FFF", fontSize: 13, fontWeight: "700" },
   text: { fontSize: 14, color: "#1E293B", flex: 1, fontWeight: "500" },
   textDone: { color: "#166534" },
@@ -283,27 +296,20 @@ export const PpeStepPlugin: StepPlugin = {
   type: "ppe",
   label: "PPE Check",
   detect: (config) => config?.["x-behavior"] === "ai-ppe-check",
-
-  // 🚀 1. State ban đầu phải chuẩn
   buildInitialState: (config) => ({
     photoUri: null,
     checkedItems: Object.fromEntries(
       (config.requiredPPE as string[]).map((item) => [item, false]),
     ),
   }),
-
-  // 🚀 2. Phải có ảnh VÀ tick đủ thì mới tính là fulfilled
   isFulfilled: (state) => {
     if (!state.photoUri) return false;
     const items = state.checkedItems || {};
     return Object.keys(items).length > 0 && Object.values(items).every(Boolean);
   },
-
-  // 🚀 3. Khi gửi về BE, gửi cả ảnh và list đã tick
   serialize: (state) => ({
     photoUri: state.photoUri,
     checkedItems: state.checkedItems,
   }),
-
   Component: PpeComponent,
 };

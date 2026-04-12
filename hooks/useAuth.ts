@@ -169,7 +169,7 @@ const useAuth = () => {
       });
       return res.data;
     } catch (err) {
-      console.error("Error updating worker profile:", err);
+      console.error("Lỗi khi cập nhật hồ sơ nhân viên", err);
       setError(err?.response?.data?.message || "Cập nhật hồ sơ thất bại");
       throw err;
     } finally {
