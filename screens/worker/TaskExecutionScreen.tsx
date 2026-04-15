@@ -36,7 +36,14 @@ interface RouteParams {
   qrResult?: {
     valid: boolean;
     raw?: string;
-    locationId?: string;
+    stepId?: string;
+    checkinPointId?: string;
+    workareaId?: string;
+    code?: string;
+
+    checkinRecordId?: string;
+    checkinAt?: string;
+
     verifiedAt?: string;
     message?: string;
   };
@@ -159,38 +166,42 @@ export default function TaskExecutionScreen() {
   // ─── Nhận kết quả QR từ QRScannerScreen ──────────────────────────────────
   useEffect(() => {
     const qrResult = params?.qrResult;
-    const stepId = params?.stepId;
-    if (!qrResult || !stepId) return;
+    if (!qrResult?.valid || !qrResult?.stepId) return;
 
-    if (!qrResult.valid) {
-      Alert.alert("Lỗi", qrResult.message || "QR không hợp lệ");
-    } else {
-      setSteps((prev) => {
-        const updated = prev.map((s) => {
-          if (s.id !== stepId) return s;
-          return {
-            ...s,
-            stepState: {
-              ...s.stepState,
-              checkedIn: true,
-              verified: true,
-              method: "qr",
-              qrRaw: qrResult.raw,
-              locationId: qrResult.locationId,
-              verifiedAt: qrResult.verifiedAt,
-            },
-          };
-        });
-        AsyncStorage.setItem(
-          `taskProgress:${taskAssignmentId}`,
-          JSON.stringify(updated),
-        );
-        return updated;
+    setSteps((prev) => {
+      const updated = prev.map((s) => {
+        if (s.id !== qrResult.stepId) return s;
+
+        return {
+          ...s,
+          stepState: {
+            ...s.stepState,
+            checkedIn: true,
+            verified: true,
+            method: "qr",
+
+            qrRaw: qrResult.raw,
+            checkinPointId: qrResult.checkinPointId,
+            workareaId: qrResult.workareaId,
+            code: qrResult.code,
+
+            checkinRecordId: qrResult.checkinRecordId,
+            checkinAt: qrResult.checkinAt,
+            verifiedAt: qrResult.verifiedAt,
+          },
+        };
       });
-    }
 
-    navigation.setParams({ qrResult: undefined, stepId: undefined });
-  }, [params?.qrResult]);
+      AsyncStorage.setItem(
+        `taskProgress:${taskAssignmentId}`,
+        JSON.stringify(updated),
+      );
+
+      return updated;
+    });
+
+    navigation.setParams({ qrResult: undefined });
+  }, [params?.qrResult, taskAssignmentId]);
 
   // ─── Nhận kết quả selfie từ InspectionCameraScreen ───────────────────────
   useEffect(() => {

@@ -1,4 +1,6 @@
 // src/screens/QRScannerScreen.tsx
+import { useAuth } from "@/contexts/AuthContext";
+import { useCheckin } from "@/hooks/useCheckin";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -10,40 +12,26 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
-
-// ─── Mock verify (thay bằng API call sau) ────────────────────────────────────
-const MOCK_VALID: Record<string, { locationId: string; name: string }> = {
-  "LOC-FLOOR1-A": { locationId: "floor1-zone-a", name: "Tầng 1 - Khu A" },
-  "LOC-FLOOR2-B": { locationId: "floor2-zone-b", name: "Tầng 2 - Khu B" },
-  "LOC-LOBBY-01": { locationId: "lobby-01", name: "Sảnh chính" },
-};
 
 export interface QRScanResult {
   valid: boolean;
   message?: string;
   raw?: string;
-  locationId?: string;
-  verifiedAt?: string;
-}
 
-function verifyQR(raw: string): QRScanResult {
-  // TODO: thay bằng await axiosInstance.post("/qr/verify", { raw })
-  const entry = MOCK_VALID[raw];
-  if (entry) {
-    return {
-      valid: true,
-      raw,
-      locationId: entry.locationId,
-      verifiedAt: new Date().toISOString(),
-    };
-  }
-  return {
-    valid: false,
-    raw,
-    message: "QR không hợp lệ hoặc không thuộc khu vực được phân công.",
-  };
+  stepId?: string;
+
+  // từ BE
+  checkinRecordId?: string;
+  checkinAt?: string;
+
+  // từ WorkareaCheckinPoint
+  checkinPointId?: string;
+  workareaId?: string;
+  code?: string;
+
+  verifiedAt?: string;
 }
 
 // ─── Corner brackets ──────────────────────────────────────────────────────────
@@ -100,22 +88,51 @@ export default function QRScannerScreen() {
   const [result, setResult] = useState<QRScanResult | null>(null);
   const [verifying, setVerifying] = useState(false);
   const isHandled = useRef(false); // ngăn scan nhiều lần
+  const { checkinByQr } = useCheckin();
+  const { getWorkerProfile } = useAuth();
 
-  const handleBarCodeScanned = ({ data }: { data: string }) => {
+  const handleBarCodeScanned = async ({ data }: { data: string }) => {
     if (isHandled.current || verifying) return;
+
     isHandled.current = true;
     setVerifying(true);
 
-    // TODO: đổi thành async API call khi BE sẵn sàng
-    const scanResult = verifyQR(data);
-    setResult(scanResult);
-    setVerifying(false);
+    try {
+      const profile = await getWorkerProfile();
+      const workerId = profile?.id;
 
-    if (scanResult.valid) {
-      setTimeout(() => {
-        onScanned?.(scanResult);
-        navigation.goBack();
-      }, 1000);
+      if (!workerId) throw new Error("Không xác định worker");
+
+      const scanResult = await checkinByQr({
+        raw: data,
+        workerId,
+
+        taskId: route.params?.taskId,
+        taskStepId: route.params?.stepId,
+
+        deviceUuid: undefined, // QR thì không có
+        notes: "QR scan",
+      });
+
+      setResult(scanResult);
+
+      if (scanResult.valid) {
+        setTimeout(() => {
+          onScanned?.({
+            ...scanResult,
+            stepId: route.params?.stepId,
+          });
+          navigation.goBack();
+        }, 800);
+      }
+    } catch (err: any) {
+      setResult({
+        valid: false,
+        raw: data,
+        message: err.message,
+      });
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -226,9 +243,6 @@ export default function QRScannerScreen() {
               >
                 {result.valid ? "Check-in thành công!" : "QR không hợp lệ"}
               </Text>
-              {result.valid && result.locationId && (
-                <Text style={styles.resultSub}>📍 {result.locationId}</Text>
-              )}
               {!result.valid && result.message && (
                 <Text style={styles.resultSub}>{result.message}</Text>
               )}

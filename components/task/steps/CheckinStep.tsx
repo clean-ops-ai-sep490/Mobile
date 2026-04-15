@@ -29,8 +29,15 @@ function CheckinComponent({ config, state, onChange }: StepPluginProps) {
               checkedIn: true,
               verified: true,
               method: "qr",
+
               qrRaw: result.raw,
-              locationId: result.locationId,
+              checkinPointId: result.checkinPointId,
+              workareaId: result.workareaId,
+              code: result.code,
+
+              checkinRecordId: result.checkinRecordId,
+              checkinAt: result.checkinAt,
+
               verifiedAt: result.verifiedAt,
             });
           },
@@ -114,7 +121,9 @@ function CheckinComponent({ config, state, onChange }: StepPluginProps) {
                 <Text style={s.successSub}>Location: {state.locationId}</Text>
               )}
               {state.verifiedAt && (
-                <Text style={s.successSub}>Time: {state.verifiedAt}</Text>
+                <Text style={s.successSub}>
+                  Time: {new Date(state.verifiedAt).toLocaleString("vi-VN")}
+                </Text>
               )}
             </>
           )}
