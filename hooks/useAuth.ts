@@ -30,7 +30,7 @@ const useAuth = () => {
 
       return res;
     } catch (err) {
-      setError(err?.response?.data?.message || "Login failed");
+      setError(err?.response?.data?.message || "Đăng nhập thất bại");
       throw err;
     } finally {
       setLoading(false);
@@ -45,7 +45,7 @@ const useAuth = () => {
     try {
       return await axiosInstance.post("/Auths/register", data);
     } catch (err) {
-      setError(err?.response?.data?.message || "Register failed");
+      setError(err?.response?.data?.message || "Đăng ký thất bại");
       throw err;
     } finally {
       setLoading(false);
@@ -136,7 +136,9 @@ const useAuth = () => {
       });
       return res.data.token;
     } catch (err) {
-      setError(err?.response?.data?.message || "OTP is incorrect or expired");
+      setError(
+        err?.response?.data?.message || "Mã OTP không đúng hoặc đã hết hạn",
+      );
       throw err;
     } finally {
       setLoading(false);
@@ -151,8 +153,27 @@ const useAuth = () => {
       }
       return null;
     } catch (err) {
-      console.error("Lỗi lấy thông tin Worker:", err);
+      console.error("Error fetching worker profile:", err);
       return null;
+    }
+  };
+
+  const updateWorkerProfile = async (id, formData) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await axiosInstance.put(`/Workers/${id}`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      return res.data;
+    } catch (err) {
+      console.error("Lỗi khi cập nhật hồ sơ nhân viên", err);
+      setError(err?.response?.data?.message || "Cập nhật hồ sơ thất bại");
+      throw err;
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -169,6 +190,7 @@ const useAuth = () => {
     refreshToken,
     verifyOtp,
     getWorkerProfile,
+    updateWorkerProfile,
   };
 };
 

@@ -1,14 +1,14 @@
 import DateTimePicker, {
-    DateTimePickerEvent,
+  DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 import React, { useEffect, useState } from "react";
 import {
-    Modal,
-    Platform,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 // Khai báo kiểu dữ liệu cho Props (Rule: Type Everything)
@@ -32,27 +32,38 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({
 
   // Đồng bộ tempDate mỗi khi Modal được mở
   useEffect(() => {
-    if (visible) {
-      setTempDate(value || new Date());
+    if (visible && value) {
+      setTempDate(value);
+    } else if (visible) {
+      setTempDate(new Date());
     }
   }, [visible, value]);
 
   // Đảm bảo minimumDate luôn bắt đầu từ 00:00:00 để không chặn ngày hiện tại
   const getSafeMinDate = (): Date => {
     if (minimumDate) {
-      const min = new Date(minimumDate);
-      min.setHours(0, 0, 0, 0);
-      return min;
+      // minimumDate may be provided as UTC-midnight (Date.UTC). Convert
+      // to a local-midnight Date for the same calendar day so the native
+      // picker interprets the min correctly in local timezone.
+      const y = minimumDate.getUTCFullYear();
+      const m = minimumDate.getUTCMonth();
+      const d = minimumDate.getUTCDate();
+      return new Date(y, m, d); // local midnight of that YYYY-MM-DD
     }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return today;
+
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
   };
 
   const handleDone = () => {
-    const dateAtMidnight = new Date(tempDate);
-    dateAtMidnight.setHours(0, 0, 0, 0);
-    onConfirm(dateAtMidnight);
+    // Construct UTC midnight for the selected local date so that when
+    // converted to ISO (or interpreted by backend) the date component
+    // remains the same regardless of timezone.
+    const y = tempDate.getFullYear();
+    const m = tempDate.getMonth();
+    const d = tempDate.getDate();
+    const utcMidnight = new Date(Date.UTC(y, m, d));
+    onConfirm(utcMidnight);
   };
 
   if (!visible) return null;
@@ -69,10 +80,10 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({
         <View style={styles.modalBottomSheet}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={onCancel}>
-              <Text style={styles.modalCancelText}>Cancel</Text>
+              <Text style={styles.modalCancelText}>Hủy</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={handleDone}>
-              <Text style={styles.modalDoneText}>Done</Text>
+              <Text style={styles.modalDoneText}>Xong</Text>
             </TouchableOpacity>
           </View>
           <DateTimePicker
@@ -106,9 +117,11 @@ const CustomDatePicker: React.FC<CustomDatePickerProps> = ({
       style={{ height: 200, width: "100%" }}
       onChange={(event: DateTimePickerEvent, selectedDate?: Date) => {
         if (event.type === "set" && selectedDate) {
-          const dateAtMidnight = new Date(selectedDate);
-          dateAtMidnight.setHours(0, 0, 0, 0);
-          onConfirm(dateAtMidnight);
+          const y = selectedDate.getFullYear();
+          const m = selectedDate.getMonth();
+          const d = selectedDate.getDate();
+          const utcMidnight = new Date(Date.UTC(y, m, d));
+          onConfirm(utcMidnight);
         } else {
           // Trigger khi user bấm "Cancel" hoặc bấm ra ngoài Dialog
           onCancel();

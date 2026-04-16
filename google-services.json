@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "574187235508",
+    "project_id": "cleanopsai",
+    "storage_bucket": "cleanopsai.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:574187235508:android:8873feeb0ea5d2103c4fe1",
+        "android_client_info": {
+          "package_name": "com.cleanopsai.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAoaF4FOCYVfFbht68AG9riXsv7jE41Cnc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

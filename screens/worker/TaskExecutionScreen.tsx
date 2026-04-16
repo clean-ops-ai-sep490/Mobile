@@ -1,837 +1,585 @@
 import AppButton from "@/components/common/AppButton";
 import Header from "@/components/common/Header";
+import EquipmentRequestModal from "@/components/modals/EquipmentRequestModal";
+import IssueReportModal from "@/components/modals/IssueReportModal";
+import {
+  StepRenderer,
+  buildInitialState,
+  getStepLabel,
+  isStepFulfilled,
+  serializeStepData,
+} from "@/components/task/StepRenderer";
+import { useAuth } from "@/contexts/AuthContext";
+import { useSteps } from "@/hooks/useStep";
+import { useTaskAssignments } from "@/hooks/useTaskAssignment";
+import { useTaskSchedules } from "@/hooks/useTaskSchedule";
 import useTaskStepExecution from "@/hooks/useTaskStepExecution";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   SafeAreaView,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+// 👉 1. IMPORT THƯ VIỆN Ở ĐÂY
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
-import { useAuth } from "@/contexts/AuthContext";
-import {
-  TaskStepExecutionDto,
-  useTaskAssignments,
-} from "@/hooks/useTaskAssignment";
-
-// ─── Types ───────────────────────────────────────────────────────────────────
 interface RouteParams {
-  id: string; // taskAssignmentId
-  steps: TaskStepExecutionDto[];
+  id: string;
+  qrResult?: {
+    valid: boolean;
+    raw?: string;
+    stepId?: string;
+    checkinPointId?: string;
+    workareaId?: string;
+    code?: string;
+
+    checkinRecordId?: string;
+    checkinAt?: string;
+
+    verifiedAt?: string;
+    message?: string;
+  };
+  selfieResult?: {
+    uri: string;
+  };
+  stepId?: string;
 }
 
 enum StepStatus {
-  NotStarted = "NotStarted",
-  InProgress = "InProgress",
-  Completed = "Completed",
+  NotStarted = "Chưa bắt đầu",
+  InProgress = "Đang thực hiện",
+  Completed = "Hoàn thành",
 }
 
-// ─── Status Configuration ────────────────────────────────────────────────────
-const STEP_STATUS_CONFIG: Record<
-  StepStatus,
-  {
-    label: string;
-    color: string;
-    bg: string;
-    icon: keyof typeof Ionicons.glyphMap;
-  }
-> = {
-  [StepStatus.NotStarted]: {
-    label: "Not Started",
-    color: "#94A3B8",
-    bg: "#F1F5F9",
-    icon: "radio-button-off",
-  },
-  [StepStatus.InProgress]: {
-    label: "In Progress",
-    color: "#F59E0B",
-    bg: "#FEF3C7",
-    icon: "time-outline",
-  },
-  [StepStatus.Completed]: {
-    label: "Completed",
-    color: "#10B981",
-    bg: "#ECFDF5",
-    icon: "checkmark-circle",
-  },
-};
+interface StepItem {
+  id: string;
+  name: string;
+  stepOrder: number;
+  config: any;
+  status: StepStatus;
+  stepState: any;
+}
 
-// ─── Components ──────────────────────────────────────────────────────────────
-const StepCard = ({
-  step,
-  stepNumber,
-  isActive,
-  onComplete,
-  onToggleSubtask,
-  onPress,
-}: {
-  step: TaskStepExecutionDto;
-  stepNumber: number;
-  isActive: boolean;
-  onComplete?: () => void;
-  onToggleSubtask?: (taskId: string) => void;
-  onPress?: () => void;
-}) => {
-  const status = step.status as StepStatus;
-  const cfg = STEP_STATUS_CONFIG[status];
-  const isCompleted = status === StepStatus.Completed;
-  const subtasks = (step as any).tasks || [];
-  const subtasksDone =
-    subtasks.length > 0 && subtasks.every((t: any) => t.done);
-  const isInProgress = status === StepStatus.InProgress;
-
-  return (
-    <TouchableOpacity
-      activeOpacity={0.9}
-      onPress={() => onPress && onPress()}
-      style={[styles.stepCard, isActive && styles.stepCardActive]}
-    >
-      {/* Step header */}
-      <View style={styles.stepHeader}>
-        <View style={styles.stepHeaderLeft}>
-          <View
-            style={[
-              styles.stepNumber,
-              isCompleted && styles.stepNumberCompleted,
-              isInProgress && styles.stepNumberInProgress,
-            ]}
-          >
-            {isCompleted ? (
-              <Ionicons name="checkmark" size={16} color="#fff" />
-            ) : (
-              <Text
-                style={[
-                  styles.stepNumberText,
-                  isInProgress && styles.stepNumberTextActive,
-                ]}
-              >
-                {stepNumber}
-              </Text>
-            )}
-          </View>
-          <Text style={styles.stepTitle}>Step {stepNumber}</Text>
-        </View>
-
-        <View style={[styles.stepBadge, { backgroundColor: cfg.bg }]}>
-          <Ionicons name={cfg.icon} size={14} color={cfg.color} />
-          <Text style={[styles.stepBadgeText, { color: cfg.color }]}>
-            {cfg.label}
-          </Text>
-        </View>
-      </View>
-
-      {/* Step description - In real app, fetch from SOP details */}
-      <Text style={styles.stepDescription}>
-        Complete the task according to standard operating procedure.
-      </Text>
-
-      {/* Action buttons - only show for active step */}
-      {isActive && isInProgress && (
-        <View style={styles.stepActions}>
-          {subtasksDone ? (
-            <AppButton
-              label="Mark Complete"
-              onPress={onComplete}
-              iconLeft="checkmark-circle-outline"
-              size="md"
-              style={{ flex: 1, marginBottom: 0 }}
-            />
-          ) : (
-            <View style={{ flex: 1, justifyContent: "center" }}>
-              <Text style={{ color: "#6B7280", fontSize: 13 }}>
-                Complete all subtasks to enable
-              </Text>
-            </View>
-          )}
-        </View>
-      )}
-
-      {/* Subtasks list for active step */}
-      {isActive &&
-        (step as any).tasks &&
-        Array.isArray((step as any).tasks) && (
-          <View style={{ marginTop: 12 }}>
-            {(step as any).tasks.map((t: any) => (
-              <TouchableOpacity
-                key={t.id}
-                style={styles.subtaskRow}
-                onPress={() => onToggleSubtask && onToggleSubtask(t.id)}
-              >
-                <Text style={styles.subtaskText}>{t.title}</Text>
-                <View
-                  style={[
-                    styles.subtaskCheckbox,
-                    t.done && styles.subtaskCheckboxChecked,
-                  ]}
-                >
-                  {t.done ? (
-                    <Ionicons name="checkmark" size={14} color="#fff" />
-                  ) : null}
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-      {/* Additional actions for in-progress step */}
-      {isActive && isInProgress && (
-        <View style={styles.stepExtras}>
-          <TouchableOpacity style={styles.extraBtn}>
-            <Ionicons name="camera-outline" size={18} color="#2563EB" />
-            <Text style={styles.extraBtnText}>Take Photo</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.extraBtn}>
-            <Ionicons name="chatbubble-outline" size={18} color="#2563EB" />
-            <Text style={styles.extraBtnText}>Add Note</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </TouchableOpacity>
-  );
-};
-
-const ProgressBar = ({
-  current,
-  total,
-}: {
-  current: number;
-  total: number;
-}) => {
-  const percentage = total > 0 ? (current / total) * 100 : 0;
-
-  return (
-    <View style={styles.progressContainer}>
-      <View style={styles.progressHeader}>
-        <Text style={styles.progressText}>
-          Progress: {current} of {total} completed
-        </Text>
-        <Text style={styles.progressPercent}>{Math.round(percentage)}%</Text>
-      </View>
-      <View style={styles.progressBarBg}>
-        <View style={[styles.progressBarFill, { width: `${percentage}%` }]} />
-      </View>
-    </View>
-  );
-};
-
-// ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function TaskExecutionScreen() {
-  const navigation = useNavigation();
-  const route = useRoute();
-  const { user } = useAuth();
-  const { updateTaskAssignmentStatus } = useTaskAssignments();
-  const { completeStep } = useTaskStepExecution();
-  const { getWorkerProfile } = useAuth();
-  const [workerId, setWorkerId] = useState<string | null>(null);
-  const [loadingWorker, setLoadingWorker] = useState(false);
-
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const params = route.params as RouteParams;
   const taskAssignmentId = params?.id;
-  const initialSteps = params?.steps || [];
 
-  const [steps, setSteps] = useState<TaskStepExecutionDto[]>(initialSteps);
+  const { completeStep } = useTaskStepExecution();
+  const { completeTask, getTaskAssignmentById } = useTaskAssignments();
+  const { getTaskScheduleById } = useTaskSchedules();
+  const { getWorkerProfile } = useAuth();
+
+  const [steps, setSteps] = useState<StepItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [workerId, setWorkerId] = useState<string | null>(null);
+  const [issueModalVisible, setIssueModalVisible] = useState(false);
+  const [equipmentModalVisible, setEquipmentModalVisible] = useState(false);
+  const { getSteps, buildStepConfig } = useSteps();
 
+  const requiredEquipment = useMemo(() => {
+    const equipmentStep = steps.find(
+      (s) => s.config?.["x-behavior"] === "equipment-check",
+    );
+
+    const allEquipment =
+      (equipmentStep?.config?.requiredEquipment as {
+        id: string;
+        name: string;
+      }[]) ?? [];
+
+    // Lấy state của step đó để biết cái nào đã tick
+    const stepState = equipmentStep?.stepState ?? {};
+
+    // Lọc ra những cái CHƯA được tick
+    return allEquipment.filter((eq) => !stepState[eq.id]);
+  }, [steps]);
+
+  // ─── Load worker ──────────────────────────────────────────────────────────
   useEffect(() => {
-    const fetchWorkerId = async () => {
+    (async () => {
       try {
-        setLoadingWorker(true);
         const profile = await getWorkerProfile();
-
-        if (profile && profile.id) {
-          setWorkerId(profile.id);
-        }
-      } catch (error) {
-        console.error("Lỗi khi lấy worker profile:", error);
-      } finally {
-        setLoadingWorker(false);
-      }
-    };
-
-    fetchWorkerId();
+        setWorkerId(profile?.id ?? null);
+      } catch {}
+    })();
   }, []);
+
+  // ─── Load task data ───────────────────────────────────────────────────────
   useEffect(() => {
-    const load = async () => {
-      // enrich initial steps with demo subtasks if missing
-      const enriched = initialSteps.map((s) => {
-        if ((s as any).tasks && Array.isArray((s as any).tasks)) return s;
-        const demoTasks = [
-          { id: `${s.id}-t1`, title: "Inspect area", done: false },
-          { id: `${s.id}-t2`, title: "Perform cleaning", done: false },
-          { id: `${s.id}-t3`, title: "Verify results", done: false },
-        ];
-        return { ...s, tasks: demoTasks };
-      });
+    if (!taskAssignmentId) return;
 
-      // try to restore saved progress
+    const loadData = async () => {
+      setLoading(true);
       try {
-        if (taskAssignmentId) {
-          const raw = await AsyncStorage.getItem(
-            `taskProgress:${taskAssignmentId}`,
-          );
-          if (raw) {
-            const saved = JSON.parse(raw) as any[];
-            // merge saved statuses/tasks into enriched steps by id
-            const merged = enriched.map((s) => {
-              const match = saved.find((x) => x.id === s.id);
-              return match ? { ...s, ...match } : s;
-            });
-            setSteps(merged);
-            return;
-          }
-        }
-      } catch (e) {
-        // ignore storage errors
-      }
+        const task = await getTaskAssignmentById(taskAssignmentId);
+        if (!task) throw new Error("Task not found");
 
-      setSteps(enriched);
+        const sorted = [...task.steps].sort(
+          (a, b) => a.stepOrder - b.stepOrder,
+        );
+
+        const mapped: StepItem[] = sorted.map((s) => {
+          const detail = s.configSnapshot?.detail ?? {};
+          const schema = s.configSnapshot?.schema ?? {};
+
+          const config = {
+            ...detail,
+            "x-behavior": schema["x-behavior"],
+            actionKey: s.sopStepId,
+          };
+
+          return {
+            id: s.id,
+            name: schema?.title || `Step ${s.stepOrder}`,
+            stepOrder: s.stepOrder,
+            config,
+            status:
+              s.status === "Completed"
+                ? StepStatus.Completed
+                : s.status === "InProgress"
+                  ? StepStatus.InProgress
+                  : StepStatus.NotStarted,
+            stepState: buildInitialState(config),
+          };
+        });
+
+        const raw = await AsyncStorage.getItem(
+          `taskProgress:${taskAssignmentId}`,
+        );
+        if (raw) {
+          const saved: Partial<StepItem>[] = JSON.parse(raw);
+          setSteps(
+            mapped.map((s) => {
+              const match = saved.find((x) => x.id === s.id);
+              return match
+                ? { ...s, ...match, config: s.config, status: s.status }
+                : s;
+            }),
+          );
+        } else {
+          setSteps(mapped);
+        }
+      } catch (err) {
+        console.error(err);
+        Alert.alert("Lỗi", "Tải công việc thất bại");
+      } finally {
+        setLoading(false);
+      }
     };
 
-    load();
+    loadData();
   }, [taskAssignmentId]);
 
-  // Find current active step
-  const currentStepIndex = steps.findIndex(
-    (s) => s.status === StepStatus.InProgress,
-  );
+  // ─── Nhận kết quả QR từ QRScannerScreen ──────────────────────────────────
+  useEffect(() => {
+    const qrResult = params?.qrResult;
+    if (!qrResult?.valid || !qrResult?.stepId) return;
 
-  const arePreviousStepsCompleted = (index: number) => {
-    if (index <= 0) return true;
-    for (let i = 0; i < index; i++) {
-      if (steps[i].status !== StepStatus.Completed) return false;
-    }
-    return true;
-  };
+    setSteps((prev) => {
+      const updated = prev.map((s) => {
+        if (s.id !== qrResult.stepId) return s;
 
-  const selectStep = (stepId: string) => {
-    const idx = steps.findIndex((s) => s.id === stepId);
-    if (idx === -1) return;
-    if (!arePreviousStepsCompleted(idx)) {
-      Alert.alert("Cannot open step", "Please complete previous steps first.");
-      return;
-    }
+        return {
+          ...s,
+          stepState: {
+            ...s.stepState,
+            checkedIn: true,
+            verified: true,
+            method: "qr",
 
-    setSteps((prev) =>
-      prev.map((s, i) => {
-        if (s.id === stepId) return { ...s, status: StepStatus.InProgress };
-        if (s.status === StepStatus.InProgress)
-          return { ...s, status: StepStatus.NotStarted };
-        return s;
-      }),
-    );
-  };
+            qrRaw: qrResult.raw,
+            checkinPointId: qrResult.checkinPointId,
+            workareaId: qrResult.workareaId,
+            code: qrResult.code,
 
+            checkinRecordId: qrResult.checkinRecordId,
+            checkinAt: qrResult.checkinAt,
+            verifiedAt: qrResult.verifiedAt,
+          },
+        };
+      });
+
+      AsyncStorage.setItem(
+        `taskProgress:${taskAssignmentId}`,
+        JSON.stringify(updated),
+      );
+
+      return updated;
+    });
+
+    navigation.setParams({ qrResult: undefined });
+  }, [params?.qrResult, taskAssignmentId]);
+
+  // ─── Nhận kết quả selfie từ InspectionCameraScreen ───────────────────────
+  useEffect(() => {
+    const selfieResult = params?.selfieResult;
+    const stepId = params?.stepId;
+    if (!selfieResult?.uri || !stepId) return;
+
+    setSteps((prev) => {
+      const updated = prev.map((s) => {
+        if (s.id !== stepId) return s;
+        return {
+          ...s,
+          stepState: {
+            ...s.stepState,
+            checkedIn: true,
+            method: "selfie",
+            photoUri: selfieResult.uri,
+            capturedAt: new Date().toISOString(),
+          },
+        };
+      });
+      AsyncStorage.setItem(
+        `taskProgress:${taskAssignmentId}`,
+        JSON.stringify(updated),
+      );
+      return updated;
+    });
+
+    navigation.setParams({ selfieResult: undefined, stepId: undefined });
+  }, [params?.selfieResult]);
+
+  // ─── Derived ──────────────────────────────────────────────────────────────
   const completedCount = steps.filter(
     (s) => s.status === StepStatus.Completed,
   ).length;
+  const allCompleted =
+    steps.length > 0 && steps.every((s) => s.status === StepStatus.Completed);
 
-  const allCompleted = steps.every((s) => s.status === StepStatus.Completed);
-
-  useEffect(() => {
-    if (!taskAssignmentId || steps.length === 0) {
-      Alert.alert("Error", "No task data available");
-      navigation.goBack();
-    }
-  }, []);
+  // ─── Handlers ─────────────────────────────────────────────────────────────
+  const handleStepStateChange = (stepId: string, newState: any) => {
+    setSteps((prev) => {
+      const updated = prev.map((s) =>
+        s.id === stepId ? { ...s, stepState: newState } : s,
+      );
+      AsyncStorage.setItem(
+        `taskProgress:${taskAssignmentId}`,
+        JSON.stringify(updated),
+      );
+      return updated;
+    });
+  };
 
   const handleCompleteStep = async (stepId: string) => {
-    // Ensure all subtasks in this step are completed first
-    const step = steps.find((s) => s.id === stepId) as any;
-    if (step && Array.isArray(step.tasks)) {
-      const allDone =
-        step.tasks.length > 0 && step.tasks.every((t: any) => t.done);
-      if (!allDone) {
-        Alert.alert(
-          "Complete subtasks",
-          "Please finish all subtasks in this step before marking it complete.",
-        );
-        return;
-      }
+    const step = steps.find((s) => s.id === stepId);
+    if (!step) return;
+
+    if (!isStepFulfilled(step.stepState, step.config)) {
+      Alert.alert("Chưa hoàn thành", getIncompleteMessage(step.config));
+      return;
     }
 
-    setLoading(true);
+    if (!workerId) {
+      Alert.alert("Lỗi", "Không xác định được worker. Vui lòng thử lại.");
+      return;
+    }
+
     try {
-      // Build result data (include subtasks state)
-      const step = steps.find((s) => s.id === stepId) as any;
-      const resultData = {
-        subtasks: Array.isArray(step?.tasks)
-          ? step.tasks.map((t: any) => ({ id: t.id, done: t.done }))
-          : [],
-      };
+      setSubmitting(true);
 
-      // Call backend to complete step via hook
-      const returned: any = await completeStep(stepId, {
-        workerId: workerId || "unknown",
-        resultData,
+      const res: any = await completeStep(step.id, {
+        workerId,
+        resultData: serializeStepData(step.stepState, step.config) ?? {},
       });
 
-      // Update local steps based on server response (mark completed and activate next)
-      const nextStepId: string | null =
-        returned.nextStepId ?? returned.NextStepId ?? null;
+      const nextId = res?.nextStepId ?? null;
 
-      const updatedSteps = steps.map((s) => {
-        if (s.id === stepId) return { ...s, status: StepStatus.Completed };
-        if (nextStepId && s.id === nextStepId)
-          return { ...s, status: StepStatus.InProgress };
-        return s;
-      });
-
-      setSteps(updatedSteps);
-
-      // persist progress
-      try {
-        if (taskAssignmentId) {
-          await AsyncStorage.setItem(
-            `taskProgress:${taskAssignmentId}`,
-            JSON.stringify(updatedSteps),
-          );
-        }
-      } catch (e) {
-        // ignore
-      }
-
-      const allDone = updatedSteps.every(
-        (s) => s.status === StepStatus.Completed,
-      );
-      if (allDone) {
-        Alert.alert(
-          "Task Completed",
-          "All steps have been completed. Would you like to finish this task?",
-          [
-            { text: "Not Yet", style: "cancel" },
-            { text: "Finish Task", onPress: handleFinishTask },
-          ],
+      setSteps((prev) => {
+        const updated = prev.map((s) => {
+          if (s.id === stepId) return { ...s, status: StepStatus.Completed };
+          if (nextId && s.id === nextId)
+            return { ...s, status: StepStatus.InProgress };
+          return s;
+        });
+        AsyncStorage.setItem(
+          `taskProgress:${taskAssignmentId}`,
+          JSON.stringify(updated),
         );
-      }
+        return updated;
+      });
     } catch (err: any) {
-      console.error("Complete step failed:", err);
-      Alert.alert(
-        "Error",
-        err?.response?.data?.message ||
-          err?.message ||
-          "Failed to complete step",
-      );
+      Alert.alert("Lỗi", "Hoàn thành bước thất bại: " + err?.message);
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
-
-  // Skipping steps removed - users must complete all subtasks and steps in order
 
   const handleFinishTask = async () => {
+    if (!workerId) {
+      Alert.alert("Lỗi", "Không xác định được worker. Vui lòng thử lại.");
+      return;
+    }
+
     try {
-      setLoading(true);
+      setSubmitting(true);
+      const result = await completeTask(taskAssignmentId, workerId);
 
-      // Update task assignment status to Completed
-      const success = await updateTaskAssignmentStatus(
-        taskAssignmentId,
-        2, // TaskAssignmentStatus.Completed
-      );
-
-      if (success) {
-        Alert.alert("Success", "Task has been completed successfully!", [
-          {
-            text: "OK",
-            onPress: () => navigation.navigate("Tasks" as never),
-          },
+      if (result) {
+        await AsyncStorage.removeItem(`taskProgress:${taskAssignmentId}`);
+        Alert.alert("Thành công", "Công việc đã được hoàn thành!", [
+          { text: "OK", onPress: () => navigation.navigate("Tasks" as never) },
         ]);
-        // clear persisted progress
-        try {
-          if (taskAssignmentId)
-            await AsyncStorage.removeItem(`taskProgress:${taskAssignmentId}`);
-        } catch (e) {
-          // ignore
-        }
       } else {
-        Alert.alert("Error", "Failed to complete task. Please try again.");
+        Alert.alert(
+          "Lỗi",
+          "Không thể hoàn thành công việc. Vui lòng kiểm tra lại kết nối.",
+        );
       }
-    } catch (error: any) {
-      Alert.alert("Error", error?.message || "An error occurred");
+    } catch (err) {
+      console.error("Lỗi khi kết thúc task:", err);
+      Alert.alert("Lỗi hệ thống", "Đã xảy ra lỗi không mong muốn.");
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
-  const handlePauseTask = () => {
-    Alert.alert(
-      "Pause Task",
-      "Do you want to pause this task? You can resume it later.",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Pause",
-          onPress: () => navigation.goBack(),
-        },
-      ],
-    );
-  };
+  // ─── Header right ─────────────────────────────────────────────────────────
+  const headerRight = (
+    <View style={s.headerActions}>
+      <TouchableOpacity
+        style={s.headerBtn}
+        onPress={() => setEquipmentModalVisible(true)}
+      >
+        <Ionicons name="construct-outline" size={22} color="#1E293B" />
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={s.headerBtn}
+        onPress={() => setIssueModalVisible(true)}
+      >
+        <Ionicons name="warning-outline" size={22} color="#EF4444" />
+      </TouchableOpacity>
+    </View>
+  );
 
-  const toggleSubtask = (stepId: string, taskId: string) => {
-    setSteps((prev) =>
-      prev.map((s) => {
-        if (s.id !== stepId) return s;
-        const tasks = (s as any).tasks || [];
-        const updatedTasks = tasks.map((t: any) =>
-          t.id === taskId ? { ...t, done: !t.done } : t,
-        );
-        return { ...s, tasks: updatedTasks };
-      }),
-    );
-    // persist change
-    (async () => {
-      try {
-        if (taskAssignmentId) {
-          const next = steps.map((s) => (s.id === stepId ? { ...s } : s));
-          // apply toggle locally for save snapshot
-          const saved = next.map((s) => {
-            if (s.id !== stepId) return s;
-            const tasks = (s as any).tasks || [];
-            return {
-              ...s,
-              tasks: tasks.map((t: any) =>
-                t.id === taskId ? { ...t, done: !t.done } : t,
-              ),
-            };
-          });
-          await AsyncStorage.setItem(
-            `taskProgress:${taskAssignmentId}`,
-            JSON.stringify(saved),
-          );
-        }
-      } catch (e) {
-        // ignore
-      }
-    })();
-  };
-
-  // also persist whenever steps change (debounced simple)
-  useEffect(() => {
-    const save = setTimeout(async () => {
-      try {
-        if (taskAssignmentId)
-          await AsyncStorage.setItem(
-            `taskProgress:${taskAssignmentId}`,
-            JSON.stringify(steps),
-          );
-      } catch (e) {
-        // ignore
-      }
-    }, 300);
-    return () => clearTimeout(save);
-  }, [steps]);
-
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+    <SafeAreaView style={s.safe}>
+      <StatusBar barStyle="dark-content" />
+
       <Header
-        title="Task Execution"
-        onBack={() => handlePauseTask()}
-        rightElement={
-          <TouchableOpacity onPress={handlePauseTask}>
-            <Ionicons name="pause-circle-outline" size={24} color="#2563EB" />
-          </TouchableOpacity>
-        }
+        title="Thực thi công việc"
+        onBack={() => navigation.goBack()}
+        rightElement={headerRight}
       />
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+      {/* 👉 2. THAY THẾ SCROLLVIEW THÀNH KEYBOARDAWARESCROLLVIEW */}
+      <KeyboardAwareScrollView
+        style={s.scroll}
+        contentContainerStyle={s.scrollContent}
+        enableOnAndroid={true}
+        extraScrollHeight={80} // Đẩy input lên cao thêm 80px để nhìn rõ nút Complete bên dưới
+        keyboardShouldPersistTaps="handled" // Giúp bấm nút ko cần 2 lần chạm khi bàn phím đang bật
         showsVerticalScrollIndicator={false}
       >
-        {/* Progress */}
-        <ProgressBar current={completedCount} total={steps.length} />
-
-        {/* Task Info */}
-        <View style={styles.infoCard}>
-          <View style={styles.infoRow}>
-            <Ionicons name="clipboard-outline" size={20} color="#64748B" />
-            <Text style={styles.infoLabel}>Task ID:</Text>
-            <Text style={styles.infoValue}>
-              {taskAssignmentId.slice(0, 8)}...
-            </Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Ionicons name="clipboard-outline" size={20} color="#64748B" />
-            <Text style={styles.infoLabel}>Task Name:</Text>
-            <Text
-              style={styles.infoValue}
-            >{`Task for ${"Minh Luan" || "-------"}`}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Ionicons name="time-outline" size={20} color="#64748B" />
-            <Text style={styles.infoLabel}>Started:</Text>
-            <Text style={styles.infoValue}>
-              {new Date().toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </Text>
+        <View style={s.progressRow}>
+          <Text style={s.progressText}>
+            {completedCount}/{steps.length} bước đã hoàn thành
+          </Text>
+          <View style={s.progressTrack}>
+            <View
+              style={[
+                s.progressFill,
+                {
+                  width:
+                    steps.length > 0
+                      ? `${(completedCount / steps.length) * 100}%`
+                      : "0%",
+                },
+              ]}
+            />
           </View>
         </View>
 
-        {/* Steps */}
-        <View style={styles.stepsSection}>
-          <Text style={styles.sectionTitle}>Task Steps</Text>
-          {loading ? (
-            <ActivityIndicator size="large" color="#2563EB" />
-          ) : (
-            steps.map((step, index) => (
-              <StepCard
+        {loading ? (
+          <ActivityIndicator style={{ marginTop: 40 }} />
+        ) : (
+          steps.map((step, index) => {
+            const isActive = step.status === StepStatus.InProgress;
+            const isDone = step.status === StepStatus.Completed;
+            const fulfilled = isStepFulfilled(step.stepState, step.config);
+
+            return (
+              <View
                 key={step.id}
-                step={step}
-                stepNumber={index + 1}
-                isActive={index === currentStepIndex}
-                onComplete={() => handleCompleteStep(step.id)}
-                onToggleSubtask={(taskId) => toggleSubtask(step.id, taskId)}
-                onPress={() => selectStep(step.id)}
-              />
-            ))
-          )}
-        </View>
+                style={[s.card, isDone && s.cardDone, isActive && s.cardActive]}
+              >
+                <View style={s.stepHeader}>
+                  <View
+                    style={[
+                      s.badge,
+                      isDone && s.badgeDone,
+                      isActive && s.badgeActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        s.badgeText,
+                        isDone && s.badgeTextDone,
+                        isActive && s.badgeTextActive,
+                      ]}
+                    >
+                      {isDone ? "✓" : index + 1}
+                    </Text>
+                  </View>
 
-        {/* Finish button - show when all completed */}
+                  <View style={s.stepInfo}>
+                    <Text style={[s.stepName, isDone && s.stepNameDone]}>
+                      {step.name}
+                    </Text>
+                    <Text style={s.stepType}>{getStepLabel(step.config)}</Text>
+                  </View>
+
+                  {isDone && (
+                    <View style={s.donePill}>
+                      <Text style={s.donePillText}>Hoàn thành</Text>
+                    </View>
+                  )}
+                </View>
+
+                {isActive && (
+                  <>
+                    <View style={s.divider} />
+                    <StepRenderer
+                      stepName={step.name}
+                      config={step.config}
+                      state={{
+                        ...step.stepState,
+                        __stepId: step.id,
+                        __taskAssignmentId: taskAssignmentId,
+                      }}
+                      onChange={(newState) =>
+                        handleStepStateChange(step.id, newState)
+                      }
+                    />
+                    <View style={s.completeBtn}>
+                      <AppButton
+                        label={submitting ? "Đang xử lý..." : "Hoàn thành bước"}
+                        onPress={() => handleCompleteStep(step.id)}
+                        disabled={!fulfilled || submitting}
+                      />
+                    </View>
+                  </>
+                )}
+              </View>
+            );
+          })
+        )}
+
         {allCompleted && (
-          <View style={styles.finishSection}>
+          <View style={s.finishWrap}>
             <AppButton
-              label="Finish Task"
+              label={submitting ? "Đang xử lý..." : "Hoàn tất công việc"}
               onPress={handleFinishTask}
-              iconLeft="checkmark-done-outline"
-              size="lg"
-              disabled={loading}
+              disabled={submitting}
             />
           </View>
         )}
+      </KeyboardAwareScrollView>
 
-        <View style={{ height: 40 }} />
-      </ScrollView>
+      <IssueReportModal
+        visible={issueModalVisible}
+        onClose={() => setIssueModalVisible(false)}
+        taskAssignmentId={taskAssignmentId}
+      />
+      <EquipmentRequestModal
+        visible={equipmentModalVisible}
+        onClose={() => setEquipmentModalVisible(false)}
+        taskAssignmentId={taskAssignmentId}
+        requiredEquipment={requiredEquipment}
+      />
     </SafeAreaView>
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: "#f5f6fa",
-  },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-  },
+// Hàm getIncompleteMessage và StyleSheet giữ nguyên...
+function getIncompleteMessage(config: any): string {
+  const msgs: Record<string, string> = {
+    checkin: "Vui lòng hoàn thành check-in trước.",
+    "ai-ppe-check": "Vui lòng xác nhận đã mặc đủ đồ bảo hộ.",
+    "equipment-check": "Vui lòng xác nhận đủ thiết bị.",
+    "photo-capture": "Vui lòng chụp đủ số ảnh yêu cầu.",
+    checklist: "Vui lòng hoàn thành tất cả mục trong checklist.",
+    list: "Vui lòng xác nhận đã đọc danh sách.",
+    finish: "Vui lòng nhập ghi chú hoàn thành.",
+  };
+  return (
+    msgs[config?.["x-behavior"]] ??
+    "Vui lòng hoàn thành tất cả yêu cầu của bước này."
+  );
+}
 
-  // Progress
-  progressContainer: {
-    marginBottom: 20,
-  },
-  progressHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  progressText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#1E293B",
-  },
-  progressPercent: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#2563EB",
-  },
-  progressBarBg: {
-    height: 8,
+const s = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: "#F8FAFC" },
+  scroll: { flex: 1 },
+  scrollContent: { padding: 16, paddingBottom: 40 },
+
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 4 },
+  headerBtn: { padding: 6, borderRadius: 8 },
+
+  progressRow: { marginBottom: 16 },
+  progressText: { fontSize: 13, color: "#64748B", marginBottom: 6 },
+  progressTrack: {
+    height: 4,
     backgroundColor: "#E2E8F0",
-    borderRadius: 4,
+    borderRadius: 2,
     overflow: "hidden",
   },
-  progressBarFill: {
-    height: "100%",
-    backgroundColor: "#2563EB",
-    borderRadius: 4,
-  },
+  progressFill: { height: "100%", backgroundColor: "#0F172A", borderRadius: 2 },
 
-  // Info Card
-  infoCard: {
-    backgroundColor: "#F8FAFC",
+  card: {
+    backgroundColor: "#FFF",
     borderRadius: 12,
     padding: 16,
-    marginBottom: 24,
-    gap: 12,
-  },
-  infoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  infoLabel: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#64748B",
-  },
-  infoValue: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#1E293B",
-    flex: 1,
-  },
-
-  // Steps Section
-  stepsSection: {
-    gap: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1E293B",
-    marginBottom: 8,
-  },
-
-  // Step Card
-  stepCard: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: "#E2E8F0",
+    opacity: 0.6,
   },
-  stepCardActive: {
-    borderColor: "#2563EB",
-    borderWidth: 2,
-    backgroundColor: "#F8FAFC",
-  },
-  stepHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  stepHeaderLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  stepNumber: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#E2E8F0",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  stepNumberCompleted: {
-    backgroundColor: "#10B981",
-  },
-  stepNumberInProgress: {
-    backgroundColor: "#2563EB",
-  },
-  stepNumberText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#64748B",
-  },
-  stepNumberTextActive: {
-    color: "#fff",
-  },
-  stepTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#1E293B",
-  },
-  stepBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  stepBadgeText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  stepDescription: {
-    fontSize: 14,
-    color: "#64748B",
-    lineHeight: 20,
-    marginBottom: 12,
-  },
+  cardActive: { opacity: 1, borderColor: "#0F172A", borderWidth: 1.5 },
+  cardDone: { opacity: 0.75, backgroundColor: "#F8FAFC" },
 
-  // Step Actions
-  stepActions: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 12,
-  },
-
-  // Extra Actions
-  stepExtras: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
-  },
-  extraBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-    backgroundColor: "#EFF6FF",
-  },
-  extraBtnText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#2563EB",
-  },
-
-  // Subtasks
-  subtaskRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
-  },
-  subtaskText: {
-    fontSize: 14,
-    color: "#0F172A",
-    flex: 1,
-  },
-  subtaskCheckbox: {
+  stepHeader: { flexDirection: "row", alignItems: "center" },
+  badge: {
     width: 28,
     height: 28,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    justifyContent: "center",
+    borderRadius: 14,
+    backgroundColor: "#E2E8F0",
     alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
   },
-  subtaskCheckboxChecked: {
-    backgroundColor: "#10B981",
-    borderColor: "#10B981",
-  },
+  badgeActive: { backgroundColor: "#0F172A" },
+  badgeDone: { backgroundColor: "#DCFCE7" },
+  badgeText: { fontSize: 12, fontWeight: "700", color: "#94A3B8" },
+  badgeTextActive: { color: "#FFF" },
+  badgeTextDone: { color: "#166534" },
 
-  // Finish Section
-  finishSection: {
-    marginTop: 24,
+  stepInfo: { flex: 1 },
+  stepName: { fontSize: 15, fontWeight: "700", color: "#1E293B" },
+  stepNameDone: { color: "#94A3B8" },
+  stepType: { fontSize: 12, color: "#64748B", marginTop: 1 },
+
+  donePill: {
+    backgroundColor: "#DCFCE7",
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
+  donePillText: { fontSize: 12, color: "#166534", fontWeight: "600" },
+
+  divider: { height: 0.5, backgroundColor: "#E2E8F0", marginVertical: 12 },
+  completeBtn: { marginTop: 14 },
+  finishWrap: { marginTop: 8 },
 });

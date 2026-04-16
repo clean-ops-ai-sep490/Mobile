@@ -1,7 +1,8 @@
 import BottomTabBar, { TabKey } from "@/components/common/BottomTabBar";
-import TaskPickerModal from "@/components/TaskPickerModal";
+import TaskPickerModal from "@/components/modals/TaskPickerModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSelectedTask } from "@/contexts/SelectedTaskContext";
+import { useNotificationStore } from "@/store/notification.store";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import React, { useEffect, useRef, useState } from "react";
@@ -134,6 +135,7 @@ export default function HomeScreen({ onNavigate }: Props) {
   const { selectedTaskId, setSelectedTaskId } = useSelectedTask();
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const { unreadCount, fetchUnreadCount } = useNotificationStore();
 
   const handleNavigate = (screen: TabKey) => {
     navigation.navigate(screen as never);
@@ -152,9 +154,10 @@ export default function HomeScreen({ onNavigate }: Props) {
         useNativeDriver: true,
       }),
     ]).start();
+    fetchUnreadCount();
   }, []);
 
-  const today = new Date().toLocaleDateString("en-US", {
+  const today = new Date().toLocaleDateString("vi-VN", {
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -169,7 +172,7 @@ export default function HomeScreen({ onNavigate }: Props) {
         <View style={styles.topBar}>
           <View style={styles.topBarLeft}>
             <View>
-              <Text style={styles.greeting}>Have a good day,</Text>
+              <Text style={styles.greeting}>Chúc bạn một ngày tốt lành,</Text>
               <Text style={styles.userName}>{userName}</Text>
               <Text style={styles.date}>{today}</Text>
             </View>
@@ -184,11 +187,23 @@ export default function HomeScreen({ onNavigate }: Props) {
                 size={18}
                 color="#334155"
               />
-              <View style={styles.notifDot} />
+              {unreadCount > 0 && (
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeText}>
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.iconBtn}
-              onPress={() => onNavigate?.("Profile")}
+              onPress={() => {
+                if (user?.role === "Worker") {
+                  (navigation as any).navigate("WorkerProfile");
+                } else {
+                  onNavigate?.("Profile");
+                }
+              }}
             >
               <Ionicons name="person-outline" size={18} color="#334155" />
             </TouchableOpacity>
@@ -216,12 +231,7 @@ export default function HomeScreen({ onNavigate }: Props) {
                   />
                 </View>
                 <View>
-                  <Text style={styles.tasksTitle}>My Tasks</Text>
-                  {selectedTaskId ? (
-                    <Text style={styles.tasksPending}>
-                      Using: {selectedTaskId.slice(0, 8)}...
-                    </Text>
-                  ) : null}
+                  <Text style={styles.tasksTitle}>Công việc của tôi</Text>
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
@@ -229,72 +239,53 @@ export default function HomeScreen({ onNavigate }: Props) {
           </Animated.View>
 
           {/* ── Quick Actions ── */}
-          <Text style={styles.sectionLabel}>Quick Actions</Text>
-          <View style={styles.quickGrid}>
-            <QuickCard
-              icon="warning-outline"
-              label="Issue Report"
-              subtitle="Broken equipment, sudden issues"
-              iconBg="#FEE2E2"
-              iconColor="#EF4444"
-              delay={100}
-              onPress={() => {
-                if (selectedTaskId) {
-                  navigation.navigate(
-                    "IssueReport" as never,
-                    { taskRef: selectedTaskId } as never,
-                  );
-                } else {
-                  setPendingAction("IssueReport");
-                  setPickerVisible(true);
-                }
-              }}
-            />
-            <QuickCard
-              icon="add-circle-outline"
-              label="Ad-hoc Request"
-              subtitle="Support, additional supplies"
-              iconBg="#DCFCE7"
-              iconColor="#22C55E"
-              delay={180}
-              onPress={() => onNavigate?.("AdhocRequest")}
-            />
-          </View>
-          <View style={styles.quickGrid}>
-            <QuickCard
-              icon="construct-outline"
-              label="Request Equipment"
-              subtitle="Request tools & supplies"
-              iconBg="#FFF7ED"
-              iconColor="#F97316"
-              delay={260}
-              onPress={() => {
-                if (selectedTaskId) {
-                  navigation.navigate(
-                    "RequestEquipment" as never,
-                    { taskAssignmentId: selectedTaskId } as never,
-                  );
-                } else {
-                  setPendingAction("RequestEquipment");
-                  setPickerVisible(true);
-                }
-              }}
-            />
+          <Text style={styles.sectionLabel}>Tác vụ nhanh</Text>
+          <View
+            style={[
+              styles.quickGrid,
+              { gap: CARD_GAP, marginBottom: CARD_GAP },
+            ]}
+          >
             <QuickCard
               icon="swap-horizontal-outline"
-              label="Request Swap Task"
-              subtitle="Request shift swap"
+              label="Yêu cầu đổi công việc"
+              subtitle="Gửi yêu cầu đổi công việc"
               iconBg="#F3F4F6"
               iconColor="#6B7280"
               delay={340}
-              onPress={() => onNavigate?.("SwapTask")}
+              onPress={() => {
+                setPendingAction("SwapTask");
+                setPickerVisible(true);
+              }}
+            />
+          </View>
+          <View
+            style={[
+              styles.quickGrid,
+              { gap: CARD_GAP, marginBottom: CARD_GAP },
+            ]}
+          >
+            <QuickCard
+              icon="person-outline"
+              label="Hồ sơ của tôi"
+              subtitle="Xem và quản lý thông tin của bạn"
+              iconBg="#F3E8FF"
+              iconColor="#9333EA"
+              delay={180}
+              onPress={() => {
+                if (user?.role === "Worker") {
+                  (navigation as any).navigate("WorkerProfile");
+                } else {
+                  onNavigate?.("Profile");
+                }
+              }}
             />
           </View>
           <View style={styles.quickGrid}>
             <QuickCard
               icon="list-outline"
-              label="List All Requests"
-              subtitle="View and manage all requests"
+              label="Danh sách yêu cầu"
+              subtitle="Xem và quản lý tất cả yêu cầu"
               iconBg="#FFF7ED"
               iconColor="#F97316"
               delay={260}
@@ -312,27 +303,28 @@ export default function HomeScreen({ onNavigate }: Props) {
             setPickerVisible(false);
             setPendingAction(null);
           }}
-          onSelect={async (id) => {
-            await setSelectedTaskId(id);
+          onSelect={(id) => {
             setPickerVisible(false);
-            const action = pendingAction ?? "IssueReport";
-            if (action === "IssueReport") {
+
+            const action = pendingAction ?? "SwapTask";
+
+            if (action === "SwapTask") {
               navigation.navigate(
-                "IssueReport" as never,
-                { taskRef: id } as never,
+                "SwapTask" as never,
+                { taskAssignmentId: id } as never,
               );
-            } else if (action === "RequestEquipment") {
+            } else if (action === "EmergencyLeave") {
               navigation.navigate(
-                "RequestEquipment" as never,
+                "EmergencyLeave" as never,
                 { taskAssignmentId: id } as never,
               );
             } else {
-              // fallback: go to IssueReport
               navigation.navigate(
-                "IssueReport" as never,
-                { taskRef: id } as never,
+                "SwapTask" as never,
+                { taskAssignmentId: id } as never,
               );
             }
+
             setPendingAction(null);
           }}
         />
@@ -405,20 +397,6 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
   },
   date: { fontSize: 13, color: "#94A3B8", marginBottom: 24 },
-
-  // Stats
-  statsRow: { flexDirection: "row", gap: 12, marginBottom: 16 },
-  statCard: {
-    flex: 1,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 12,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#E6EEF8",
-  },
-  statNumber: { fontSize: 18, fontWeight: "800", color: "#0F172A" },
-  statLabel: { fontSize: 12, color: "#64748B", marginTop: 6 },
 
   // Tasks card
   tasksCard: {
@@ -493,40 +471,6 @@ const styles = StyleSheet.create({
   },
   quickSub: { fontSize: 11, color: "#94A3B8", lineHeight: 16 },
 
-  // Performance card
-  perfCard: {
-    backgroundColor: "#FFF",
-    borderRadius: 18,
-    padding: 18,
-    marginTop: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  perfHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  perfTitle: { fontSize: 15, fontWeight: "700", color: "#1E293B" },
-  perfPct: { fontSize: 15, fontWeight: "800", color: "#2563EB" },
-  perfTrack: {
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#E2E8F0",
-    overflow: "hidden",
-    marginBottom: 10,
-  },
-  perfFill: {
-    height: "100%",
-    borderRadius: 4,
-    backgroundColor: "#2563EB",
-  },
-  perfSub: { fontSize: 12, color: "#94A3B8" },
-
   // Tab bar
   tabBar: {
     flexDirection: "row",
@@ -552,5 +496,25 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: "#2563EB",
+  },
+  // Xóa class notifDot cũ và thêm 2 class này vào:
+  notifBadge: {
+    position: "absolute",
+    top: -2,
+    right: -4,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "#EF4444",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: "#FFF",
+  },
+  notifBadgeText: {
+    color: "#FFF",
+    fontSize: 9,
+    fontWeight: "bold",
   },
 });

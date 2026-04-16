@@ -1,6 +1,6 @@
 import axiosInstance from "@/config/axiosInstance";
 import { useAuth } from "@/contexts/AuthContext";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 // pagination types (local)
 export interface PaginationRequest {
@@ -26,28 +26,48 @@ export interface EquipmentRequestItem {
   createdAt?: string;
 }
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 export interface EquipmentItem {
   id: string;
   name: string;
-  type: number;
+  type: string | number; // API trả về "DisinfectantSprayer" thay vì number
   description?: string;
+}
+
+export interface EquipmentRequestItemPayload {
+  equipmentId: string;
+  quantity: number;
 }
 
 export interface CreateEquipmentRequestPayload {
   taskAssignmentId: string;
-  equipmentId: string;
-  quantity: number;
   reason: string;
+  items: EquipmentRequestItemPayload[];
 }
 
-// ─── Hook ─────────────────────────────────────────────────────────────────────
 const useEquipment = () => {
-  const { user } = useAuth();
+  const { getWorkerProfile } = useAuth();
   const [equipmentList, setEquipmentList] = useState<EquipmentItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [workerId, setWorkerId] = useState<string | null>(null);
+
+  // 🔥 FIX TÍNH NĂNG: Không gọi trực tiếp hàm async ở body hook. Sử dụng useEffect.
+  useEffect(() => {
+    let isMounted = true;
+    const fetchWorkerId = async () => {
+      try {
+        const profile = await getWorkerProfile();
+        if (isMounted && profile?.id) setWorkerId(profile.id);
+      } catch (error) {
+        console.error("Error fetching worker profile:", error);
+      }
+    };
+    fetchWorkerId();
+    return () => {
+      isMounted = false;
+    };
+  }, [getWorkerProfile]);
 
   // GET danh sách equipment
   const fetchEquipments = async () => {
@@ -59,31 +79,50 @@ const useEquipment = () => {
       );
       setEquipmentList(res.data.content ?? []);
     } catch (e: any) {
-      setError(e?.response?.data?.message || "Failed to load equipment list");
+      setError(e?.response?.data?.message || "Tải danh sách thiết bị thất bại");
     } finally {
       setLoading(false);
     }
   };
 
+  // 🔥 THÊM MỚI: GET equipment by ID để lấy Name
+  // Trong useEquipment.ts
+  const getEquipmentById = useCallback(
+    async (id: string): Promise<EquipmentItem | null> => {
+      try {
+        const res = await axiosInstance.get(`/Equipments/${id}`);
+
+        // Kiểm tra nếu là mảng thì lấy phần tử đầu tiên, nếu không thì lấy trực tiếp
+        const data = Array.isArray(res.data) ? res.data[0] : res.data;
+
+        return data || null;
+      } catch (e: any) {
+        console.error(`Failed to fetch equipment details for ${id}`, e);
+        return null;
+      }
+    },
+    [],
+  );
+
   // POST tạo equipment request
   const createEquipmentRequest = async (
     payload: CreateEquipmentRequestPayload,
   ) => {
-    if (!user?.userId) throw new Error("User not found. Please login again.");
+    if (!workerId)
+      throw new Error("Không tìm thấy người dùng. Vui lòng đăng nhập lại.");
 
     try {
       setSubmitting(true);
       setError(null);
       const res = await axiosInstance.post("/EquipmentRequests", {
         taskAssignmentId: payload.taskAssignmentId,
-        workerId: user.userId,
-        equipmentId: payload.equipmentId,
-        quantity: payload.quantity,
+        workerId: workerId,
         reason: payload.reason,
+        items: payload.items,
       });
       return res.data;
     } catch (e: any) {
-      setError(e?.response?.data?.message || "Failed to submit request");
+      setError(e?.response?.data?.message || "Gửi yêu cầu thất bại");
       throw e;
     } finally {
       setSubmitting(false);
@@ -98,12 +137,9 @@ const useEquipment = () => {
       const res = await axiosInstance.get<
         PaginatedResult<EquipmentRequestItem>
       >(`/EquipmentRequests/worker/${workerId}`, { params });
-
       return res.data;
     } catch (e: any) {
-      setError(
-        e?.response?.data?.message || "Failed to fetch equipment requests",
-      );
+      setError(e?.response?.data?.message || "Lấy yêu cầu thiết bị thất bại");
       throw e;
     } finally {
       setLoading(false);
@@ -116,6 +152,7 @@ const useEquipment = () => {
     submitting,
     error,
     fetchEquipments,
+    getEquipmentById, // Trả hàm mới ra ngoài
     createEquipmentRequest,
     getByWorker,
   };

@@ -1,14 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import {
-    Platform,
-    StyleProp,
-    StyleSheet,
-    Text,
-    TextStyle,
-    TouchableOpacity,
-    View,
-    ViewStyle,
+  Platform,
+  StyleProp,
+  StyleSheet,
+  Text,
+  TextStyle,
+  TouchableOpacity,
+  View,
+  ViewStyle,
 } from "react-native";
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>["name"];
@@ -27,6 +27,7 @@ interface HeaderProps {
   onBack?: () => void;
   style?: StyleProp<ViewStyle>;
   titleStyle?: StyleProp<TextStyle>;
+  rightElement?: React.ReactNode;
 }
 
 const DEFAULT_LEFT: Omit<HeaderAction, "onPress"> = {
@@ -41,6 +42,7 @@ export default function Header({
   onBack,
   style,
   titleStyle,
+  rightElement,
 }: HeaderProps) {
   // Resolve left button
   const left: HeaderAction | null = leftAction
@@ -73,7 +75,12 @@ export default function Header({
       <Text style={[styles.headerTitle, titleStyle]} numberOfLines={1}>
         {title}
       </Text>
-      <View style={styles.headerBtnPlaceholder} />
+
+      {rightElement ? (
+        <View style={styles.rightContainer}>{rightElement}</View>
+      ) : (
+        <View style={styles.headerBtnPlaceholder} />
+      )}
     </View>
   );
 }
@@ -112,5 +119,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 4,
     elevation: 2,
+  },
+  rightContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    minWidth: 36,
   },
 });

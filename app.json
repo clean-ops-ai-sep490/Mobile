@@ -10,11 +10,21 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.cleanopsai.app",
       "infoPlist": {
-        "NSCameraUsageDescription": "CleanOps cần camera để chụp ảnh kiểm tra trước/sau khi dọn dẹp."
+        "NSCameraUsageDescription": "CleanOps cần camera để chụp ảnh kiểm tra trước/sau khi dọn dẹp.",
+        "UIBackgroundModes": [
+          "fetch",
+          "remote-notification",
+          "fetch",
+          "remote-notification"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
+      "package": "com.cleanopsai.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -30,6 +40,8 @@
     },
     "plugins": [
       "expo-router",
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging",
       [
         "expo-splash-screen",
         {
@@ -46,6 +58,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "36dc2259-2103-4371-ada8-62a2337eeed3"
+      }
     }
   }
 }

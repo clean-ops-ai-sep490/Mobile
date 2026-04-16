@@ -1,5 +1,5 @@
+import axiosInstance from "@/config/axiosInstance";
 import { useState } from "react";
-import axiosInstance from "../config/axiosInstance";
 
 // Types
 export interface TaskStepExecutionDto {
@@ -15,6 +15,19 @@ export interface StartTaskDto {
   steps: TaskStepExecutionDto[];
 }
 
+export interface TaskStepSnapshotDto {
+  id: string; // TaskStepExecution ID
+  sopStepId: string;
+  stepOrder: number;
+  status: string; // "InProgress" | "NotStarted" | "Completed"
+  configSnapshot: {
+    detail: any;
+    schema: any;
+  };
+  resultData: any;
+  nextStepId: string | null;
+}
+
 export interface TaskAssignmentDto {
   id: string;
   taskScheduleId: string;
@@ -25,19 +38,20 @@ export interface TaskAssignmentDto {
   isAdhocTask: boolean;
   nameAdhocTask?: string;
   displayLocation?: string;
+  steps: TaskStepSnapshotDto[];
 }
 
 export enum TaskAssignmentStatus {
-  NotStarted = 0,
-  InProgress = 1,
-  Completed = 2,
-  Block = 3,
+  NotStarted = "Chưa bắt đầu",
+  InProgress = "Đang thực hiện",
+  Completed = "Hoàn thành",
+  Block = "Bị chặn",
 }
 
 export interface TaskAssignmentFilter {
   assigneeId?: string;
   workAreaId?: string;
-  status?: TaskAssignmentStatus;
+  status?: TaskAssignmentStatus | string;
   fromDate?: string;
   toDate?: string;
   isAdhocTask?: boolean;
@@ -95,7 +109,7 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
       return response.data;
     } catch (err: any) {
       const message =
-        err?.response?.data?.message || err?.message || "An error occurred";
+        err?.response?.data?.message || err?.message || "Đã xảy ra lỗi";
       setError(message);
       return null;
     } finally {
@@ -115,11 +129,11 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
       return response.data;
     } catch (err: any) {
       if (err?.response?.status === 404) {
-        setError("Task assignment not found");
+        setError("Không tìm thấy công việc");
         return null;
       }
       const message =
-        err?.response?.data?.message || err?.message || "An error occurred";
+        err?.response?.data?.message || err?.message || "Đã xảy ra lỗi";
       setError(message);
       return null;
     } finally {
@@ -127,7 +141,6 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
     }
   };
 
-  // Start a task
   const startTask = async (
     taskAssignmentId: string,
     workerId: string,
@@ -135,17 +148,17 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
     setLoading(true);
     setError(null);
 
+    const url = `${baseUrl}/${taskAssignmentId}/start`;
+    const payload = { workerId };
+
     try {
-      const response = await axiosInstance.post(
-        `${baseUrl}/${taskAssignmentId}/start`,
-        { workerId },
-      );
+      const response = await axiosInstance.post(url, payload);
       return response.data;
     } catch (err: any) {
-      const message =
-        err?.response?.data?.message || err?.message || "An error occurred";
+      const errorData = err?.response?.data;
+      const message = errorData?.message || err?.message || "Đã xảy ra lỗi";
       setError(message);
-      return null;
+      throw new Error(message);
     } finally {
       setLoading(false);
     }
@@ -164,11 +177,11 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
       return response.data;
     } catch (err: any) {
       if (err?.response?.status === 404) {
-        setError("Task assignment not found");
+        setError("Không tìm thấy công việc");
         return null;
       }
       const message =
-        err?.response?.data?.message || err?.message || "An error occurred";
+        err?.response?.data?.message || err?.message || "Đã xảy ra lỗi";
       setError(message);
       return null;
     } finally {
@@ -189,11 +202,11 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
       return true;
     } catch (err: any) {
       if (err?.response?.status === 404) {
-        setError("Task assignment not found");
+        setError("Không tìm thấy công việc");
         return false;
       }
       const message =
-        err?.response?.data?.message || err?.message || "An error occurred";
+        err?.response?.data?.message || err?.message || "Đã xảy ra lỗi";
       setError(message);
       return false;
     } finally {
@@ -211,13 +224,35 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
       return true;
     } catch (err: any) {
       if (err?.response?.status === 404) {
-        setError("Task assignment not found");
+        setError("Không tìm thấy công việc");
         return false;
       }
       const message =
-        err?.response?.data?.message || err?.message || "An error occurred";
+        err?.response?.data?.message || err?.message || "Đã xảy ra lỗi";
       setError(message);
       return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const completeTask = async (
+    taskAssignmentId: string,
+    workerId: string,
+  ): Promise<StartTaskDto | null> => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const url = `${baseUrl}/${taskAssignmentId}/complete`;
+      const payload = { workerId };
+      const response = await axiosInstance.post<StartTaskDto>(url, payload);
+      return response.data;
+    } catch (err: any) {
+      const errorData = err?.response?.data;
+      const message = errorData?.message || err?.message || "An error occurred";
+      setError(message);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -232,5 +267,6 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
     updateTaskAssignment,
     updateTaskAssignmentStatus,
     deleteTaskAssignment,
+    completeTask,
   };
 };

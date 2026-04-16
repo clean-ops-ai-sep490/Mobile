@@ -11,11 +11,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import ProfileScreen from "@/screens/shared/ProfileScreen";
 
 // ─── Import worker screens ────────────────────────────────────────────────────
-import AdhocRequestScreen from "@/screens/worker/AdhocRequestScreen";
 import EmergencyLeaveScreen from "@/screens/worker/EmergencyLeaveScreen";
 import HomeScreen from "@/screens/worker/HomeScreen";
-import IssueReportScreen from "@/screens/worker/IssueReportScreen";
-import RequestEquipmentScreen from "@/screens/worker/RequestEquipmentScreen";
 import RequestSwapTaskScreen from "@/screens/worker/RequestSwapTaskScreen";
 import TaskExecutionScreen from "@/screens/worker/TaskExecutionScreen";
 import TaskListScreen from "@/screens/worker/TaskListScreen";
@@ -26,15 +23,15 @@ import LoginScreen from "@/screens/auth/LoginScreen";
 import OTPVerificationScreen from "@/screens/auth/OtpVerificationScreen";
 import ResetPasswordScreen from "@/screens/auth/ResetPasswordScreen";
 import ResetSuccessScreen from "@/screens/auth/ResetSuccessScreen";
+import InspectionCameraScreen from "@/screens/shared/CameraScreen";
+import { NotificationListScreen } from "@/screens/shared/NotificationListScreen";
+import QRScannerScreen from "@/screens/shared/QRScannerScreen";
 import CreateEmergencyTaskScreen from "@/screens/supervisor/adhoc-task/CreateEmergencyTaskScreen";
 import SupervisorHomeScreen from "@/screens/supervisor/home/SupervisorHomeScreen";
 import SwapRequestDetailScreen from "@/screens/supervisor/swap-task/SwapRequestDetailScreen";
 import SwapRequestListScreen from "@/screens/supervisor/swap-task/SwapRequestListScreen";
-import EmergencyLeaveDetailScreen from "@/screens/worker/EmergencyLeaveDetailScreen";
-import EquipmentRequestDetailScreen from "@/screens/worker/EquipmentRequestDetailScreen";
-import IssueReportDetailScreen from "@/screens/worker/IssueReportDetailScreen";
 import ListAllRequestsScreen from "@/screens/worker/ListAllRequestsScreen";
-import TaskSwapDetailScreen from "@/screens/worker/TaskSwapDetailScreen";
+import WorkerProfileScreen from "@/screens/worker/WorkerProfileScreen";
 
 // ─── Auth Route params ──────────────────────────────────────────────────────
 export type AuthStackParamList = {
@@ -49,18 +46,25 @@ export type AuthStackParamList = {
 export type WorkerStackParamList = {
   Home: undefined;
   EmergencyLeave: undefined;
-  Profile: undefined;
+  WorkerProfile: undefined;
   Tasks: undefined;
   IssueReport: undefined;
   RequestEquipment: undefined;
   SwapTask: undefined;
-  AdhocRequest: undefined;
   ListAllRequests: undefined;
   EmergencyLeaveDetail: { id: string };
   IssueReportDetail: { id: string };
   TaskSwapDetail: { id: string };
   EquipmentRequestDetail: { id: string; item?: any };
   TaskExecution: { id: string; steps?: any[] };
+  QRScannerScreen: {
+    onScanned: (result: any) => void;
+  };
+  InspectionCameraScreen: {
+    mode?: "selfie" | "inspection";
+    onCaptured?: (photo: any) => void;
+  };
+  Notifications: undefined;
 };
 
 // ─── Supervisor Route params ──────────────────────────────────────────────────
@@ -70,6 +74,7 @@ export type SupervisorStackParamList = {
   SwapRequestList: undefined;
   SwapRequestDetail: { requestId: string };
   Profile: undefined;
+  Notifications: undefined;
 };
 
 // ─── Combined Route params ────────────────────────────────────────────────────
@@ -162,38 +167,29 @@ function WorkerNavigator() {
         name="EmergencyLeave"
         component={EmergencyLeaveScreen}
       />
-      <WorkerStack.Screen name="Profile" component={ProfileScreen} />
-      <WorkerStack.Screen name="Tasks" component={TaskListScreen} />
-      <WorkerStack.Screen name="IssueReport" component={IssueReportScreen} />
       <WorkerStack.Screen
-        name="RequestEquipment"
-        component={RequestEquipmentScreen}
+        name="WorkerProfile"
+        component={WorkerProfileScreen}
       />
+      <WorkerStack.Screen name="Tasks" component={TaskListScreen} />
       <WorkerStack.Screen name="SwapTask" component={RequestSwapTaskScreen} />
-      <WorkerStack.Screen name="AdhocRequest" component={AdhocRequestScreen} />
       <WorkerStack.Screen
         name="ListAllRequests"
         component={ListAllRequestsScreen}
       />
       <WorkerStack.Screen
-        name="EmergencyLeaveDetail"
-        component={EmergencyLeaveDetailScreen}
-      />
-      <WorkerStack.Screen
-        name="IssueReportDetail"
-        component={IssueReportDetailScreen}
-      />
-      <WorkerStack.Screen
-        name="TaskSwapDetail"
-        component={TaskSwapDetailScreen}
-      />
-      <WorkerStack.Screen
-        name="EquipmentRequestDetail"
-        component={EquipmentRequestDetailScreen}
-      />
-      <WorkerStack.Screen
         name="TaskExecution"
         component={TaskExecutionScreen}
+      />
+      <WorkerStack.Screen name="QRScannerScreen" component={QRScannerScreen} />
+
+      <WorkerStack.Screen
+        name="InspectionCameraScreen"
+        component={InspectionCameraScreen}
+      />
+      <WorkerStack.Screen
+        name="Notifications"
+        component={NotificationListScreen}
       />
     </WorkerStack.Navigator>
   );
@@ -223,6 +219,10 @@ function SupervisorNavigator() {
         component={SwapRequestDetailScreen}
       />
       <SupervisorStack.Screen name="Profile" component={ProfileScreen} />
+      <SupervisorStack.Screen
+        name="Notifications"
+        component={NotificationListScreen}
+      />
     </SupervisorStack.Navigator>
   );
 }

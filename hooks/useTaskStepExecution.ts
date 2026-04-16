@@ -15,6 +15,7 @@ export const useTaskStepExecution = () => {
 
   const completeStep = useCallback(
     async (stepId: string, payload: { workerId: string; resultData: any }) => {
+      console.log("➡️ API call /TaskStepExecutions", stepId, payload);
       try {
         setLoading(true);
         const res = await axiosInstance.post<TaskStepExecutionDto>(
@@ -23,10 +24,12 @@ export const useTaskStepExecution = () => {
         );
         return res.data;
       } catch (err: any) {
+        console.error("❌ API error:", err?.response?.data || err.message);
         setError(
-          err?.response?.data?.message ||
+          err?.response?.data?.detail || // ✅ đúng field
+            err?.response?.data?.title ||
             err?.message ||
-            "Failed to complete step",
+            "Hoàn thành bước thất bại",
         );
         throw err;
       } finally {
@@ -45,7 +48,7 @@ export const useTaskStepExecution = () => {
       return res.data;
     } catch (err: any) {
       setError(
-        err?.response?.data?.message || err?.message || "Failed to fetch step",
+        err?.response?.data?.message || err?.message || "Lấy bước thất bại",
       );
       throw err;
     } finally {

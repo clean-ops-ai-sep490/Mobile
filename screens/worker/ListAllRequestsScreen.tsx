@@ -7,7 +7,11 @@ import {
 } from "@/hooks/useEmergencyLeave";
 import useEquipment, { EquipmentRequestItem } from "@/hooks/useEquipment";
 import { IssueReport, useIssueReport } from "@/hooks/useIssueReport";
-import { TaskSwapRequestListItem, useTaskSwap } from "@/hooks/useTaskSwap";
+import {
+  SwapRequest,
+  TaskSwapRequestListItem,
+  useTaskSwap,
+} from "@/hooks/useTaskSwap";
 import { WorkerStackParamList } from "@/navigation/AppNavigator";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -22,6 +26,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import EmergencyLeaveDetailModal from "./EmergencyLeaveDetailModal";
+import EquipmentRequestDetailModal from "./EquipmentRequestDetailModal";
+import IssueReportDetailModal from "./IssueReportDetailModal";
+import TaskSwapDetailModal from "./TaskSwapDetailModal";
 
 type Props = NativeStackScreenProps<WorkerStackParamList, "ListAllRequests">;
 
@@ -36,10 +44,14 @@ interface TabConfig {
 }
 
 const TABS: TabConfig[] = [
-  { key: "equipment", label: "Equipment", icon: "cube-outline" },
-  { key: "issue", label: "Issue Reports", icon: "warning-outline" },
-  { key: "swap", label: "Task Swaps", icon: "swap-horizontal-outline" },
-  { key: "emergency", label: "Emergency Leave", icon: "medkit-outline" },
+  { key: "equipment", label: "Yêu cầu thiết bị", icon: "cube-outline" },
+  { key: "issue", label: "Báo cáo sự cố", icon: "warning-outline" },
+  {
+    key: "swap",
+    label: "Yêu cầu đổi công việc",
+    icon: "swap-horizontal-outline",
+  },
+  { key: "emergency", label: "Nghỉ khẩn cấp", icon: "medkit-outline" },
 ];
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
@@ -122,14 +134,10 @@ function EquipmentCard({ item }: { item: EquipmentRequestItem }) {
   return (
     <Card>
       <CardHeader
-        title={`Equipment · ${item.equipmentId}`}
-        status={item.status ?? "Pending"}
-        date={item.createdAt}
+        title={`Yêu cầu thiết bị`}
+        status={item.status ?? "Đang chờ"}
+        date={item?.created}
       />
-      <View style={styles.divider} />
-      <CardRow label="Task Assignment" value={item.taskAssignmentId} />
-      <CardRow label="Quantity" value={String(item.quantity)} />
-      <CardRow label="Reason" value={item.reason} />
     </Card>
   );
 }
@@ -137,18 +145,14 @@ function EquipmentCard({ item }: { item: EquipmentRequestItem }) {
 // ─── Issue card ───────────────────────────────────────────────────────────────
 
 function IssueCard({ item }: { item: IssueReport }) {
-  const preview =
-    item.description.length > 70
-      ? item.description.slice(0, 70) + "…"
-      : item.description;
+  const preview = "Báo cáo sự cố";
   return (
     <Card>
       <CardHeader title={preview} status={item.status} date={item.created} />
       <View style={styles.divider} />
-      <CardRow label="Task Assignment" value={item.taskAssignmentId} />
       {item.resolvedAt && (
         <CardRow
-          label="Resolved At"
+          label="Đã xử lý vào"
           value={new Date(item.resolvedAt).toLocaleDateString("vi-VN")}
         />
       )}
@@ -163,33 +167,28 @@ function EmergencyCard({ item }: { item: EmergencyLeaveRequestDto }) {
     ? item.transcription.length > 70
       ? item.transcription.slice(0, 70) + "…"
       : item.transcription
-    : `Emergency Leave · #${item.id.slice(0, 8)}`;
+    : `Nghỉ khẩn cấp`;
   return (
     <Card>
       <CardHeader title={preview} status={item.status} date={item.created} />
       <View style={styles.divider} />
-      <CardRow label="Task Assignment" value={item.taskAssignmentId} />
+      <CardRow label="Công việc" value={item.taskAssignmentId} />
       {item.transcription && (
-        <CardRow label="Transcription" value={item.transcription} />
+        <CardRow label="Bản ghi" value={item.transcription} />
       )}
-      <CardRow label="Reviewed By" value={item.reviewedByUserId ?? undefined} />
+      <CardRow label="Đã xem bởi" value={item.reviewedByUserId ?? undefined} />
     </Card>
   );
 }
 
 // ─── Swap card ────────────────────────────────────────────────────────────────
 
-function SwapCard({ item }: { item: TaskSwapRequestListItem }) {
+function SwapCard({ item }: { item: SwapRequest }) {
   return (
     <Card>
-      <CardHeader
-        title={`Swap · #${item.id.slice(0, 8)}`}
-        status={item.status}
-      />
+      <CardHeader title={`Đổi công việc`} status={item.status} />
       <View style={styles.divider} />
-      <CardRow label="Task Assignment" value={item.taskAssignmentId} />
-      <CardRow label="Target Worker" value={item.targetWorkerId ?? "—"} />
-      <CardRow label="Reviewed By" value={item.reviewedByUserId ?? undefined} />
+      <CardRow label="Người nhận" value={item.targetWorkerName ?? "—"} />
     </Card>
   );
 }
@@ -212,7 +211,7 @@ function Empty({ label }: { label: string }) {
   return (
     <View style={styles.emptyWrap}>
       <Ionicons name="document-outline" size={40} color="#CBD5E1" />
-      <Text style={styles.emptyText}>No {label} found</Text>
+      <Text style={styles.emptyText}>Không tìm thấy {label}</Text>
     </View>
   );
 }
@@ -239,6 +238,14 @@ export default function MyRequestsScreen({ navigation }: Props) {
   const [issItems, setIssItems] = useState<IssueReport[]>([]);
   const [swItems, setSwItems] = useState<TaskSwapRequestListItem[]>([]);
   const [elItems, setElItems] = useState<EmergencyLeaveRequestDto[]>([]);
+  const [emModalVisible, setEmModalVisible] = useState(false);
+  const [emModalId, setEmModalId] = useState<string | null>(null);
+  const [issueModalVisible, setIssueModalVisible] = useState(false);
+  const [issueModalId, setIssueModalId] = useState<string | null>(null);
+  const [swapModalVisible, setSwapModalVisible] = useState(false);
+  const [swapModalId, setSwapModalId] = useState<string | null>(null);
+  const [equipmentModalVisible, setEquipmentModalVisible] = useState(false);
+  const [equipmentModalItem, setEquipmentModalItem] = useState<any>(null);
 
   const isLoading =
     eqLoading || issLoading || swLoading || elLoading || loadingWorker;
@@ -281,10 +288,27 @@ export default function MyRequestsScreen({ navigation }: Props) {
     fetchAll();
   }, [fetchAll]);
 
+  const openEmergencyModal = (item: EmergencyLeaveRequestDto) => {
+    setEmModalId(item.id);
+    setEmModalVisible(true);
+  };
+  const openIssueModal = (item: IssueReport) => {
+    setIssueModalId(item.id);
+    setIssueModalVisible(true);
+  };
+  const openSwapModal = (item: TaskSwapRequestListItem) => {
+    setSwapModalId(item.id);
+    setSwapModalVisible(true);
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
     await fetchAll();
     setRefreshing(false);
+  };
+  const openEquipmentModal = (item: EquipmentRequestItem) => {
+    setEquipmentModalItem(item);
+    setEquipmentModalVisible(true);
   };
 
   const counts: Record<TabKey2, number> = {
@@ -302,7 +326,7 @@ export default function MyRequestsScreen({ navigation }: Props) {
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" />
 
-      <Header title="My Requests" onBack={() => navigation.goBack()} />
+      <Header title="Yêu cầu của tôi" onBack={() => navigation.goBack()} />
 
       {/* ── Tab bar ── */}
       <View style={styles.tabBar}>
@@ -376,12 +400,7 @@ export default function MyRequestsScreen({ navigation }: Props) {
                   <TouchableOpacity
                     key={item.id}
                     activeOpacity={0.8}
-                    onPress={() =>
-                      navigation.navigate("EquipmentRequestDetail", {
-                        id: item.id,
-                        item,
-                      })
-                    }
+                    onPress={() => openEquipmentModal(item)}
                   >
                     <EquipmentCard item={item} />
                   </TouchableOpacity>
@@ -396,9 +415,7 @@ export default function MyRequestsScreen({ navigation }: Props) {
                   <TouchableOpacity
                     key={item.id}
                     activeOpacity={0.8}
-                    onPress={() =>
-                      navigation.navigate("IssueReportDetail", { id: item.id })
-                    }
+                    onPress={() => openIssueModal(item)}
                   >
                     <IssueCard item={item} />
                   </TouchableOpacity>
@@ -413,9 +430,7 @@ export default function MyRequestsScreen({ navigation }: Props) {
                   <TouchableOpacity
                     key={item.id}
                     activeOpacity={0.8}
-                    onPress={() =>
-                      navigation.navigate("TaskSwapDetail", { id: item.id })
-                    }
+                    onPress={() => openSwapModal(item)}
                   >
                     <SwapCard item={item} />
                   </TouchableOpacity>
@@ -430,11 +445,7 @@ export default function MyRequestsScreen({ navigation }: Props) {
                   <TouchableOpacity
                     key={item.id}
                     activeOpacity={0.8}
-                    onPress={() =>
-                      navigation.navigate("EmergencyLeaveDetail", {
-                        id: item.id,
-                      })
-                    }
+                    onPress={() => openEmergencyModal(item)}
                   >
                     <EmergencyCard item={item} />
                   </TouchableOpacity>
@@ -443,7 +454,27 @@ export default function MyRequestsScreen({ navigation }: Props) {
           </>
         )}
       </ScrollView>
-
+      <EmergencyLeaveDetailModal
+        visible={emModalVisible}
+        leaveId={emModalId!}
+        onClose={() => setEmModalVisible(false)}
+      />
+      <IssueReportDetailModal
+        visible={issueModalVisible}
+        reportId={issueModalId!}
+        onClose={() => setIssueModalVisible(false)}
+      />
+      <EquipmentRequestDetailModal
+        visible={equipmentModalVisible}
+        requestId={equipmentModalItem?.id}
+        item={equipmentModalItem}
+        onClose={() => setEquipmentModalVisible(false)}
+      />
+      <TaskSwapDetailModal
+        visible={swapModalVisible}
+        swapId={swapModalId!}
+        onClose={() => setSwapModalVisible(false)}
+      />
       <BottomTabBar onNavigate={handleNavigate} />
     </SafeAreaView>
   );

@@ -53,7 +53,9 @@ export function SelectedTaskProvider({
 export function useSelectedTask() {
   const ctx = useContext(SelectedTaskContext);
   if (!ctx)
-    throw new Error("useSelectedTask must be used within SelectedTaskProvider");
+    throw new Error(
+      "useSelectedTask phải được sử dụng bên trong SelectedTaskProvider",
+    );
   return ctx;
 }
 

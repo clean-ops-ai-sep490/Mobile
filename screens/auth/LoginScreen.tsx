@@ -43,15 +43,15 @@ export default function LoginScreen({ onNavigate }: Props) {
   const buttonScale = useRef(new Animated.Value(1)).current;
 
   const validateEmail = (value: string) => {
-    if (!value.trim()) return "Email is required";
+    if (!value.trim()) return "Vui lòng nhập email";
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(value)) return "Invalid email format";
+    if (!emailRegex.test(value)) return "Định dạng email không hợp lệ";
     return "";
   };
 
   const validatePassword = (value: string) => {
-    if (!value) return "Password is required";
-    if (value.length < 8) return "Password must be at least 8 characters";
+    if (!value) return "Vui lòng nhập mật khẩu";
+    if (value.length < 8) return "Mật khẩu phải có ít nhất 8 ký tự";
     return "";
   };
 
@@ -135,9 +135,9 @@ export default function LoginScreen({ onNavigate }: Props) {
 
         {/* Card */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Welcome back</Text>
+          <Text style={styles.cardTitle}>Chào mừng quay lại</Text>
           <Text style={styles.cardSubtitle}>
-            Sign in to your account to continue
+            Đăng nhập vào tài khoản của bạn để tiếp tục
           </Text>
 
           {/* Email */}
@@ -180,7 +180,7 @@ export default function LoginScreen({ onNavigate }: Props) {
 
           {/* Password */}
           <View style={styles.fieldWrapper}>
-            <Text style={styles.label}>Password</Text>
+            <Text style={styles.label}>Mật khẩu</Text>
             <View
               style={[
                 styles.inputContainer,
@@ -196,7 +196,7 @@ export default function LoginScreen({ onNavigate }: Props) {
               />
               <TextInput
                 style={styles.input}
-                placeholder="Enter your password"
+                placeholder="Nhập mật khẩu"
                 placeholderTextColor="#8899AA"
                 value={password}
                 onChangeText={(v) => {
@@ -229,7 +229,7 @@ export default function LoginScreen({ onNavigate }: Props) {
             onPress={() => onNavigate("ForgotPassword")}
             style={styles.forgotBtn}
           >
-            <Text style={styles.forgotText}>Forgot Password?</Text>
+            <Text style={styles.forgotText}>Quên mật khẩu?</Text>
           </TouchableOpacity>
 
           {apiError ? (
@@ -252,7 +252,7 @@ export default function LoginScreen({ onNavigate }: Props) {
               {loading ? (
                 <ActivityIndicator color="#0A0F1E" size="small" />
               ) : (
-                <Text style={styles.loginButtonText}>Sign In →</Text>
+                <Text style={styles.loginButtonText}>Đăng nhập →</Text>
               )}
             </TouchableOpacity>
           </Animated.View>

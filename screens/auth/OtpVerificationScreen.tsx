@@ -102,7 +102,7 @@ export default function OTPVerificationScreen({ route, navigation }: Props) {
       setOtp("");
       setError("");
     } catch (e) {
-      setError("Send email failed. Please try again.");
+      setError("Gửi email thất bại. Vui lòng thử lại.");
     } finally {
       setResendLoading(false);
     }
@@ -110,7 +110,7 @@ export default function OTPVerificationScreen({ route, navigation }: Props) {
 
   const handleVerify = async () => {
     if (otp.length < 6) {
-      setError("Please enter all 6 digits");
+      setError("Vui lòng nhập đủ 6 chữ số");
       return;
     }
     try {
@@ -119,7 +119,9 @@ export default function OTPVerificationScreen({ route, navigation }: Props) {
       const token = await verifyOtp(email, otp);
       navigation.navigate("ResetPassword", { email, token });
     } catch (e: any) {
-      setError(e?.response?.data?.message || "OTP is incorrect or expired");
+      setError(
+        e?.response?.data?.message || "OTP không chính xác hoặc đã hết hạn",
+      );
     } finally {
       setVerifyLoading(false);
     }
@@ -155,9 +157,9 @@ export default function OTPVerificationScreen({ route, navigation }: Props) {
             />
           </View>
 
-          <Text style={styles.title}>OTP Verification</Text>
+          <Text style={styles.title}>Xác thực OTP</Text>
           <Text style={styles.subtitle}>
-            Enter the 6-digit code sent to{"\n"}your email address:
+            Nhập mã 6 chữ số đã được gửi đến{"\n"}địa chỉ email của bạn:
           </Text>
           <Text style={styles.emailHighlight}>{email}</Text>
 
@@ -166,10 +168,10 @@ export default function OTPVerificationScreen({ route, navigation }: Props) {
             {error ? <Text style={styles.errorText}>⚠ {error}</Text> : null}
 
             <View style={styles.resendRow}>
-              <Text style={styles.resendLabel}>Did not receive the code? </Text>
+              <Text style={styles.resendLabel}>Không nhận được mã? </Text>
               {canResend ? (
                 <TouchableOpacity onPress={handleResend}>
-                  <Text style={styles.resendLink}>Resend</Text>
+                  <Text style={styles.resendLink}>Gửi lại</Text>
                 </TouchableOpacity>
               ) : (
                 <Text style={styles.resendTimer}>
@@ -179,10 +181,10 @@ export default function OTPVerificationScreen({ route, navigation }: Props) {
             </View>
 
             <AppButton
-              label="Verify Code"
+              label="Xác nhận mã"
               onPress={handleVerify}
               loading={verifyLoading}
-              loadingLabel="Verifying..."
+              loadingLabel="Đang xác minh..."
               disabled={otp.length < 6}
               iconRight="checkmark"
               style={{

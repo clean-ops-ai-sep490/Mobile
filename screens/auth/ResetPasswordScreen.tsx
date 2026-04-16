@@ -56,7 +56,7 @@ export default function ResetPasswordScreen({ route, navigation }: Props) {
     } catch (e: any) {
       setApiError(
         e?.response?.data?.message ||
-          "Failed to reset password. Please try again.",
+          "Đặt lại mật khẩu thất bại. Vui lòng thử lại.",
       );
     } finally {
       setLoading(false);
@@ -88,18 +88,18 @@ export default function ResetPasswordScreen({ route, navigation }: Props) {
             <Ionicons name="lock-open-outline" size={32} color="#4F6EF7" />
           </View>
 
-          <Text style={styles.title}>Reset Password</Text>
+          <Text style={styles.title}>Đặt lại mật khẩu</Text>
           <Text style={styles.subtitle}>
-            Please enter a new password for your account below.
+            Vui lòng nhập mật khẩu mới cho tài khoản của bạn bên dưới.
           </Text>
 
           <View style={styles.card}>
             {/* New password */}
-            <Text style={styles.label}>New Password</Text>
+            <Text style={styles.label}>Mật khẩu mới</Text>
             <View style={styles.inputWrap}>
               <TextInput
                 style={styles.input}
-                placeholder="Enter new password"
+                placeholder="Nhập mật khẩu mới"
                 placeholderTextColor="#8899AA"
                 value={password}
                 onChangeText={setPassword}
@@ -116,14 +116,14 @@ export default function ResetPasswordScreen({ route, navigation }: Props) {
 
             {/* Confirm password */}
             <Text style={[styles.label, { marginTop: 16 }]}>
-              Confirm New Password
+              Xác nhận mật khẩu mới
             </Text>
             <View
               style={[styles.inputWrap, matchError ? styles.inputError : null]}
             >
               <TextInput
                 style={styles.input}
-                placeholder="Re-enter new password"
+                placeholder="Nhập lại mật khẩu mới"
                 placeholderTextColor="#8899AA"
                 value={confirm}
                 onChangeText={setConfirm}
@@ -139,15 +139,15 @@ export default function ResetPasswordScreen({ route, navigation }: Props) {
               </TouchableOpacity>
             </View>
             {matchError ? (
-              <Text style={styles.errorText}>⚠ Passwords do not match</Text>
+              <Text style={styles.errorText}>⚠ Mật khẩu không khớp</Text>
             ) : null}
 
             {/* Requirements */}
             <View style={styles.reqBox}>
-              <Text style={styles.reqTitle}>Password Requirements</Text>
-              <Requirement met={hasLength} label="At least 8 characters" />
-              <Requirement met={hasCase} label="Upper and lowercase letters" />
-              <Requirement met={hasNumber} label="At least one number" />
+              <Text style={styles.reqTitle}>Yêu cầu mật khẩu</Text>
+              <Requirement met={hasLength} label="Ít nhất 8 ký tự" />
+              <Requirement met={hasCase} label="Chữ hoa và chữ thường" />
+              <Requirement met={hasNumber} label="Ít nhất một chữ số" />
             </View>
 
             {apiError ? (
@@ -155,10 +155,10 @@ export default function ResetPasswordScreen({ route, navigation }: Props) {
             ) : null}
 
             <AppButton
-              label="Update Password"
+              label="Cập nhật mật khẩu"
               onPress={handleSubmit}
               loading={loading}
-              loadingLabel="Updating..."
+              loadingLabel="Đang cập nhật..."
               disabled={!allMet || !confirm}
               iconRight="checkmark-circle-outline"
               style={{

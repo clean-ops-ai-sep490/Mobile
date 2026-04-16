@@ -1,13 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import {
-    ActivityIndicator,
-    StyleProp,
-    StyleSheet,
-    Text,
-    TextStyle,
-    TouchableOpacity,
-    ViewStyle,
+  ActivityIndicator,
+  StyleProp,
+  StyleSheet,
+  Text,
+  TextStyle,
+  TouchableOpacity,
+  ViewStyle,
 } from "react-native";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
@@ -113,7 +113,7 @@ export default function AppButton({
               textStyle,
             ]}
           >
-            {loadingLabel ?? "Loading..."}
+            {loadingLabel ?? "Đang xử lý..."}
           </Text>
         </>
       ) : (

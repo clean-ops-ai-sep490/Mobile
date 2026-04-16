@@ -29,7 +29,8 @@ interface AuthContextType {
     token: string,
     newPassword: string,
   ) => Promise<void>;
-  getWorkerProfile: () => Promise<any>; // ✅ Thêm khai báo hàm ở đây
+  getWorkerProfile: () => Promise<any>;
+  updateWorkerProfile: (id: string, formData: any) => Promise<any>;
 }
 
 // ─── Context ───────────────────────────────────────────────────
@@ -45,7 +46,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     forgotPassword: forgotPasswordApi,
     resetPassword: resetPasswordApi,
     verifyOtp: verifyOtpApi,
-    getWorkerProfile, // ✅ Lấy hàm này từ useAuthHook
+    getWorkerProfile,
+    updateWorkerProfile,
   } = useAuthHook();
 
   const [appUser, setAppUser] = useState<AuthUser | null>(null);
@@ -188,6 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         verifyOtp,
         resetPassword,
         getWorkerProfile, // ✅ Export ra cho toàn app dùng được
+        updateWorkerProfile, // ✅ Export ra cho toàn app dùng được
       }}
     >
       {children}
@@ -198,7 +201,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 // ─── Hook dùng global ──────────────────────────────────────────
 export function useAuth(): AuthContextType {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
+  if (!ctx) throw new Error("useAuth phải được sử dụng bên trong AuthProvider");
   return ctx;
 }
 

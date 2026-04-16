@@ -47,6 +47,19 @@ export interface TaskSwapRequestListItem {
   reviewedByUserId?: string;
 }
 
+export interface SwapTaskInfo {
+  taskAssignmentId: string;
+  scheduledStartAt: string;
+  scheduledEndAt: string;
+  displayLocation?: string;
+}
+
+export interface SwapCandidate {
+  workerId: string;
+  assigneeName: string;
+  task: SwapTaskInfo;
+}
+
 export type SwapPerspective = "All" | "Sent" | "Received";
 
 /* ================= HOOK ================= */
@@ -209,7 +222,7 @@ export const useTaskSwap = () => {
       try {
         setLoading(true);
 
-        const res = await axiosInstance.get<PaginatedResult<any>>(
+        const res = await axiosInstance.get<PaginatedResult<SwapCandidate>>(
           `/TaskSwapRequests/${taskAssignmentId}/swap-candidates`,
           {
             params: {
@@ -218,10 +231,14 @@ export const useTaskSwap = () => {
             },
           },
         );
-
         return res.data;
       } catch (err: any) {
-        setError(err.message);
+        console.error("Lỗi lấy danh sách Swap Candidates:", err);
+        const errorMsg =
+          err?.response?.data?.message ||
+          err.message ||
+          "Lấy danh sách ứng viên thất bại";
+        setError(errorMsg);
         throw err;
       } finally {
         setLoading(false);

@@ -1,7 +1,9 @@
 import AppButton from "@/components/common/AppButton";
 import BottomTabBar, { TabKey } from "@/components/common/BottomTabBar";
+import FormattedDate from "@/components/common/FormattedDate";
 import Header from "@/components/common/Header";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTaskAssignments } from "@/hooks/useTaskAssignment";
 import { useTaskSwap } from "@/hooks/useTaskSwap";
 import { WorkerStackParamList } from "@/navigation/AppNavigator";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,14 +27,18 @@ type Props = NativeStackScreenProps<WorkerStackParamList, "SwapTask">;
 export default function SwapTaskScreen({ navigation, route }: Props) {
   const { create, loading, getSwapCandidates } = useTaskSwap();
   const { user } = useAuth();
+  const { getTaskAssignments } = useTaskAssignments();
 
   const currentTaskId = route.params?.taskAssignmentId;
-  const currentUserId = user?.userId || "";
+  const { getWorkerProfile } = useAuth();
+  const [workerId, setWorkerId] = useState<string | null>(null);
+  const [loadingWorker, setLoadingWorker] = useState(false);
 
   const [candidates, setCandidates] = useState<any[]>([]);
   const [selected, setSelected] = useState<any>(null);
   const [reason, setReason] = useState("");
   const [loadingCandidates, setLoadingCandidates] = useState(true);
+  const [currentTask, setCurrentTask] = useState<any>(null);
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -45,6 +51,55 @@ export default function SwapTaskScreen({ navigation, route }: Props) {
   useEffect(() => {
     fetchCandidates();
   }, [currentTaskId]);
+
+  useEffect(() => {
+    if (!currentTaskId || !workerId) return;
+
+    const fetchCurrentTask = async () => {
+      try {
+        // Lấy task assignments của chính worker
+        const res = await getTaskAssignments(
+          {
+            assigneeId: workerId,
+            fromDate: "1970-01-01T00:00:00Z", // hoặc range rộng
+          },
+          {
+            pageNumber: 1,
+            pageSize: 100,
+            sortBy: "scheduledStartAt",
+            sortDescending: false,
+          },
+        );
+
+        const task = res.content.find((t: any) => t.id === currentTaskId);
+        setCurrentTask(task || null);
+      } catch (err) {
+        console.error("Failed to fetch current task", err);
+        setCurrentTask(null);
+      }
+    };
+
+    fetchCurrentTask();
+  }, [currentTaskId, workerId]);
+
+  useEffect(() => {
+    const fetchWorkerId = async () => {
+      try {
+        setLoadingWorker(true);
+        const profile = await getWorkerProfile();
+
+        if (profile && profile.id) {
+          setWorkerId(profile.id);
+        }
+      } catch (error) {
+        console.error("Error fetching worker profile:", error);
+      } finally {
+        setLoadingWorker(false);
+      }
+    };
+
+    fetchWorkerId();
+  }, []);
 
   const fetchCandidates = async () => {
     if (!currentTaskId) return;
@@ -74,20 +129,10 @@ export default function SwapTaskScreen({ navigation, route }: Props) {
     const diffHours = (start.getTime() - now.getTime()) / (1000 * 60 * 60);
 
     if (diffHours < 12) {
-      return { valid: false, reason: "Less than 12h" };
+      return { valid: false, reason: "Ít hơn 12 giờ" };
     }
 
     return { valid: true };
-  };
-
-  /* ================= HELPERS ================= */
-
-  const formatTime = (date: string) => {
-    const d = new Date(date);
-    return d.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
   };
 
   /* ================= ANIMATION ================= */
@@ -109,51 +154,43 @@ export default function SwapTaskScreen({ navigation, route }: Props) {
     ]).start();
   };
 
-  /* ================= POLLING ================= */
-
-  useEffect(() => {
-    let interval: any;
-
-    if (selected) {
-      interval = setInterval(() => {
-        console.log("Checking swap status...");
-      }, 5000);
-    }
-
-    return () => clearInterval(interval);
-  }, [selected]);
-
   /* ================= SUBMIT ================= */
 
   const handleSubmit = () => {
     if (!selected) return;
 
     if (!reason.trim()) {
-      Alert.alert("Missing reason", "Please enter a reason.");
+      Alert.alert("Thiếu lý do", "Vui lòng nhập lý do.");
       return;
     }
 
-    Alert.alert("Confirm Swap", `Swap with ${selected.workerName}?`, [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert("Xác nhận đổi ca", `Đổi với ${selected.assigneeName}?`, [
+      { text: "Hủy", style: "cancel" },
       {
-        text: "Confirm",
+        text: "Xác nhận",
         onPress: async () => {
           try {
             await create({
               taskAssignmentId: currentTaskId,
               targetTaskAssignmentId: selected.task.taskAssignmentId,
-              requesterId: currentUserId,
+              requesterId: workerId || "",
               targetWorkerId: selected.workerId,
               requesterNote: reason,
             });
 
-            navigation.goBack();
+            Alert.alert("Thành công", "Yêu cầu đổi ca đã được gửi.", [
+              { text: "OK", onPress: () => navigation.goBack() },
+            ]);
           } catch (e: any) {
             console.error(
               "Error submitting swap request:",
               e.response?.data || "Unknown error",
             );
-            // Alert.alert("Error", "Swap failed");
+            Alert.alert(
+              "Lỗi",
+              e.response?.data?.message ||
+                "Gửi yêu cầu đổi ca thất bại. Vui lòng thử lại.",
+            );
           }
         },
       },
@@ -184,11 +221,18 @@ export default function SwapTaskScreen({ navigation, route }: Props) {
         >
           <View style={styles.rowBetween}>
             <View>
-              <Text style={styles.name}>{item.workerName}</Text>
+              <Text style={styles.name}>{item.assigneeName}</Text>
               <Text style={styles.location}>{item.task.displayLocation}</Text>
               <Text style={styles.time}>
-                {formatTime(item.task.scheduledStartAt)} -{" "}
-                {formatTime(item.task.scheduledEndAt)}
+                <FormattedDate
+                  dateString={item.task.scheduledStartAt}
+                  style={styles.time}
+                />{" "}
+                -{" "}
+                <FormattedDate
+                  dateString={item.task.scheduledEndAt}
+                  style={styles.time}
+                />
               </Text>
 
               {!validation.valid && (
@@ -209,17 +253,38 @@ export default function SwapTaskScreen({ navigation, route }: Props) {
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" />
 
-      <Header title="Swap Task" onBack={() => navigation.goBack()} />
+      <Header
+        title="Yêu cầu đổi công việc"
+        onBack={() => navigation.goBack()}
+      />
 
       <ScrollView contentContainerStyle={styles.container}>
         {/* YOUR TASK */}
-        <Text style={styles.section}>Your Task</Text>
-        <View style={styles.yourTask}>
-          <Text style={styles.bold}>Task ID: {currentTaskId}</Text>
-        </View>
+        <Text style={styles.section}>Công việc của bạn</Text>
+        {currentTask ? (
+          <View style={styles.taskCard}>
+            <Text style={styles.rowTitle}>
+              {currentTask.isAdhocTask && currentTask.nameAdhocTask
+                ? `Ad-hoc: ${currentTask.nameAdhocTask}`
+                : `Schedule: `}
+              <FormattedDate
+                dateString={currentTask.scheduledStartAt}
+                style={styles.rowTitle}
+              />
+            </Text>
+            <Text style={styles.rowSub}>
+              {currentTask.displayLocation || "No location assigned"}
+            </Text>
+            <View style={styles.statusBadge}>
+              <Text style={styles.statusText}>{currentTask.status}</Text>
+            </View>
+          </View>
+        ) : (
+          <Text style={styles.empty}>Loading task...</Text>
+        )}
 
         {/* SELECT */}
-        <Text style={styles.section}>Select Target Task</Text>
+        <Text style={styles.section}>Chọn công việc thay thế</Text>
 
         {loadingCandidates ? (
           <>
@@ -228,26 +293,16 @@ export default function SwapTaskScreen({ navigation, route }: Props) {
             ))}
           </>
         ) : candidates.length === 0 ? (
-          <Text style={styles.empty}>No available tasks to swap</Text>
+          <Text style={styles.empty}>Không có công việc khả dụng để đổi</Text>
         ) : (
           candidates.map(renderCandidate)
         )}
 
-        {/* PREVIEW */}
-        {selected && (
-          <View style={styles.preview}>
-            <Text style={styles.previewTitle}>Swap Preview</Text>
-            <Text>Your Task → {currentTaskId}</Text>
-            <Text>With → {selected.workerName}</Text>
-            <Text>Target → {selected.task.displayLocation}</Text>
-          </View>
-        )}
-
         {/* REASON */}
-        <Text style={styles.section}>Reason</Text>
+        <Text style={styles.section}>Lý do</Text>
         <TextInput
           style={styles.input}
-          placeholder="Enter reason..."
+          placeholder="Nhập lý do..."
           value={reason}
           onChangeText={setReason}
           multiline
@@ -255,7 +310,7 @@ export default function SwapTaskScreen({ navigation, route }: Props) {
 
         {/* ACTION */}
         <AppButton
-          label="Submit Swap Request"
+          label="Gửi yêu cầu đổi"
           onPress={handleSubmit}
           loading={loading}
           disabled={!selected || !reason.trim() || loading}
@@ -357,4 +412,26 @@ const styles = StyleSheet.create({
   },
 
   bold: { fontWeight: "700" },
+  taskCard: {
+    backgroundColor: "#FFF",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  rowTitle: { fontSize: 15, fontWeight: "700", color: "#0f172a" },
+  rowSub: { fontSize: 13, color: "#64748b", marginTop: 6 },
+  statusBadge: {
+    marginTop: 10,
+    backgroundColor: "#f0f9ff",
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#bae6fd",
+  },
+  statusText: { fontSize: 11, fontWeight: "600", color: "#0369a1" },
+  empty: { padding: 20, textAlign: "center", color: "#94a3b8" },
 });

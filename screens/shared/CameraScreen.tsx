@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { CameraView, FlashMode, useCameraPermissions } from "expo-camera";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
@@ -41,13 +42,23 @@ const MAX_ZOOM = 1;
 const ZOOM_SENSITIVITY = 0.005;
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
-export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
+export default function InspectionCameraScreen(props: Props) {
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+
+  const { mode, onCaptured } = route.params || {};
+
+  const isSelfie = mode === "selfie";
+
+  const onClose = props.onClose;
+  const onSubmit = props.onSubmit;
   const [permission, requestPermission] = useCameraPermissions();
   const [flash, setFlash] = useState<FlashMode>("off");
   const [gridVisible, setGridVisible] = useState(true);
   const [photos, setPhotos] = useState<CapturedPhoto[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const [zoom, setZoom] = useState(MIN_ZOOM);
   const zoomRef = useRef(MIN_ZOOM);
@@ -55,8 +66,15 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
   const [zoomBarVisible, setZoomBarVisible] = useState(false);
   const zoomBarOpacity = useRef(new Animated.Value(0)).current;
   const zoomBarTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [facing, setFacing] = useState<"back" | "front">("back");
 
   const cameraRef = useRef<CameraView>(null);
+
+  useEffect(() => {
+    if (isSelfie) {
+      setFacing("front");
+    }
+  }, [isSelfie]);
 
   // ── No permission yet ──────────────────────────────────────────────────────
   if (!permission) return <View style={styles.container} />;
@@ -67,18 +85,18 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
         <View style={styles.permissionIconWrap}>
           <Ionicons name="camera-outline" size={52} color="#94A3B8" />
         </View>
-        <Text style={styles.permissionTitle}>Camera Access Required</Text>
+        <Text style={styles.permissionTitle}>Cần quyền truy cập Camera</Text>
         <Text style={styles.permissionText}>
-          CleanOps needs camera access to capture inspection photos.
+          CleanOps cần quyền truy cập camera để chụp ảnh kiểm tra.
         </Text>
         <TouchableOpacity
           style={styles.permissionBtn}
           onPress={requestPermission}
         >
-          <Text style={styles.permissionBtnText}>Grant Permission</Text>
+          <Text style={styles.permissionBtnText}>Cho phép truy cập</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.permissionCancel} onPress={onClose}>
-          <Text style={styles.permissionCancelText}>Cancel</Text>
+          <Text style={styles.permissionCancelText}>Hủy</Text>
         </TouchableOpacity>
       </View>
     );
@@ -142,37 +160,132 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
       setCapturing(true);
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
       if (!photo) return;
-      setPhotos((prev) => [
-        ...prev,
-        {
-          uri: photo.uri,
-          timestamp: new Date().toLocaleTimeString("en-US", {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-        },
-      ]);
+
+      const newPhoto = {
+        uri: photo.uri,
+        timestamp: new Date().toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      };
+
+      // 🔥 SELFIE → overwrite (1 ảnh)
+      if (isSelfie) {
+        setPhotos([newPhoto]);
+      } else {
+        setPhotos((prev) => [...prev, newPhoto]);
+      }
     } catch {
-      Alert.alert("Error", "Failed to capture photo. Please try again.");
+      Alert.alert("Lỗi", "Chụp ảnh thất bại. Vui lòng thử lại.");
     } finally {
       setCapturing(false);
     }
   };
-
   const handleDelete = (index: number) => {
     setPhotos((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // const handleSubmit = () => {
+  //   if (photos.length === 0) {
+  //     Alert.alert(
+  //       "Không có ảnh",
+  //       "Vui lòng chụp ít nhất một ảnh trước khi gửi.",
+  //     );
+  //     return;
+  //   }
+  //   if (isSelfie) {
+  //     // Upload selfie first, then return server URL
+  //     (async () => {
+  //       try {
+  //         setUploading(true);
+  //         const uploaded = await uploadPhotos(photos);
+  //         const p = uploaded[0] ?? photos[0];
+  //         onCaptured?.(p as CapturedPhoto);
+  //         navigation.goBack();
+  //       } catch (err) {
+  //         Alert.alert("Lỗi", "Upload ảnh thất bại. Vui lòng thử lại.");
+  //       } finally {
+  //         setUploading(false);
+  //       }
+  //     })();
+  //     return;
+  //   }
+
+  //   // 🔥 INSPECTION FLOW (Modal)
+  //   (async () => {
+  //     try {
+  //       setUploading(true);
+  //       const uploaded = await uploadPhotos(photos);
+  //       onSubmit?.(uploaded);
+  //       onClose?.();
+  //     } catch (err) {
+  //       Alert.alert("Lỗi", "Upload ảnh thất bại. Vui lòng thử lại.");
+  //     } finally {
+  //       setUploading(false);
+  //     }
+  //   })();
+  // };
+
+  // Upload photos to backend endpoint. Backend must accept multipart/form-data
+  // and return an array of uploaded file URLs (or array of objects with `url`).
+
   const handleSubmit = () => {
     if (photos.length === 0) {
       Alert.alert(
-        "No Photos",
-        "Please capture at least one photo before submitting.",
+        "Không có ảnh",
+        "Vui lòng chụp ít nhất một ảnh trước khi gửi.",
       );
       return;
     }
+    if (isSelfie) {
+      onCaptured?.(photos[0]);
+      navigation.goBack();
+      return;
+    }
+
     onSubmit?.(photos);
+    onClose?.();
   };
+
+  // const getFilenameFromUri = (uri: string) => {
+  //   const parts = uri.split("/");
+  //   return parts[parts.length - 1] || `photo-${Date.now()}.jpg`;
+  // };
+
+  // const uploadPhotos = async (
+  //   items: CapturedPhoto[],
+  // ): Promise<CapturedPhoto[]> => {
+  //   if (!items || items.length === 0) return [];
+
+  //   const formData = new FormData();
+  //   items.forEach((p, i) => {
+  //     // name must include extension
+  //     formData.append("files", {
+  //       uri: p.uri,
+  //       name: getFilenameFromUri(p.uri),
+  //       type: "image/jpeg",
+  //     } as any);
+  //   });
+
+  //   // Adjust endpoint path to your backend upload route
+  //   const res = await axiosInstance.post("/files/upload", formData, {
+  //     headers: { "Content-Type": "multipart/form-data" },
+  //   });
+
+  //   // Expect response.data to be an array of urls or objects { url }
+  //   const data = res.data;
+  //   if (!Array.isArray(data)) return items;
+
+  //   const urls: string[] = data
+  //     .map((it: any) => (typeof it === "string" ? it : it.url || it.uri))
+  //     .filter(Boolean);
+
+  //   // Map back to CapturedPhoto shape with timestamp preserved
+  //   return urls.map((u, idx) => ({
+  //     uri: u,
+  //     timestamp: items[idx]?.timestamp ?? new Date().toISOString(),
+  //   }));
+  // };
 
   // ── UI ─────────────────────────────────────────────────────────────────────
   return (
@@ -191,7 +304,7 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
           <CameraView
             ref={cameraRef}
             style={styles.camera}
-            facing="back"
+            facing={facing}
             flash={flash}
             zoom={zoom}
           >
@@ -227,20 +340,36 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
 
             {/* ── Top bar ── */}
             <SafeAreaView style={styles.topBar}>
-              <TouchableOpacity style={styles.iconBtn} onPress={onClose}>
+              <TouchableOpacity
+                style={styles.iconBtn}
+                onPress={() => {
+                  if (onClose) onClose();
+                  else navigation.goBack();
+                }}
+              >
                 <Ionicons name="close" size={18} color="#FFF" />
               </TouchableOpacity>
 
               {photos.length > 0 && (
                 <View style={styles.countPill}>
                   <Ionicons name="camera" size={13} color="#FFF" />
-                  <Text style={styles.countPillText}>
-                    {photos.length} photo{photos.length > 1 ? "s" : ""}
-                  </Text>
+                  <Text style={styles.countPillText}>{photos.length} ảnh</Text>
                 </View>
               )}
 
               <View style={styles.topRight}>
+                <TouchableOpacity
+                  style={styles.iconBtn}
+                  onPress={() =>
+                    setFacing((prev) => (prev === "back" ? "front" : "back"))
+                  }
+                >
+                  <Ionicons
+                    name="camera-reverse-outline"
+                    size={18}
+                    color="#FFF"
+                  />
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.iconBtn}
                   onPress={() => setGridVisible((v) => !v)}
@@ -353,7 +482,7 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
         <View style={styles.drawer}>
           <View style={styles.drawerHandle} />
           <View style={styles.drawerHeader}>
-            <Text style={styles.drawerTitle}>Photos ({photos.length})</Text>
+            <Text style={styles.drawerTitle}>Ảnh ({photos.length})</Text>
             <TouchableOpacity onPress={() => setShowPreview(false)}>
               <Ionicons name="close" size={18} color="#64748B" />
             </TouchableOpacity>
@@ -386,8 +515,9 @@ export default function InspectionCameraScreen({ onClose, onSubmit }: Props) {
             onPress={handleSubmit}
           >
             <Text style={styles.drawerSubmitText}>
-              Submit {photos.length} photo{photos.length > 1 ? "s" : ""} for AI
-              Review
+              {isSelfie
+                ? "Xác nhận điểm danh"
+                : `Gửi ${photos.length} ảnh để AI kiểm tra`}
             </Text>
           </TouchableOpacity>
         </View>

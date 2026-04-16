@@ -1,4 +1,6 @@
+import { useAuth } from "@/contexts/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import React from "react";
 import {
   Platform,
@@ -8,7 +10,7 @@ import {
   View,
 } from "react-native";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Kiểu dữ liệu ─────────────────────────────────────────────────────────────
 export type TabKey =
   | "Home"
   | "Tasks"
@@ -30,15 +32,20 @@ interface BottomTabBarProps {
   onEmergencyPress?: () => void;
 }
 
-// ─── Tab config (Emergency slot is a placeholder — rendered separately) ───────
+// ─── Cấu hình Tab (Vị trí Khẩn cấp ở giữa được render riêng) ─────────────────
 const LEFT_TABS: {
   key: TabKey;
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
   activeIcon: keyof typeof Ionicons.glyphMap;
 }[] = [
-  { key: "Home", label: "Home", icon: "home-outline", activeIcon: "home" },
-  { key: "Tasks", label: "Tasks", icon: "list-outline", activeIcon: "list" },
+  { key: "Home", label: "Trang chủ", icon: "home-outline", activeIcon: "home" },
+  {
+    key: "Tasks",
+    label: "Công việc",
+    icon: "list-outline",
+    activeIcon: "list",
+  },
 ];
 
 const RIGHT_TABS: {
@@ -49,19 +56,19 @@ const RIGHT_TABS: {
 }[] = [
   {
     key: "Notifications",
-    label: "Notifications",
+    label: "Thông báo",
     icon: "notifications-outline",
     activeIcon: "notifications",
   },
   {
     key: "Profile",
-    label: "Profile",
+    label: "Hồ sơ",
     icon: "person-outline",
     activeIcon: "person",
   },
 ];
 
-// ─── Tab Item ─────────────────────────────────────────────────────────────────
+// ─── Component Tab Item ───────────────────────────────────────────────────────
 function TabItem({ icon, activeIcon, label, active, onPress }: TabItemProps) {
   return (
     <TouchableOpacity
@@ -83,16 +90,18 @@ function TabItem({ icon, activeIcon, label, active, onPress }: TabItemProps) {
   );
 }
 
-// ─── Bottom Tab Bar ───────────────────────────────────────────────────────────
+// ─── Thanh Bottom Tab ─────────────────────────────────────────────────────────
 export default function BottomTabBar({
   activeTab = "Home",
   onNavigate,
   onEmergencyPress,
 }: BottomTabBarProps) {
+  const navigation = useNavigation();
+  const { user } = useAuth();
   return (
     <View style={styles.wrapper}>
       <View style={styles.tabBar}>
-        {/* Left tabs */}
+        {/* Các tab bên trái */}
         {LEFT_TABS.map((tab) => (
           <TabItem
             key={tab.key}
@@ -104,10 +113,10 @@ export default function BottomTabBar({
           />
         ))}
 
-        {/* Center placeholder for floating button */}
+        {/* Khoảng trống ở giữa cho nút nổi */}
         <View style={styles.tabItemCenter} />
 
-        {/* Right tabs */}
+        {/* Các tab bên phải */}
         {RIGHT_TABS.map((tab) => (
           <TabItem
             key={tab.key}
@@ -115,12 +124,25 @@ export default function BottomTabBar({
             activeIcon={tab.activeIcon}
             label={tab.label}
             active={activeTab === tab.key}
-            onPress={() => onNavigate?.(tab.key)}
+            onPress={() => {
+              // For the Profile tab, route based on role
+              if (tab.key === "Profile") {
+                if (user?.role === "Worker") {
+                  // Navigate to worker-only profile screen
+                  (navigation as any).navigate("WorkerProfile");
+                } else {
+                  // Default supervisor/general profile
+                  onNavigate?.("Profile");
+                }
+                return;
+              }
+              onNavigate?.(tab.key);
+            }}
           />
         ))}
       </View>
 
-      {/* Floating Emergency button */}
+      {/* Nút Khẩn cấp nổi */}
       <TouchableOpacity
         style={styles.emergencyBtn}
         onPress={() => {
@@ -136,7 +158,7 @@ export default function BottomTabBar({
         <View style={styles.emergencyInner}>
           <Ionicons name="warning" size={26} color="#FFF" />
         </View>
-        <Text style={styles.emergencyLabel}>EMERGENCY</Text>
+        <Text style={styles.emergencyLabel}>KHẨN CẤP</Text>
       </TouchableOpacity>
     </View>
   );
@@ -145,7 +167,7 @@ export default function BottomTabBar({
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const TAB_HEIGHT = Platform.OS === "ios" ? 80 : 64;
 const EMERGENCY_BTN_SIZE = 60;
-const EMERGENCY_LIFT = 20; // how many px the button floats above the tab bar
+const EMERGENCY_LIFT = 20;
 
 const styles = StyleSheet.create({
   wrapper: {
@@ -175,7 +197,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     position: "relative",
   },
-  tabItemCenter: { flex: 1 }, // empty space for the floating button
+  tabItemCenter: { flex: 1 },
   tabIcon: { marginBottom: 3 },
   tabLabel: { fontSize: 10, fontWeight: "600", color: "#94A3B8" },
   tabLabelActive: { color: "#2563EB" },
@@ -188,7 +210,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#2563EB",
   },
 
-  // Floating emergency button
   emergencyBtn: {
     position: "absolute",
     top: -(EMERGENCY_BTN_SIZE / 2 + EMERGENCY_LIFT / 2),

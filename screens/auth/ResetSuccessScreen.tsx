@@ -51,15 +51,15 @@ export default function ResetSuccessScreen({ navigation }: Props) {
         </Animated.View>
 
         <Animated.View style={{ opacity, alignItems: "center", gap: 12 }}>
-          <Text style={styles.title}>Password Updated!</Text>
+          <Text style={styles.title}>Đã cập nhật mật khẩu!</Text>
           <Text style={styles.subtitle}>
-            Your password has been changed successfully.{"\n"}You can now sign
-            in with your new password.
+            Mật khẩu của bạn đã được thay đổi thành công.{"\n"}Bạn có thể đăng
+            nhập bằng mật khẩu mới.
           </Text>
         </Animated.View>
 
         <AppButton
-          label="Back to Sign In"
+          label="Quay lại Đăng nhập"
           onPress={handleGoToLogin}
           iconLeft="log-in-outline"
           style={{ backgroundColor: "#4F6EF7", shadowColor: "#4F6EF7" }}
