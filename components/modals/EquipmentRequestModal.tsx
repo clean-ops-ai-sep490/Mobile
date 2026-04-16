@@ -1,96 +1,135 @@
 import AppButton from "@/components/common/AppButton";
-import useEquipment, { EquipmentItem } from "@/hooks/useEquipment";
+import useEquipment from "@/hooks/useEquipment";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
+
+interface EquipmentItem {
+  id: string;
+  name: string;
+}
+
+interface SelectedEquipmentItem {
+  equipment: EquipmentItem;
+  quantity: number;
+}
 
 interface Props {
   visible: boolean;
   onClose: () => void;
   taskAssignmentId: string;
+  requiredEquipment?: EquipmentItem[];
 }
 
 export default function EquipmentRequestModal({
   visible,
   onClose,
   taskAssignmentId,
+  requiredEquipment = [],
 }: Props) {
-  const {
-    equipmentList,
-    loading: equipmentLoading,
-    submitting,
-    fetchEquipments,
-    createEquipmentRequest,
-  } = useEquipment();
+  const { submitting, createEquipmentRequest } = useEquipment();
 
   const [equipmentSearch, setEquipmentSearch] = useState("");
-  const [selectedEquipment, setSelectedEquipment] =
-    useState<EquipmentItem | null>(null);
+  const [selectedEquipments, setSelectedEquipments] = useState<
+    SelectedEquipmentItem[]
+  >([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [quantity, setQuantity] = useState(1);
   const [reason, setReason] = useState("");
 
+  // RESET khi mở modal
   useEffect(() => {
     if (visible) {
-      fetchEquipments();
-      // Reset form when opened
       setEquipmentSearch("");
-      setSelectedEquipment(null);
-      setQuantity(1);
+      setSelectedEquipments([]);
       setReason("");
       setDropdownOpen(false);
     }
   }, [visible]);
 
-  const filteredEquipment = equipmentList.filter((e) =>
+  // Filter trực tiếp từ prop
+  const filteredEquipment = requiredEquipment.filter((e) =>
     e.name.toLowerCase().includes(equipmentSearch.toLowerCase()),
   );
 
+  // SELECT
   const handleSelectEquipment = (item: EquipmentItem) => {
-    setSelectedEquipment(item);
+    const exists = selectedEquipments.find((e) => e.equipment.id === item.id);
+
+    if (exists) {
+      setSelectedEquipments((prev) =>
+        prev.map((e) =>
+          e.equipment.id === item.id ? { ...e, quantity: e.quantity + 1 } : e,
+        ),
+      );
+    } else {
+      setSelectedEquipments((prev) => [
+        ...prev,
+        { equipment: item, quantity: 1 },
+      ]);
+    }
+
     setDropdownOpen(false);
   };
 
+  // UPDATE QTY
+  const updateQuantity = (id: string, delta: number) => {
+    setSelectedEquipments((prev) =>
+      prev.map((e) =>
+        e.equipment.id === id
+          ? { ...e, quantity: Math.max(1, e.quantity + delta) }
+          : e,
+      ),
+    );
+  };
+
+  // REMOVE
+  const removeItem = (id: string) => {
+    setSelectedEquipments((prev) => prev.filter((e) => e.equipment.id !== id));
+  };
+
+  // SUBMIT
   const handleSubmit = async () => {
-    if (!selectedEquipment) {
-      Alert.alert("Thiếu thông tin", "Vui lòng chọn thiết bị.");
+    if (selectedEquipments.length === 0) {
+      Alert.alert("Thiếu thông tin", "Vui lòng chọn ít nhất 1 thiết bị.");
       return;
     }
+
     if (!reason.trim()) {
-      Alert.alert("Thiếu thông tin", "Vui lòng nhập lý do yêu cầu.");
+      Alert.alert("Thiếu thông tin", "Vui lòng nhập lý do.");
       return;
     }
 
     try {
       await createEquipmentRequest({
         taskAssignmentId,
-        equipmentId: selectedEquipment.id,
-        quantity,
         reason,
+        items: selectedEquipments.map((e) => ({
+          equipmentId: e.equipment.id,
+          quantity: e.quantity,
+        })),
       });
 
-      Alert.alert("Thành công", "Yêu cầu thiết bị đã được gửi.", [
+      Alert.alert("Thành công", "Đã gửi yêu cầu.", [
         { text: "OK", onPress: onClose },
       ]);
     } catch (e: any) {
-      const beErr =
+      const msg =
         e?.response?.data?.errors?.[0] ||
         e?.response?.data?.message ||
         e?.message ||
-        "Gửi yêu cầu thiết bị thất bại.";
-      Alert.alert("Lỗi", String(beErr));
+        "Gửi thất bại";
+      Alert.alert("Lỗi", msg);
     }
   };
 
@@ -98,7 +137,7 @@ export default function EquipmentRequestModal({
     <Modal
       visible={visible}
       animationType="slide"
-      transparent={true}
+      transparent
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
@@ -107,139 +146,116 @@ export default function EquipmentRequestModal({
           style={styles.modalContainer}
         >
           <View style={styles.modalContent}>
-            {/* Header */}
+            {/* HEADER */}
             <View style={styles.header}>
               <Text style={styles.headerTitle}>Yêu cầu thiết bị</Text>
-              <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+              <TouchableOpacity onPress={onClose}>
                 <Ionicons name="close" size={24} color="#64748B" />
               </TouchableOpacity>
             </View>
 
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              {/* Select Equipment + Quantity */}
-              <View style={styles.fieldRow}>
-                <View style={styles.leftCol}>
-                  <Text style={styles.sectionTitle}>Chọn thiết bị</Text>
-                  {equipmentLoading ? (
-                    <ActivityIndicator
-                      color="#2563EB"
-                      style={{ marginVertical: 10 }}
-                    />
-                  ) : (
-                    <View style={{ zIndex: 10 }}>
-                      <TouchableOpacity
-                        style={[
-                          styles.dropdown,
-                          dropdownOpen && styles.dropdownOpen,
-                        ]}
-                        onPress={() => setDropdownOpen((v) => !v)}
-                        activeOpacity={0.85}
-                      >
-                        <TextInput
-                          style={styles.dropdownInput}
-                          placeholder="Tìm thiết bị..."
-                          placeholderTextColor="#CBD5E1"
-                          value={
-                            equipmentSearch
-                              ? equipmentSearch
-                              : selectedEquipment?.name || ""
-                          }
-                          onChangeText={(t) => {
-                            setEquipmentSearch(t);
-                            setSelectedEquipment(null);
-                            setDropdownOpen(true);
-                          }}
-                          onFocus={() => setDropdownOpen(true)}
-                        />
-                        <Ionicons
-                          name={dropdownOpen ? "chevron-up" : "chevron-down"}
-                          size={16}
-                          color="#94A3B8"
-                        />
-                      </TouchableOpacity>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              {/* DROPDOWN */}
+              <Text style={styles.sectionTitle}>Chọn thiết bị</Text>
 
-                      {dropdownOpen && (
-                        <ScrollView
-                          style={styles.dropdownList}
-                          nestedScrollEnabled={true}
-                          keyboardShouldPersistTaps="handled"
-                        >
-                          {filteredEquipment.length > 0 ? (
-                            filteredEquipment.map((item) => (
-                              <TouchableOpacity
-                                key={item.id}
-                                style={[
-                                  styles.dropdownItem,
-                                  selectedEquipment?.id === item.id &&
-                                    styles.dropdownItemActive,
-                                ]}
-                                onPress={() => handleSelectEquipment(item)}
-                              >
-                                <View>
-                                  <Text
-                                    style={[
-                                      styles.dropdownItemText,
-                                      selectedEquipment?.id === item.id &&
-                                        styles.dropdownItemTextActive,
-                                    ]}
-                                  >
-                                    {item.name}
-                                  </Text>
-                                </View>
-                              </TouchableOpacity>
-                            ))
-                          ) : (
-                            <View style={styles.dropdownEmpty}>
-                              <Text style={styles.dropdownEmptyText}>
-                                Không tìm thấy thiết bị
-                              </Text>
-                            </View>
-                          )}
-                        </ScrollView>
+              {requiredEquipment.length === 0 ? (
+                <Text style={styles.emptyText}>
+                  Không có thiết bị yêu cầu nào.
+                </Text>
+              ) : (
+                <View style={{ zIndex: 10 }}>
+                  <TouchableOpacity
+                    style={[
+                      styles.dropdown,
+                      dropdownOpen && styles.dropdownOpen,
+                    ]}
+                    onPress={() => setDropdownOpen((v) => !v)}
+                  >
+                    <TextInput
+                      style={styles.dropdownInput}
+                      placeholder="Tìm thiết bị..."
+                      value={equipmentSearch}
+                      onChangeText={(t) => {
+                        setEquipmentSearch(t);
+                        setDropdownOpen(true);
+                      }}
+                    />
+                    <Ionicons
+                      name={dropdownOpen ? "chevron-up" : "chevron-down"}
+                      size={16}
+                    />
+                  </TouchableOpacity>
+
+                  {dropdownOpen && (
+                    <ScrollView
+                      style={styles.dropdownList}
+                      keyboardShouldPersistTaps="handled"
+                    >
+                      {filteredEquipment.length === 0 ? (
+                        <Text style={styles.emptyDropdown}>
+                          Không tìm thấy thiết bị.
+                        </Text>
+                      ) : (
+                        filteredEquipment.map((item) => (
+                          <TouchableOpacity
+                            key={item.id}
+                            style={styles.dropdownItem}
+                            onPress={() => handleSelectEquipment(item)}
+                          >
+                            <Text>{item.name}</Text>
+                          </TouchableOpacity>
+                        ))
                       )}
-                    </View>
+                    </ScrollView>
                   )}
                 </View>
+              )}
 
-                <View style={styles.rightCol}>
-                  <Text style={styles.sectionTitle}>Số lượng</Text>
-                  <View style={styles.quantityControl}>
-                    <TouchableOpacity
-                      style={[
-                        styles.qtyBtn,
-                        quantity <= 1 && styles.qtyBtnDisabled,
-                      ]}
-                      onPress={() => setQuantity((q) => Math.max(1, q - 1))}
+              {/* SELECTED LIST */}
+              <View style={{ marginTop: 12 }}>
+                {selectedEquipments.map((item) => (
+                  <View key={item.equipment.id} style={styles.selectedItem}>
+                    <Text style={{ flex: 1 }}>{item.equipment.name}</Text>
+
+                    <View
+                      style={{ flexDirection: "row", alignItems: "center" }}
                     >
-                      <Ionicons name="remove" size={18} color="#1E293B" />
-                    </TouchableOpacity>
-                    <Text style={styles.qtyValue}>{quantity}</Text>
+                      <TouchableOpacity
+                        onPress={() => updateQuantity(item.equipment.id, -1)}
+                      >
+                        <Ionicons name="remove" size={18} />
+                      </TouchableOpacity>
+
+                      <Text style={{ marginHorizontal: 10 }}>
+                        {item.quantity}
+                      </Text>
+
+                      <TouchableOpacity
+                        onPress={() => updateQuantity(item.equipment.id, 1)}
+                      >
+                        <Ionicons name="add" size={18} />
+                      </TouchableOpacity>
+                    </View>
+
                     <TouchableOpacity
-                      style={styles.qtyBtn}
-                      onPress={() => setQuantity((q) => Math.min(99, q + 1))}
+                      onPress={() => removeItem(item.equipment.id)}
                     >
-                      <Ionicons name="add" size={18} color="#1E293B" />
+                      <Ionicons name="trash" size={18} color="red" />
                     </TouchableOpacity>
                   </View>
-                </View>
+                ))}
               </View>
 
-              {/* Reason */}
+              {/* REASON */}
               <Text style={[styles.sectionTitle, { marginTop: 16 }]}>
-                Lý do yêu cầu
+                Lý do
               </Text>
               <TextInput
                 style={styles.textInput}
-                placeholder="Giải thích lý do yêu cầu..."
-                placeholderTextColor="#CBD5E1"
                 multiline
-                numberOfLines={4}
+                placeholder="Nhập lý do yêu cầu..."
                 value={reason}
                 onChangeText={setReason}
-                textAlignVertical="top"
               />
             </ScrollView>
 
@@ -248,8 +264,6 @@ export default function EquipmentRequestModal({
                 label="Gửi yêu cầu"
                 onPress={handleSubmit}
                 loading={submitting}
-                loadingLabel="Đang gửi..."
-                iconLeft="send"
               />
             </View>
           </View>
@@ -262,129 +276,71 @@ export default function EquipmentRequestModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "flex-end",
   },
-  modalContainer: {
-    maxHeight: "85%",
-  },
+  modalContainer: { maxHeight: "85%" },
   modalContent: {
     backgroundColor: "#F5F6FA",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
-    minHeight: 400,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 16,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1E293B",
-  },
-  closeBtn: {
-    padding: 4,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#1E293B",
-    marginBottom: 8,
-  },
-  fieldRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginBottom: 12,
-    zIndex: 10,
-  },
-  leftCol: {
-    flex: 1,
-    marginRight: 12,
-  },
-  rightCol: {
-    width: 110,
-  },
+  headerTitle: { fontSize: 18, fontWeight: "700" },
+  sectionTitle: { fontWeight: "700", marginBottom: 6 },
   dropdown: {
-    flexDirection: "row",
-    alignItems: "center",
     backgroundColor: "#FFF",
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    paddingHorizontal: 12,
-    height: 48,
+    padding: 10,
+    flexDirection: "row",
+    alignItems: "center",
   },
-  dropdownOpen: {
-    borderColor: "#2563EB",
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-  },
-  dropdownInput: {
-    flex: 1,
-    fontSize: 14,
-    color: "#1E293B",
-  },
+  dropdownOpen: { borderColor: "#2563EB" },
+  dropdownInput: { fontSize: 14, flex: 1 },
   dropdownList: {
     backgroundColor: "#FFF",
-    borderWidth: 1,
-    borderTopWidth: 0,
-    borderColor: "#2563EB",
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
     maxHeight: 150,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    marginTop: 4,
   },
   dropdownItem: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    padding: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#F8FAFC",
+    borderBottomColor: "#F1F5F9",
   },
-  dropdownItemActive: { backgroundColor: "#EFF6FF" },
-  dropdownItemText: { fontSize: 14, color: "#475569" },
-  dropdownItemTextActive: { color: "#2563EB", fontWeight: "600" },
-  dropdownEmpty: { padding: 16, alignItems: "center" },
-  dropdownEmptyText: { fontSize: 13, color: "#94A3B8" },
-  quantityControl: {
+  emptyDropdown: {
+    padding: 10,
+    color: "#94A3B8",
+    fontSize: 13,
+  },
+  emptyText: {
+    color: "#94A3B8",
+    fontSize: 13,
+    marginVertical: 8,
+  },
+  selectedItem: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#FFF",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    height: 48,
-  },
-  qtyBtn: {
-    width: 36,
-    height: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#F8FAFC",
-  },
-  qtyBtnDisabled: { opacity: 0.35 },
-  qtyValue: {
-    flex: 1,
-    textAlign: "center",
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#1E293B",
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 8,
   },
   textInput: {
     backgroundColor: "#FFF",
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 14,
-    color: "#1E293B",
-    minHeight: 100,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    marginBottom: 20,
+    borderRadius: 10,
+    padding: 10,
+    minHeight: 80,
+    textAlignVertical: "top",
   },
-  footer: {
-    marginTop: 10,
-    paddingBottom: Platform.OS === "ios" ? 20 : 0,
-  },
+  footer: { marginTop: 10 },
 });

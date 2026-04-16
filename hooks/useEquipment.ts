@@ -33,11 +33,15 @@ export interface EquipmentItem {
   description?: string;
 }
 
-export interface CreateEquipmentRequestPayload {
-  taskAssignmentId: string;
+export interface EquipmentRequestItemPayload {
   equipmentId: string;
   quantity: number;
+}
+
+export interface CreateEquipmentRequestPayload {
+  taskAssignmentId: string;
   reason: string;
+  items: EquipmentRequestItemPayload[];
 }
 
 const useEquipment = () => {
@@ -113,9 +117,8 @@ const useEquipment = () => {
       const res = await axiosInstance.post("/EquipmentRequests", {
         taskAssignmentId: payload.taskAssignmentId,
         workerId: workerId,
-        equipmentId: payload.equipmentId,
-        quantity: payload.quantity,
         reason: payload.reason,
+        items: payload.items,
       });
       return res.data;
     } catch (e: any) {

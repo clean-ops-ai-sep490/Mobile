@@ -5,19 +5,19 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -112,44 +112,44 @@ export default function WorkerProfileScreen() {
   const initials = getInitials(worker?.fullName);
   const avatarColor = AVATAR_COLORS["Worker"];
 
-  //   const handleOpenEdit = () => {
-  //     setEditFullName(worker?.fullName || "");
-  //     setEditAddress(worker?.displayAddress || "");
-  //     setIsEditModalVisible(true);
-  //   };
+  const handleOpenEdit = () => {
+    setEditFullName(worker?.fullName || "");
+    setEditAddress(worker?.displayAddress || "");
+    setIsEditModalVisible(true);
+  };
 
-  //   const handleUpdateProfile = async () => {
-  //     if (!worker?.id) return;
+  const handleUpdateProfile = async () => {
+    if (!worker?.id) return;
 
-  //     if (!editFullName.trim()) {
-  //       Alert.alert("Lỗi", "Họ và tên không được để trống");
-  //       return;
-  //     }
+    if (!editFullName.trim()) {
+      Alert.alert("Lỗi", "Họ và tên không được để trống");
+      return;
+    }
 
-  //     try {
-  //       setSubmitting(true);
+    try {
+      setSubmitting(true);
 
-  //       // Đóng gói FormData
-  //       const formData = new FormData();
-  //       formData.append("fullName", editFullName.trim());
+      // Đóng gói FormData
+      const formData = new FormData();
+      formData.append("fullName", editFullName.trim());
 
-  //       // SỬA Ở ĐÂY: Đổi "Address" thành "DisplayAddress" cho khớp với Backend
-  //       formData.append("displayAddress", editAddress.trim());
+      // SỬA Ở ĐÂY: Đổi "Address" thành "DisplayAddress" cho khớp với Backend
+      formData.append("address", editAddress.trim());
 
-  //       await updateWorkerProfile(worker.id, formData);
+      await updateWorkerProfile(worker.id, formData);
 
-  //       Alert.alert("Thành công", "Cập nhật hồ sơ thành công!");
-  //       setIsEditModalVisible(false);
+      Alert.alert("Thành công", "Cập nhật hồ sơ thành công!");
+      setIsEditModalVisible(false);
 
-  //       // Tải lại dữ liệu sau khi update thành công
-  //       await loadProfile();
-  //     } catch (error) {
-  //       console.error("Lỗi khi cập nhật hồ sơ:", error);
-  //       Alert.alert("Lỗi", "Không thể cập nhật hồ sơ lúc này.");
-  //     } finally {
-  //       setSubmitting(false);
-  //     }
-  //   };
+      // Tải lại dữ liệu sau khi update thành công
+      await loadProfile();
+    } catch (error) {
+      console.error("Lỗi khi cập nhật hồ sơ:", error);
+      Alert.alert("Lỗi", "Không thể cập nhật hồ sơ lúc này.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert("Đăng xuất", "Bạn có chắc chắn muốn đăng xuất không?", [
@@ -241,7 +241,7 @@ export default function WorkerProfileScreen() {
 
           {/* ── Các nút thao tác (Được đẩy xuống dưới cùng) ── */}
           <View style={styles.bottomButtonContainer}>
-            {/* <AppButton
+            <AppButton
               label="Chỉnh sửa hồ sơ"
               onPress={handleOpenEdit}
               iconLeft="create-outline"
@@ -251,7 +251,7 @@ export default function WorkerProfileScreen() {
                 backgroundColor: "#2563EB",
                 marginBottom: 12,
               }}
-            /> */}
+            />
             <AppButton
               label="Đăng xuất"
               onPress={handleLogout}
@@ -311,7 +311,7 @@ export default function WorkerProfileScreen() {
                 />
               </View>
 
-              {/* <AppButton
+              <AppButton
                 label="Lưu thay đổi"
                 onPress={handleUpdateProfile}
                 loading={submitting && isEditModalVisible}
@@ -321,7 +321,7 @@ export default function WorkerProfileScreen() {
                   marginTop: 10,
                   backgroundColor: "#2563EB",
                 }}
-              /> */}
+              />
             </View>
           </View>
         </KeyboardAvoidingView>

@@ -17,7 +17,7 @@ import useTaskStepExecution from "@/hooks/useTaskStepExecution";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -86,6 +86,24 @@ export default function TaskExecutionScreen() {
   const [issueModalVisible, setIssueModalVisible] = useState(false);
   const [equipmentModalVisible, setEquipmentModalVisible] = useState(false);
   const { getSteps, buildStepConfig } = useSteps();
+
+  const requiredEquipment = useMemo(() => {
+    const equipmentStep = steps.find(
+      (s) => s.config?.["x-behavior"] === "equipment-check",
+    );
+
+    const allEquipment =
+      (equipmentStep?.config?.requiredEquipment as {
+        id: string;
+        name: string;
+      }[]) ?? [];
+
+    // Lấy state của step đó để biết cái nào đã tick
+    const stepState = equipmentStep?.stepState ?? {};
+
+    // Lọc ra những cái CHƯA được tick
+    return allEquipment.filter((eq) => !stepState[eq.id]);
+  }, [steps]);
 
   // ─── Load worker ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -479,6 +497,7 @@ export default function TaskExecutionScreen() {
         visible={equipmentModalVisible}
         onClose={() => setEquipmentModalVisible(false)}
         taskAssignmentId={taskAssignmentId}
+        requiredEquipment={requiredEquipment}
       />
     </SafeAreaView>
   );
