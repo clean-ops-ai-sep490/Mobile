@@ -24,6 +24,8 @@ import {
   useTaskAssignments,
 } from "@/hooks/useTaskAssignment";
 import { useTaskSchedules } from "@/hooks/useTaskSchedule";
+import { sendWorkerGps } from "@/hooks/useWorkerGps";
+import { getCurrentLocation } from "@/services/workergps.service";
 
 // ─── Mock Data ───────────────────────────────────────────────────────────────
 const TODAY = new Date();
@@ -321,7 +323,39 @@ export default function TaskListScreen() {
 
     try {
       setLoadingTasks(true);
+
+      let latitude: number | null = null;
+      let longitude: number | null = null;
+      let isConfirmed = true;
+
+      // 🔥 1. Lấy GPS
+      try {
+        const location = await getCurrentLocation();
+        latitude = location.latitude;
+        longitude = location.longitude;
+      } catch (gpsError) {
+        console.warn("⚠️ Không lấy được GPS:", gpsError);
+
+        // 👉 fallback UX (rất quan trọng)
+        isConfirmed = false;
+
+        Alert.alert(
+          "Không lấy được GPS",
+          "Vẫn tiếp tục nhưng sẽ lưu vị trí chưa xác nhận.",
+        );
+      }
+
+      // 🔥 2. Gửi GPS lên backend
+      try {
+        await sendWorkerGps(workerId, latitude, longitude, isConfirmed);
+      } catch (gpsApiError) {
+        console.warn("⚠️ Gửi GPS thất bại:", gpsApiError);
+        // 👉 không block user
+      }
+
+      // 🔥 3. Start task
       const res = await startTask(id, workerId);
+
       console.log("DỮ LIỆU API TRẢ VỀ KHI START:", res);
 
       (navigation as any).navigate("TaskExecution", {

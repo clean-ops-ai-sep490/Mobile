@@ -23,6 +23,8 @@ import LoginScreen from "@/screens/auth/LoginScreen";
 import OTPVerificationScreen from "@/screens/auth/OtpVerificationScreen";
 import ResetPasswordScreen from "@/screens/auth/ResetPasswordScreen";
 import ResetSuccessScreen from "@/screens/auth/ResetSuccessScreen";
+import BleScannerScreen from "@/screens/shared/BleScannerScreen";
+import BleTestScreen from "@/screens/shared/BleTestScreen";
 import InspectionCameraScreen from "@/screens/shared/CameraScreen";
 import { NotificationListScreen } from "@/screens/shared/NotificationListScreen";
 import QRScannerScreen from "@/screens/shared/QRScannerScreen";
@@ -65,6 +67,11 @@ export type WorkerStackParamList = {
     onCaptured?: (photo: any) => void;
   };
   Notifications: undefined;
+  BleScannerScreen: {
+    checkinPointId: string;
+    onResult: (result: any) => void;
+  };
+  BleTest: undefined;
 };
 
 // ─── Supervisor Route params ──────────────────────────────────────────────────
@@ -191,6 +198,11 @@ function WorkerNavigator() {
         name="Notifications"
         component={NotificationListScreen}
       />
+      <WorkerStack.Screen
+        name="BleScannerScreen"
+        component={BleScannerScreen}
+      />
+      <WorkerStack.Screen name="BleTest" component={BleTestScreen} />
     </WorkerStack.Navigator>
   );
 }

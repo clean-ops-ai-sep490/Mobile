@@ -2,6 +2,7 @@
 import { SwapRequest, useTaskSwap } from "@/hooks/useTaskSwap";
 import React, { useEffect, useState } from "react";
 import {
+  Alert,
   Modal,
   SafeAreaView,
   ScrollView,
@@ -16,16 +17,61 @@ interface TaskSwapDetailModalProps {
   visible: boolean;
   onClose: () => void;
   swapId: string;
+  currentWorkerId?: string;
+  onResponded?: () => void;
 }
 
 export default function TaskSwapDetailModal({
   visible,
   onClose,
   swapId,
+  currentWorkerId,
+  onResponded,
 }: TaskSwapDetailModalProps) {
   const { getById } = useTaskSwap();
   const [item, setItem] = useState<SwapRequest | null>(null);
   const [loading, setLoading] = useState(true);
+  const { respond } = useTaskSwap();
+  const [responding, setResponding] = useState(false);
+  const canRespond =
+    item?.status === "PendingTargetApproval" &&
+    item?.targetWorkerId === currentWorkerId;
+
+  const handleRespond = async (isAccepted: boolean) => {
+    Alert.alert(isAccepted ? "Đồng ý đổi ca?" : "Từ chối đổi ca?", "", [
+      { text: "Hủy", style: "cancel" },
+      {
+        text: "Xác nhận",
+        onPress: async () => {
+          try {
+            setResponding(true);
+            await respond({
+              swapRequestId: swapId,
+              responderId: currentWorkerId!,
+              isAccepted,
+            });
+            Alert.alert(
+              "Thành công",
+              isAccepted ? "Đã đồng ý đổi ca." : "Đã từ chối.",
+              [
+                {
+                  text: "OK",
+                  onPress: () => {
+                    onClose();
+                    onResponded?.();
+                  },
+                },
+              ],
+            );
+          } catch (e: any) {
+            Alert.alert("Lỗi", e.response?.data?.message || "Thất bại.");
+          } finally {
+            setResponding(false);
+          }
+        },
+      },
+    ]);
+  };
 
   useEffect(() => {
     if (!visible) return;
@@ -108,6 +154,30 @@ export default function TaskSwapDetailModal({
                     </Text>
                   </View>
                 </View>
+                {/* Thêm vào trong card, sau phần status */}
+                {canRespond && (
+                  <View style={styles.actionRow}>
+                    <Text style={styles.actionLabel}>
+                      Bạn muốn đồng ý đổi ca này không?
+                    </Text>
+                    <View style={styles.btnRow}>
+                      <TouchableOpacity
+                        style={[styles.btn, styles.btnAccept]}
+                        onPress={() => handleRespond(true)}
+                        disabled={responding}
+                      >
+                        <Text style={styles.btnAcceptText}>Đồng ý</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.btn, styles.btnReject]}
+                        onPress={() => handleRespond(false)}
+                        disabled={responding}
+                      >
+                        <Text style={styles.btnRejectText}>Từ chối</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
               </View>
             )}
           </ScrollView>
@@ -174,7 +244,7 @@ const styles = StyleSheet.create({
   rowLabel: {
     fontWeight: "600",
     color: "#444",
-    width: 105, // Giữ độ rộng cố định để các cột gióng thẳng nhau
+    width: 105,
   },
   rowValueContainer: {
     flex: 1,
@@ -187,4 +257,30 @@ const styles = StyleSheet.create({
   },
   loading: { textAlign: "center", marginTop: 20, color: "#555" },
   status: { fontWeight: "600", color: "#B45309" },
+
+  // Styles bổ sung
+  actionRow: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderColor: "#eee",
+    gap: 10,
+  },
+  actionLabel: {
+    fontSize: 13,
+    color: "#64748B",
+    textAlign: "center",
+  },
+  btnRow: { flexDirection: "row", gap: 10 },
+  btn: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 10,
+    alignItems: "center",
+    borderWidth: 1,
+  },
+  btnAccept: { backgroundColor: "#E1F5EE", borderColor: "#0F6E56" },
+  btnAcceptText: { color: "#0F6E56", fontWeight: "600" },
+  btnReject: { backgroundColor: "#FAECE7", borderColor: "#993C1D" },
+  btnRejectText: { color: "#993C1D", fontWeight: "600" },
 });

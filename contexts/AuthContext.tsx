@@ -1,4 +1,5 @@
 import useAuthHook from "@/hooks/useAuth";
+// import { setupFirebaseMessaging } from "@/services/firebase.service";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import React, { createContext, useContext, useEffect, useState } from "react";
@@ -102,6 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         setAppUser(mappedUser);
+        // await setupFirebaseMessaging(mappedUser.userId);
       }
     } catch (e) {
       throw e;
