@@ -47,6 +47,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-camera",
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
       [
