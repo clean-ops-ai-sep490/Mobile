@@ -13,7 +13,6 @@ import {
   Alert,
   Animated,
   SafeAreaView,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -21,6 +20,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
 type Props = NativeStackScreenProps<WorkerStackParamList, "SwapTask">;
 
@@ -258,7 +258,13 @@ export default function SwapTaskScreen({ navigation, route }: Props) {
         onBack={() => navigation.goBack()}
       />
 
-      <ScrollView contentContainerStyle={styles.container}>
+      <KeyboardAwareScrollView
+        contentContainerStyle={styles.container}
+        enableOnAndroid
+        extraScrollHeight={100}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         {/* YOUR TASK */}
         <Text style={styles.section}>Công việc của bạn</Text>
         {currentTask ? (
@@ -316,7 +322,7 @@ export default function SwapTaskScreen({ navigation, route }: Props) {
           disabled={!selected || !reason.trim() || loading}
           iconLeft="send"
         />
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       <BottomTabBar onNavigate={handleNavigate} />
     </SafeAreaView>

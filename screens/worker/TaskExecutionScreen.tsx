@@ -139,18 +139,18 @@ export default function TaskExecutionScreen() {
       try {
         const task = await getTaskAssignmentById(taskAssignmentId);
         if (!task) throw new Error("Task not found");
-        Alert.alert(
-          "Raw step[0]",
-          JSON.stringify(
-            {
-              configSnapshot: task.steps[0]?.configSnapshot,
-              // hoặc các field khác
-              keys: Object.keys(task.steps[0] ?? {}),
-            },
-            null,
-            2,
-          ).slice(0, 800),
-        );
+        // Alert.alert(
+        //   "Raw step[0]",
+        //   JSON.stringify(
+        //     {
+        //       configSnapshot: task.steps[0]?.configSnapshot,
+        //       detail: task.steps[0]?.configSnapshot?.detail, // ← thêm dòng này
+        //       keys: Object.keys(task.steps[0] ?? {}),
+        //     },
+        //     null,
+        //     2,
+        //   ).slice(0, 800),
+        // );
 
         const sorted = [...task.steps].sort(
           (a, b) => a.stepOrder - b.stepOrder,
@@ -166,6 +166,7 @@ export default function TaskExecutionScreen() {
             actionKey: s.sopStepId,
             workerId: workerId ?? "",
             checkinPointId: detail?.checkinPointId,
+            identifier: detail?.identifier,
           };
 
           return {
@@ -281,44 +282,44 @@ export default function TaskExecutionScreen() {
   }, [params?.selfieResult]);
 
   // Phần useEffect xử lý bleResult GIỮ NGUYÊN như code cũ
-  useEffect(() => {
-    const bleResult = params?.bleResult;
-    if (!bleResult?.valid || !bleResult?.stepId) return;
+  // useEffect(() => {
+  //   const bleResult = params?.bleResult;
+  //   if (!bleResult?.valid || !bleResult?.stepId) return;
 
-    const stepId = bleResult.stepId;
+  //   const stepId = bleResult.stepId;
 
-    setSteps((prev) => {
-      const updated = prev.map((s) => {
-        if (s.id !== stepId) return s;
+  //   setSteps((prev) => {
+  //     const updated = prev.map((s) => {
+  //       if (s.id !== stepId) return s;
 
-        return {
-          ...s,
-          stepState: {
-            ...s.stepState,
-            checkedIn: true,
-            verified: true,
-            method: "ble",
+  //       return {
+  //         ...s,
+  //         stepState: {
+  //           ...s.stepState,
+  //           checkedIn: true,
+  //           verified: true,
+  //           method: "ble",
 
-            deviceId: bleResult.deviceId,
-            deviceName: bleResult.deviceName,
-            deviceUuid: bleResult.deviceUuid,
-            checkinRecordId: bleResult.checkinRecordId,
-            checkinAt: bleResult.checkinAt,
-            workareaId: bleResult.workareaId,
-          },
-        };
-      });
+  //           deviceId: bleResult.deviceId,
+  //           deviceName: bleResult.deviceName,
+  //           deviceUuid: bleResult.deviceUuid,
+  //           checkinRecordId: bleResult.checkinRecordId,
+  //           checkinAt: bleResult.checkinAt,
+  //           workareaId: bleResult.workareaId,
+  //         },
+  //       };
+  //     });
 
-      AsyncStorage.setItem(
-        `taskProgress:${taskAssignmentId}`,
-        JSON.stringify(updated),
-      );
+  //     AsyncStorage.setItem(
+  //       `taskProgress:${taskAssignmentId}`,
+  //       JSON.stringify(updated),
+  //     );
 
-      return updated;
-    });
+  //     return updated;
+  //   });
 
-    navigation.setParams({ bleResult: undefined });
-  }, [params?.bleResult]);
+  //   navigation.setParams({ bleResult: undefined });
+  // }, [params?.bleResult]);
 
   // ─── Derived ──────────────────────────────────────────────────────────────
   const completedCount = steps.filter(

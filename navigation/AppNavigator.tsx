@@ -23,8 +23,8 @@ import LoginScreen from "@/screens/auth/LoginScreen";
 import OTPVerificationScreen from "@/screens/auth/OtpVerificationScreen";
 import ResetPasswordScreen from "@/screens/auth/ResetPasswordScreen";
 import ResetSuccessScreen from "@/screens/auth/ResetSuccessScreen";
-import BleScannerScreen from "@/screens/shared/BleScannerScreen";
-import BleTestScreen from "@/screens/shared/BleTestScreen";
+// import BleScannerScreen from "@/screens/shared/BleScannerScreen";
+// import BleTestScreen from "@/screens/shared/BleTestScreen";
 import InspectionCameraScreen from "@/screens/shared/CameraScreen";
 import { NotificationListScreen } from "@/screens/shared/NotificationListScreen";
 import QRScannerScreen from "@/screens/shared/QRScannerScreen";
@@ -198,11 +198,11 @@ function WorkerNavigator() {
         name="Notifications"
         component={NotificationListScreen}
       />
-      <WorkerStack.Screen
+      {/* <WorkerStack.Screen
         name="BleScannerScreen"
         component={BleScannerScreen}
       />
-      <WorkerStack.Screen name="BleTest" component={BleTestScreen} />
+      <WorkerStack.Screen name="BleTest" component={BleTestScreen} /> */}
     </WorkerStack.Navigator>
   );
 }

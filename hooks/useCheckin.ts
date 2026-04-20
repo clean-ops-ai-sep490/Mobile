@@ -108,25 +108,21 @@ export function useCheckin() {
 
   const checkinByBle = async ({
     workerId,
-    checkinPointId,
     deviceUuid,
     taskId,
     taskStepId,
     notes,
-  }: CheckinParams & { deviceUuid: string }): Promise<CheckinResult> => {
+  }: {
+    workerId: string;
+    deviceUuid: string;
+    taskId?: string;
+    taskStepId?: string;
+    notes?: string;
+  }): Promise<CheckinResult> => {
     setLoading(true);
-
     try {
-      const pointRes = await axiosInstance.get(
-        `/WorkareaCheckinPoints/${checkinPointId}`,
-      );
-      const point = pointRes.data;
-
       const checkinRes = await axiosInstance.post("/CheckinRecords/checkin", {
-        checkinPointId,
         workerId,
-        code: point.code,
-        workareaId: null, // BLE không cần workareaId trong request
         deviceUuid,
         taskId: taskId ?? null,
         taskStepId: taskStepId ?? null,
@@ -139,13 +135,16 @@ export function useCheckin() {
         valid: true,
         checkinRecordId: checkin.id,
         checkinAt: checkin.checkinAt,
-        checkinPointId: point.id,
-        workareaId: point.workareaId,
-        code: point.code,
+        checkinPointId: checkin.checkinPointId,
+        workareaId: checkin.workareaId,
         deviceUuid,
         verifiedAt: new Date().toISOString(),
       };
     } catch (err: any) {
+      console.log(
+        "❌ API error response:",
+        JSON.stringify(err?.response?.data),
+      );
       return {
         valid: false,
         message:

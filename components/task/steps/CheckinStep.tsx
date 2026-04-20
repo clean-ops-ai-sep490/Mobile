@@ -11,12 +11,19 @@ function CheckinComponent({ config, state, onChange }: StepPluginProps) {
 
   const method: string = config?.method ?? "qr";
   const checkinPointId = config?.checkinPointId;
+  const identifier = config?.identifier;
+  const workerId = config?.workerId;
+  // const taskAssignmentId = state?.__taskAssignmentId;
+  // const stepId = state?.__stepId;
 
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
   const stateRef = useRef(state);
   stateRef.current = state;
+
+  const taskAssignmentId = stateRef.current?.__taskAssignmentId;
+  const stepId = stateRef.current?.__stepId;
 
   const triggerGps = async (wId: string) => {
     try {
@@ -54,30 +61,42 @@ function CheckinComponent({ config, state, onChange }: StepPluginProps) {
               verifiedAt: result.verifiedAt,
             });
 
-            triggerGps(config?.workerId ?? "");
+            triggerGps(workerId);
           },
         });
         break;
 
       case "ble":
         navigation.navigate("BleScannerScreen", {
-          checkinPointId,
+          taskId: taskAssignmentId,
+          stepId,
+          workerId,
           onResult: (bleResult: any) => {
+            console.log("📱 BLE Result received in CheckinStep:", bleResult);
+
             if (!bleResult?.valid) {
               Alert.alert("BLE lỗi", bleResult?.message || "Không hợp lệ");
               return;
             }
 
+            // ✅ Update state ngay
             onChangeRef.current({
               ...stateRef.current,
               checkedIn: true,
               verified: true,
               method: "ble",
-
               deviceId: bleResult.deviceId,
               deviceName: bleResult.deviceName,
-              checkinAt: new Date().toISOString(),
+              deviceUuid: bleResult.deviceUuid,
+              checkinRecordId: bleResult.checkinRecordId,
+              checkinAt: bleResult.checkinAt,
+              checkinPointId: bleResult.checkinPointId,
+              workareaId: bleResult.workareaId,
+              code: bleResult.code,
+              verifiedAt: bleResult.verifiedAt,
             });
+
+            triggerGps(workerId);
           },
         });
         break;
@@ -96,7 +115,7 @@ function CheckinComponent({ config, state, onChange }: StepPluginProps) {
               capturedAt: new Date().toISOString(),
             });
 
-            triggerGps(config?.workerId ?? "");
+            triggerGps(workerId);
           },
         });
         break;
@@ -146,6 +165,24 @@ function CheckinComponent({ config, state, onChange }: StepPluginProps) {
             <>
               {state.deviceName && (
                 <Text style={s.successSub}>Device: {state.deviceName}</Text>
+              )}
+              {state.checkinAt && (
+                <Text style={s.successSub}>
+                  Time: {new Date(state.checkinAt).toLocaleString("vi-VN")}
+                </Text>
+              )}
+              {state.checkinRecordId && (
+                <Text style={s.successSub}>
+                  Record ID: {state.checkinRecordId}
+                </Text>
+              )}
+            </>
+          )}
+
+          {state.method === "qr" && (
+            <>
+              {state.workareaId && (
+                <Text style={s.successSub}>Area: {state.workareaId}</Text>
               )}
               {state.checkinAt && (
                 <Text style={s.successSub}>
@@ -203,12 +240,22 @@ export const CheckinStepPlugin: StepPlugin = {
     checkedIn: state.checkedIn,
     method: state.method,
 
-    // 🔥 QUAN TRỌNG CHO BE
-    deviceId: state.deviceId,
+    // Common fields
     checkinRecordId: state.checkinRecordId,
     checkinAt: state.checkinAt,
+    checkinPointId: state.checkinPointId,
+    workareaId: state.workareaId,
+    code: state.code,
 
+    // BLE specific
+    deviceId: state.deviceId,
+    deviceName: state.deviceName,
+    deviceUuid: state.deviceUuid,
+
+    // QR specific
     qrRaw: state.qrRaw,
+
+    // Selfie specific
     photoUri: state.photoUri,
   }),
 

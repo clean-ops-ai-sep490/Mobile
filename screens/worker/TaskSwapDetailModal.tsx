@@ -1,4 +1,5 @@
 // src/screens/TaskSwapDetailModal.tsx
+import { useAuth } from "@/contexts/AuthContext";
 import { SwapRequest, useTaskSwap } from "@/hooks/useTaskSwap";
 import React, { useEffect, useState } from "react";
 import {
@@ -17,7 +18,6 @@ interface TaskSwapDetailModalProps {
   visible: boolean;
   onClose: () => void;
   swapId: string;
-  currentWorkerId?: string;
   onResponded?: () => void;
 }
 
@@ -25,17 +25,30 @@ export default function TaskSwapDetailModal({
   visible,
   onClose,
   swapId,
-  currentWorkerId,
   onResponded,
 }: TaskSwapDetailModalProps) {
-  const { getById } = useTaskSwap();
   const [item, setItem] = useState<SwapRequest | null>(null);
   const [loading, setLoading] = useState(true);
-  const { respond } = useTaskSwap();
+  const { getById, respond, cancel } = useTaskSwap();
   const [responding, setResponding] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [currentWorkerId, setCurrentWorkerId] = useState<string | undefined>();
+
+  const { getWorkerProfile } = useAuth();
+
+  useEffect(() => {
+    (async () => {
+      const profile = await getWorkerProfile();
+      setCurrentWorkerId(profile.id);
+    })();
+  }, []);
   const canRespond =
     item?.status === "PendingTargetApproval" &&
     item?.targetWorkerId === currentWorkerId;
+
+  const canCancel =
+    item?.status === "PendingTargetApproval" &&
+    item?.requesterId === currentWorkerId;
 
   const handleRespond = async (isAccepted: boolean) => {
     Alert.alert(isAccepted ? "Đồng ý đổi ca?" : "Từ chối đổi ca?", "", [
@@ -67,6 +80,35 @@ export default function TaskSwapDetailModal({
             Alert.alert("Lỗi", e.response?.data?.message || "Thất bại.");
           } finally {
             setResponding(false);
+          }
+        },
+      },
+    ]);
+  };
+
+  console.log("targetWorkerId:", item?.targetWorkerId);
+  console.log("currentWorkerId:", currentWorkerId);
+
+  const handleCancel = async () => {
+    Alert.alert("Hủy yêu cầu?", "", [
+      { text: "Không", style: "cancel" },
+      {
+        text: "Hủy",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            setCancelling(true);
+
+            await cancel(swapId, currentWorkerId!);
+
+            Alert.alert("Thành công", "Đã hủy yêu cầu");
+
+            onClose();
+            onResponded?.();
+          } catch (e: any) {
+            Alert.alert("Lỗi", e.response?.data?.message || "Không thể hủy");
+          } finally {
+            setCancelling(false);
           }
         },
       },
@@ -178,6 +220,21 @@ export default function TaskSwapDetailModal({
                     </View>
                   </View>
                 )}
+
+                {canCancel && (
+                  <View style={styles.actionRow}>
+                    <Text style={styles.actionLabel}>
+                      Bạn muốn hủy yêu cầu đổi ca này không?
+                    </Text>
+
+                    <TouchableOpacity
+                      style={[styles.btn, styles.btnReject]}
+                      onPress={handleCancel}
+                    >
+                      <Text style={styles.btnRejectText}>Hủy yêu cầu</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             )}
           </ScrollView>
@@ -198,7 +255,7 @@ const styles = StyleSheet.create({
   // Container chính của modal
   modalContainer: {
     width: "90%",
-    maxHeight: "80%",
+    maxHeight: "85%",
     backgroundColor: "#f5f6fa",
     borderRadius: 12,
     overflow: "hidden",
@@ -227,7 +284,7 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: "#fff",
-    padding: 20,
+    padding: 10,
     borderRadius: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },

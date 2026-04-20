@@ -33,6 +33,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "permissions": [
+        "CAMERA",
         "BLUETOOTH",
         "BLUETOOTH_SCAN",
         "BLUETOOTH_CONNECT",

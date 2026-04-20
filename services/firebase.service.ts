@@ -1,5 +1,4 @@
 import messaging from "@react-native-firebase/messaging";
-import { Alert, Clipboard } from "react-native";
 
 export const setupFirebaseMessaging = async (workerId?: string) => {
   console.log(">>> setupFirebaseMessaging called");
@@ -23,15 +22,15 @@ export const setupFirebaseMessaging = async (workerId?: string) => {
     const fcmToken = await messaging().getToken();
     console.log(">>> FCM TOKEN:", fcmToken);
 
-    if (__DEV__) {
-      Alert.alert("FCM Token", fcmToken, [
-        {
-          text: "Copy Token",
-          onPress: () => Clipboard.setString(fcmToken),
-        },
-        { text: "OK" },
-      ]);
-    }
+    // if (__DEV__) {
+    //   Alert.alert("FCM Token", fcmToken, [
+    //     {
+    //       text: "Copy Token",
+    //       onPress: () => Clipboard.setString(fcmToken),
+    //     },
+    //     { text: "OK" },
+    //   ]);
+    // }
   } catch (error) {
     console.log(">>> FCM Error:", error);
   }

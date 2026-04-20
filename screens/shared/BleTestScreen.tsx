@@ -1,142 +1,118 @@
-import { bleManager } from "@/ble/bleManager";
-import { requestBlePermissions } from "@/ble/permissions";
-import React, { useEffect, useRef, useState } from "react";
-import {
-    FlatList,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from "react-native";
+// // TestBleScreen.tsx
+// import { ble } from "@/hooks/ble/bleCheckin";
+// import React, { useState } from "react";
+// import {
+//     Button,
+//     Platform,
+//     ScrollView,
+//     StyleSheet,
+//     Text,
+//     View,
+// } from "react-native";
 
-type Device = { id: string; name: string | null; rssi: number | null };
+// export default function BleTestScreen() {
+//   const [devices, setDevices] = useState<any[]>([]);
+//   const [scanning, setScanning] = useState(false);
+//   const [countdown, setCountdown] = useState(0);
 
-export default function BleTestScreen() {
-  const [scanning, setScanning] = useState(false);
-  const [devices, setDevices] = useState<Device[]>([]);
-  const seen = useRef<Set<string>>(new Set());
+//   const startScan = () => {
+//     setDevices([]);
+//     setScanning(true);
+//     setCountdown(5);
 
-  useEffect(() => {
-    return () => {
-      bleManager.stopDeviceScan();
-    };
-  }, []);
+//     const seen = new Set<string>();
 
-  const startScan = async () => {
-    const granted = await requestBlePermissions();
-    console.log("🔐 PERMISSION:", granted);
+//     ble.startDeviceScan(null, { allowDuplicates: false }, (err, device) => {
+//       if (err || !device || seen.has(device.id)) return;
 
-    if (!granted) {
-      console.log("❌ Permission denied");
-      return;
-    }
+//       seen.add(device.id);
 
-    const state = await bleManager.state();
-    console.log("🧠 BLE STATE:", state);
-    setDevices([]);
-    seen.current.clear();
-    setScanning(true);
+//       setDevices((prev) => [
+//         ...prev,
+//         {
+//           id: device.id,
+//           name: device.name || "Unknown",
+//           rssi: device.rssi,
+//           manufacturerData: device.manufacturerData,
+//         },
+//       ]);
+//     });
 
-    // null = scan ALL devices, no serviceUUID filter
-    bleManager.startDeviceScan(
-      null,
-      { allowDuplicates: false },
-      (err, device) => {
-        if (err) {
-          console.warn("BLE scan error:", err.message);
-          setScanning(false);
-          return;
-        }
-        if (!device) return;
-        console.log("📡 DEVICE FOUND =====");
-        console.log("ID:", device.id);
-        console.log("NAME:", device.name);
-        console.log("LOCAL NAME:", device.localName);
-        console.log("RSSI:", device.rssi);
-        console.log("SERVICE UUIDS:", device.serviceUUIDs);
-        console.log("MANUFACTURER DATA:", device.manufacturerData);
-        console.log("=====================");
-        if (seen.current.has(device.id)) return;
+//     // Countdown timer
+//     const interval = setInterval(() => {
+//       setCountdown((c) => {
+//         if (c <= 1) {
+//           clearInterval(interval);
+//           ble.stopDeviceScan();
+//           setScanning(false);
+//           return 0;
+//         }
+//         return c - 1;
+//       });
+//     }, 1000);
+//   };
 
-        seen.current.add(device.id);
-        setDevices((prev) => [
-          ...prev,
-          { id: device.id, name: device.name, rssi: device.rssi },
-        ]);
-      },
-    );
+//   return (
+//     <View style={s.container}>
+//       <Button
+//         title={
+//           scanning ? `Đang quét... ${countdown}s` : "Bắt đầu quét BLE (5s)"
+//         }
+//         onPress={startScan}
+//         disabled={scanning}
+//       />
 
-    // Auto stop after 10 seconds
-    setTimeout(() => {
-      bleManager.stopDeviceScan();
-      setScanning(false);
-    }, 10000);
-  };
+//       <Text style={s.title}>Tìm thấy {devices.length} thiết bị:</Text>
 
-  const stopScan = () => {
-    bleManager.stopDeviceScan();
-    setScanning(false);
-  };
+//       <ScrollView style={s.list}>
+//         {devices.map((d, i) => (
+//           <View key={d.id} style={s.item}>
+//             <Text style={s.itemTitle}>
+//               #{i + 1} {d.name}
+//               <Text style={s.rssi}> ({d.rssi} dBm)</Text>
+//             </Text>
+//             <Text style={s.itemDetail} numberOfLines={1}>
+//               ID: {d.id}
+//             </Text>
+//             <Text style={s.itemDetail}>
+//               Manufacturer Data: {d.manufacturerData ? "✅ Có" : "❌ Không"}
+//             </Text>
+//             {d.manufacturerData && (
+//               <Text style={s.itemData} numberOfLines={1}>
+//                 {d.manufacturerData.substring(0, 50)}...
+//               </Text>
+//             )}
+//           </View>
+//         ))}
+//       </ScrollView>
+//     </View>
+//   );
+// }
 
-  return (
-    <SafeAreaView style={s.safe}>
-      <Text style={s.title}>BLE Test</Text>
-      <Text style={s.sub}>
-        {scanning
-          ? `Đang quét... (${devices.length} thiết bị)`
-          : `Tìm thấy ${devices.length} thiết bị`}
-      </Text>
-
-      <TouchableOpacity
-        style={[s.btn, scanning && s.btnStop]}
-        onPress={scanning ? stopScan : startScan}
-      >
-        <Text style={s.btnText}>{scanning ? "Dừng" : "Bắt đầu quét"}</Text>
-      </TouchableOpacity>
-
-      <FlatList
-        data={devices}
-        keyExtractor={(d) => d.id}
-        style={s.list}
-        ListEmptyComponent={
-          <Text style={s.empty}>
-            {scanning ? "Đang tìm thiết bị..." : "Chưa có thiết bị nào"}
-          </Text>
-        }
-        renderItem={({ item }) => (
-          <View style={s.item}>
-            <Text style={s.name}>{item.name ?? "(no name)"}</Text>
-            <Text style={s.detail}>ID: {item.id}</Text>
-            <Text style={s.detail}>RSSI: {item.rssi ?? "-"} dBm</Text>
-          </View>
-        )}
-      />
-    </SafeAreaView>
-  );
-}
-
-const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#0B1220", padding: 16 },
-  title: { color: "#fff", fontSize: 22, fontWeight: "700", marginBottom: 4 },
-  sub: { color: "#94A3B8", fontSize: 13, marginBottom: 16 },
-  btn: {
-    backgroundColor: "#22C55E",
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  btnStop: { backgroundColor: "#EF4444" },
-  btnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
-  list: { flex: 1 },
-  empty: { color: "#475569", textAlign: "center", marginTop: 40 },
-  item: {
-    backgroundColor: "#111827",
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 8,
-  },
-  name: { color: "#fff", fontWeight: "600", fontSize: 14 },
-  detail: { color: "#94A3B8", fontSize: 12, marginTop: 2 },
-});
+// const s = StyleSheet.create({
+//   container: { flex: 1, padding: 20, backgroundColor: "#F8FAFC" },
+//   title: {
+//     fontSize: 16,
+//     fontWeight: "600",
+//     marginVertical: 16,
+//     color: "#0F172A",
+//   },
+//   list: { flex: 1 },
+//   item: {
+//     backgroundColor: "#FFF",
+//     padding: 12,
+//     marginBottom: 8,
+//     borderRadius: 8,
+//     borderWidth: 1,
+//     borderColor: "#E2E8F0",
+//   },
+//   itemTitle: { fontSize: 14, fontWeight: "700", color: "#0F172A" },
+//   rssi: { fontSize: 12, fontWeight: "400", color: "#64748B" },
+//   itemDetail: { fontSize: 12, color: "#64748B", marginTop: 4 },
+//   itemData: {
+//     fontSize: 10,
+//     color: "#94A3B8",
+//     marginTop: 4,
+//     fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+//   },
+// });
