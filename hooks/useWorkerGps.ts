@@ -1,13 +1,35 @@
+import axiosInstance from "@/config/axiosInstance";
 import { gpsService } from "@/services/gps.service";
 import { WorkerGPSParams, WorkerMarkerData } from "@/types/gps.types";
 import { getWorkerStatus } from "@/utils/gpsUtils";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-// ─── HOOK ──────────────────────────────────────────────────────────────────
+// ─── API: SEND GPS ─────────────────────────────────────────────
+export const sendWorkerGps = async (
+  workerId: string,
+  latitude: number | null,
+  longitude: number | null,
+  isConfirmed: boolean,
+) => {
+  const payload = {
+    workerId,
+    latitude,
+    longitude,
+    isConfirmed,
+  };
+
+  console.log("📍 Sending GPS:", payload);
+
+  const res = await axiosInstance.post("/WorkerGps", payload);
+
+  return res.data;
+};
+
+// ─── HOOK: FETCH + POLLING GPS ─────────────────────────────────
 
 interface UseWorkerGPSProps {
   workAreaId?: string;
-  pollingInterval?: number; // milliseconds
+  pollingInterval?: number;
   autoStart?: boolean;
 }
 
@@ -27,7 +49,7 @@ interface UseWorkerGPSReturn {
 
 export const useWorkerGPS = ({
   workAreaId,
-  pollingInterval = 10000, // 10 seconds default
+  pollingInterval = 10000,
   autoStart = true,
 }: UseWorkerGPSProps): UseWorkerGPSReturn => {
   const [workers, setWorkers] = useState<WorkerMarkerData[]>([]);
@@ -38,21 +60,15 @@ export const useWorkerGPS = ({
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mountedRef = useRef<boolean>(true);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       mountedRef.current = false;
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
+      if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, []);
 
   const fetchWorkers = useCallback(async (): Promise<void> => {
-    if (!workAreaId || !mountedRef.current) {
-      console.log("[useWorkerGPS] Skipping fetch - no workAreaId or unmounted");
-      return;
-    }
+    if (!workAreaId || !mountedRef.current) return;
 
     try {
       setError(null);
@@ -64,26 +80,13 @@ export const useWorkerGPS = ({
         offlineThresholdMinutes: 10,
       };
 
-      console.log(
-        "[useWorkerGPS] Fetching GPS data for workAreaId:",
-        workAreaId,
-      );
-      console.log("[useWorkerGPS] Params:", params);
-
       const response = await gpsService.getWorkerGPSByWorkArea(
         workAreaId,
         params,
       );
 
-      console.log("[useWorkerGPS] Response received:", response);
-      console.log(
-        "[useWorkerGPS] Workers count:",
-        response.content?.length || 0,
-      );
-
       if (!mountedRef.current) return;
 
-      // Transform workers with status
       const workersWithStatus: WorkerMarkerData[] = (
         response.content || []
       ).map((worker) => ({
@@ -91,16 +94,9 @@ export const useWorkerGPS = ({
         status: getWorkerStatus(worker.lastSeen, worker.isOnline),
       }));
 
-      console.log("[useWorkerGPS] Workers with status:", workersWithStatus);
       setWorkers(workersWithStatus);
     } catch (err: any) {
       if (!mountedRef.current) return;
-      console.error("[useWorkerGPS] Failed to fetch worker GPS:", err);
-      console.error("[useWorkerGPS] Error details:", {
-        message: err.message,
-        response: err.response?.data,
-        status: err.response?.status,
-      });
 
       const errorMessage =
         err.response?.data?.message ||
@@ -110,8 +106,7 @@ export const useWorkerGPS = ({
 
       setError(errorMessage);
     } finally {
-      if (!mountedRef.current) return;
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, [workAreaId, isPolling]);
 
@@ -119,15 +114,10 @@ export const useWorkerGPS = ({
     if (!workAreaId || isPolling) return;
 
     setIsPolling(true);
-
-    // Initial fetch
     fetchWorkers();
 
-    // Set up polling
     intervalRef.current = setInterval(() => {
-      if (mountedRef.current) {
-        fetchWorkers();
-      }
+      if (mountedRef.current) fetchWorkers();
     }, pollingInterval);
   }, [workAreaId, isPolling, fetchWorkers, pollingInterval]);
 
@@ -143,20 +133,13 @@ export const useWorkerGPS = ({
     await fetchWorkers();
   }, [fetchWorkers]);
 
-  // Auto-start polling when workAreaId changes
   useEffect(() => {
-    if (workAreaId && autoStart) {
-      startPolling();
-    } else {
-      stopPolling();
-    }
+    if (workAreaId && autoStart) startPolling();
+    else stopPolling();
 
-    return () => {
-      stopPolling();
-    };
+    return () => stopPolling();
   }, [workAreaId, autoStart, startPolling, stopPolling]);
 
-  // Calculate statistics
   const totalWorkers = workers.length;
   const onlineCount = workers.filter(
     (w) => w.status === "online" || w.status === "idle",

@@ -506,20 +506,6 @@ export default function InspectionCameraScreen(props: Props) {
               </View>
             ))}
           </ScrollView>
-
-          <TouchableOpacity
-            style={[
-              styles.drawerSubmit,
-              photos.length > 0 && styles.drawerSubmitReady,
-            ]}
-            onPress={handleSubmit}
-          >
-            <Text style={styles.drawerSubmitText}>
-              {isSelfie
-                ? "Xác nhận điểm danh"
-                : `Gửi ${photos.length} ảnh để AI kiểm tra`}
-            </Text>
-          </TouchableOpacity>
         </View>
       )}
     </GestureHandlerRootView>

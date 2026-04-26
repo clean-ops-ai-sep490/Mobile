@@ -7,8 +7,6 @@ import {
   Animated,
   Dimensions,
   Image,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -17,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
 const { width, height } = Dimensions.get("window");
 
@@ -108,10 +107,13 @@ export default function LoginScreen({ onNavigate }: Props) {
   };
 
   return (
-    <KeyboardAvoidingView
+    <KeyboardAwareScrollView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+      contentContainerStyle={styles.inner}
+      enableOnAndroid
+      extraScrollHeight={80}
+      keyboardShouldPersistTaps="handled"
+      enableAutomaticScroll={true}
     >
       <StatusBar barStyle="light-content" />
 
@@ -258,7 +260,7 @@ export default function LoginScreen({ onNavigate }: Props) {
           </Animated.View>
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAwareScrollView>
   );
 }
 
@@ -270,7 +272,7 @@ const styles = StyleSheet.create({
   inner: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    justifyContent: "center",
+    // justifyContent: "center",
     paddingVertical: 48,
   },
 

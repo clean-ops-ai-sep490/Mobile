@@ -31,6 +31,7 @@ export interface TaskStepSnapshotDto {
 export interface TaskAssignmentDto {
   id: string;
   taskScheduleId: string;
+  taskName: string;
   assigneeId: string;
   originalAssigneeId: string;
   status: TaskAssignmentStatus;

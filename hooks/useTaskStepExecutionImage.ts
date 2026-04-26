@@ -115,5 +115,19 @@ export const useTaskStepExecutionImage = () => {
     return urls;
   };
 
-  return { uploadImages, reUploadImages, getImagesByStep };
+  const deleteImagesByStep = async (
+    taskStepExecutionId: string,
+  ): Promise<boolean> => {
+    if (!taskStepExecutionId) throw new Error("Thiếu stepExecutionId");
+    const url = `/TaskStepExecutionImages/step/${taskStepExecutionId}`;
+    console.log(
+      "🗑️ [deleteImagesByStep] DELETE",
+      axiosInstance.defaults.baseURL + url,
+    );
+    const { data } = await axiosInstance.delete(url);
+    console.log("✅ [deleteImagesByStep] response:", data);
+    return true;
+  };
+
+  return { uploadImages, reUploadImages, getImagesByStep, deleteImagesByStep };
 };

@@ -125,38 +125,32 @@ export default function EquipmentRequestDetailModal({
                   )}
                 </View>
               </View>
+              {/* 2. ROW EQUIPMENT */}
+              {/* ITEMS (FIX THE REQUEST MODAL STRUCTURE) */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Thiết bị yêu cầu</Text>
 
-              {/* 2. ROW EQUIPMENT (Hiển thị Name thay vì ID) */}
-              <View style={styles.rowContainer}>
-                <Text style={styles.rowLabel}>Thiết bị:</Text>
-                <View style={styles.rowValueContainer}>
-                  {isLoadingEq ? (
-                    <ActivityIndicator
-                      size="small"
-                      color="#1e90ff"
-                      style={styles.loader}
-                    />
-                  ) : (
-                    <Text style={styles.rowValue}>
-                      {equipmentName ?? data.equipmentId ?? "—"}
-                    </Text>
-                  )}
-                </View>
+                {data.items?.length ? (
+                  data.items.map((item: any, index: number) => (
+                    <View key={index} style={styles.itemRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.itemName}>
+                          {item.equipmentName ?? item.equipmentId ?? "—"}
+                        </Text>
+                      </View>
+
+                      <Text style={styles.itemQty}>x{item.quantity}</Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.emptyText}>—</Text>
+                )}
               </View>
-
               {/* 3. ROW REASON */}
               <View style={styles.rowContainer}>
                 <Text style={styles.rowLabel}>Lý do:</Text>
                 <View style={styles.rowValueContainer}>
                   <Text style={styles.rowValue}>{data.reason ?? "—"}</Text>
-                </View>
-              </View>
-
-              {/* 4. ROW QUANTITY */}
-              <View style={styles.rowContainer}>
-                <Text style={styles.rowLabel}>Số lượng:</Text>
-                <View style={styles.rowValueContainer}>
-                  <Text style={styles.rowValue}>{data.quantity ?? "—"}</Text>
                 </View>
               </View>
 
@@ -286,5 +280,37 @@ const styles = StyleSheet.create({
   pending: {
     fontWeight: "600",
     color: "#ffc107",
+  },
+
+  section: {
+    marginTop: 12,
+  },
+
+  sectionTitle: {
+    fontWeight: "700",
+    color: "#1e90ff",
+    marginBottom: 8,
+  },
+
+  itemRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+  },
+
+  itemName: {
+    fontSize: 14,
+    color: "#0F172A",
+  },
+
+  itemQty: {
+    fontWeight: "700",
+    color: "#2563EB",
+  },
+
+  emptyText: {
+    color: "#94A3B8",
   },
 });
