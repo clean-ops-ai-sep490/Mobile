@@ -17,8 +17,7 @@
         "UIBackgroundModes": [
           "fetch",
           "remote-notification",
-          "fetch",
-          "remote-notification"
+          "bluetooth-central"
         ],
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -33,7 +32,15 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "CAMERA",
+        "BLUETOOTH",
+        "BLUETOOTH_SCAN",
+        "BLUETOOTH_CONNECT",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
     },
     "web": {
       "output": "static",
@@ -41,6 +48,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-camera",
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
       "@rnmapbox/maps",

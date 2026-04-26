@@ -51,6 +51,21 @@ interface RouteParams {
     uri: string;
   };
   stepId?: string;
+
+  bleResult?: {
+    valid: boolean;
+    stepId?: string;
+    deviceId?: string;
+    deviceName?: string;
+    deviceUuid?: string;
+    checkinRecordId?: string;
+    checkinAt?: string;
+    workareaId?: string;
+    code?: string;
+    checkinPointId?: string;
+    verifiedAt?: string;
+    message?: string;
+  };
 }
 
 enum StepStatus {
@@ -124,6 +139,18 @@ export default function TaskExecutionScreen() {
       try {
         const task = await getTaskAssignmentById(taskAssignmentId);
         if (!task) throw new Error("Task not found");
+        // Alert.alert(
+        //   "Raw step[0]",
+        //   JSON.stringify(
+        //     {
+        //       configSnapshot: task.steps[0]?.configSnapshot,
+        //       detail: task.steps[0]?.configSnapshot?.detail, // ← thêm dòng này
+        //       keys: Object.keys(task.steps[0] ?? {}),
+        //     },
+        //     null,
+        //     2,
+        //   ).slice(0, 800),
+        // );
 
         const sorted = [...task.steps].sort(
           (a, b) => a.stepOrder - b.stepOrder,
@@ -137,6 +164,9 @@ export default function TaskExecutionScreen() {
             ...detail,
             "x-behavior": schema["x-behavior"],
             actionKey: s.sopStepId,
+            workerId: workerId ?? "",
+            checkinPointId: detail?.checkinPointId,
+            identifier: detail?.identifier,
           };
 
           return {
@@ -251,6 +281,46 @@ export default function TaskExecutionScreen() {
     navigation.setParams({ selfieResult: undefined, stepId: undefined });
   }, [params?.selfieResult]);
 
+  // Phần useEffect xử lý bleResult GIỮ NGUYÊN như code cũ
+  // useEffect(() => {
+  //   const bleResult = params?.bleResult;
+  //   if (!bleResult?.valid || !bleResult?.stepId) return;
+
+  //   const stepId = bleResult.stepId;
+
+  //   setSteps((prev) => {
+  //     const updated = prev.map((s) => {
+  //       if (s.id !== stepId) return s;
+
+  //       return {
+  //         ...s,
+  //         stepState: {
+  //           ...s.stepState,
+  //           checkedIn: true,
+  //           verified: true,
+  //           method: "ble",
+
+  //           deviceId: bleResult.deviceId,
+  //           deviceName: bleResult.deviceName,
+  //           deviceUuid: bleResult.deviceUuid,
+  //           checkinRecordId: bleResult.checkinRecordId,
+  //           checkinAt: bleResult.checkinAt,
+  //           workareaId: bleResult.workareaId,
+  //         },
+  //       };
+  //     });
+
+  //     AsyncStorage.setItem(
+  //       `taskProgress:${taskAssignmentId}`,
+  //       JSON.stringify(updated),
+  //     );
+
+  //     return updated;
+  //   });
+
+  //   navigation.setParams({ bleResult: undefined });
+  // }, [params?.bleResult]);
+
   // ─── Derived ──────────────────────────────────────────────────────────────
   const completedCount = steps.filter(
     (s) => s.status === StepStatus.Completed,
@@ -348,6 +418,12 @@ export default function TaskExecutionScreen() {
   // ─── Header right ─────────────────────────────────────────────────────────
   const headerRight = (
     <View style={s.headerActions}>
+      <TouchableOpacity
+        style={s.headerBtn}
+        onPress={() => navigation.navigate("BleTest")}
+      >
+        <Text style={{ fontSize: 11, color: "#0F172A" }}>BLE Test</Text>
+      </TouchableOpacity>
       <TouchableOpacity
         style={s.headerBtn}
         onPress={() => setEquipmentModalVisible(true)}

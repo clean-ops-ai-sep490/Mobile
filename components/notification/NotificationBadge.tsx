@@ -11,7 +11,7 @@ export const NotificationBadge = () => {
   return (
     <TouchableOpacity
       style={styles.container}
-      onPress={() => navigation.navigate("NotificationList" as never)}
+      onPress={() => navigation.navigate("Notifications" as never)}
     >
       <Ionicons name="notifications-outline" size={24} color="#000" />
       {unreadCount > 0 && (
