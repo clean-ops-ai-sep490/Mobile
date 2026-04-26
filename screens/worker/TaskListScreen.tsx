@@ -414,15 +414,20 @@ export default function TaskListScreen() {
   const mappedTasks: Task[] = tasks.map((t) => {
     const startsAt = t.scheduledStartAt;
     const dateObj = new Date(startsAt);
-    const time = dateObj.toLocaleTimeString([], {
+    const time = dateObj.toLocaleTimeString("vi-VN", {
       hour: "2-digit",
       minute: "2-digit",
+      hour12: false,
+      timeZone: "UTC",
     });
     return {
       id: t.id,
-      title: t.isAdhocTask
-        ? t.nameAdhocTask || "Công việc linh động"
-        : `Công việc ${t.taskScheduleId.slice(0, 8).toUpperCase()}`,
+      title:
+        // Prefer explicit task name when available (backend `TaskName`)
+        t.taskName ||
+        (t.isAdhocTask
+          ? t.nameAdhocTask || "Công việc linh động"
+          : `Công việc ${t.taskScheduleId.slice(0, 8).toUpperCase()}`),
       location: t.displayLocation || "Không rõ địa điểm",
       sublocation: "",
       status: mapStatusToTaskStatus(t.status),
