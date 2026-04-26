@@ -13,6 +13,7 @@
       "bundleIdentifier": "com.cleanopsai.app",
       "infoPlist": {
         "NSCameraUsageDescription": "CleanOps cần camera để chụp ảnh kiểm tra trước/sau khi dọn dẹp.",
+        "NSLocationWhenInUseUsageDescription": "CleanOps cần truy cập vị trí để hiển thị nhân viên trên bản đồ.",
         "UIBackgroundModes": [
           "fetch",
           "remote-notification",
@@ -42,6 +43,7 @@
       "expo-router",
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
+      "@rnmapbox/maps",
       [
         "expo-splash-screen",
         {
