@@ -27,7 +27,9 @@ import InspectionCameraScreen from "@/screens/shared/CameraScreen";
 import { NotificationListScreen } from "@/screens/shared/NotificationListScreen";
 import QRScannerScreen from "@/screens/shared/QRScannerScreen";
 import CreateEmergencyTaskScreen from "@/screens/supervisor/adhoc-task/CreateEmergencyTaskScreen";
+import WorkAreaListScreen from "@/screens/supervisor/adhoc-task/WorkAreaListScreen";
 import SupervisorHomeScreen from "@/screens/supervisor/home/SupervisorHomeScreen";
+import MapScreen from "@/screens/supervisor/map/MapScreen";
 import SwapRequestDetailScreen from "@/screens/supervisor/swap-task/SwapRequestDetailScreen";
 import SwapRequestListScreen from "@/screens/supervisor/swap-task/SwapRequestListScreen";
 import ListAllRequestsScreen from "@/screens/worker/ListAllRequestsScreen";
@@ -70,9 +72,25 @@ export type WorkerStackParamList = {
 // ─── Supervisor Route params ──────────────────────────────────────────────────
 export type SupervisorStackParamList = {
   SupervisorHome: undefined;
-  CreateEmergencyTask: undefined;
+  WorkAreaList: undefined;
+  CreateEmergencyTask: {
+    workAreaId?: string;
+    workAreaName?: string;
+    preselectedWorker?: {
+      id: string;
+      name: string;
+    };
+    location?: {
+      latitude: number;
+      longitude: number;
+    };
+  };
   SwapRequestList: undefined;
   SwapRequestDetail: { requestId: string };
+  MapScreen: {
+    mode: "view" | "adhoc";
+    workAreaId?: string;
+  };
   Profile: undefined;
   Notifications: undefined;
 };
@@ -122,9 +140,13 @@ function SupervisorHomeWrapper({ navigation }: SupervisorHomeProps) {
     <SupervisorHomeScreen
       onNavigate={(screen) => {
         if (screen === "create-task") {
-          navigation.navigate("CreateEmergencyTask");
+          navigation.navigate("WorkAreaList");
         } else if (screen === "SwapRequestList") {
           navigation.navigate("SwapRequestList");
+        } else if (screen === "map-view") {
+          navigation.navigate("MapScreen", { mode: "view" });
+        } else if (screen === "map-adhoc") {
+          navigation.navigate("MapScreen", { mode: "adhoc" });
         } else {
           // Handle other navigation cases
           console.log("Navigate to:", screen);
@@ -207,9 +229,14 @@ function SupervisorNavigator() {
         component={SupervisorHomeWrapper}
       />
       <SupervisorStack.Screen
+        name="WorkAreaList"
+        component={WorkAreaListScreen}
+      />
+      <SupervisorStack.Screen
         name="CreateEmergencyTask"
         component={CreateEmergencyTaskScreen}
       />
+      <SupervisorStack.Screen name="MapScreen" component={MapScreen} />
       <SupervisorStack.Screen
         name="SwapRequestList"
         component={SwapRequestListScreen}
