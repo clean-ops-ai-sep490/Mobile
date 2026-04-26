@@ -52,8 +52,12 @@ export default function SupervisorHomeScreen({ onNavigate }: Props) {
   useEffect(() => {
     const fetchPendingCount = async () => {
       try {
-        const result = await getList({ status: "PendingManagerApproval" });
-        setPendingSwapCount(result.totalElements);
+        // Chỉ fetch khi user đã tương tác với dashboard
+        // hoặc sau một khoảng delay nhỏ để không block UI
+        setTimeout(async () => {
+          const result = await getList({ status: "PendingManagerApproval" });
+          setPendingSwapCount(result.totalElements);
+        }, 1000); // Delay 1 giây
       } catch (error) {
         console.error("Failed to fetch pending swap count:", error);
       }
@@ -63,8 +67,23 @@ export default function SupervisorHomeScreen({ onNavigate }: Props) {
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
+
+    // Chỉ fetch pending count khi user click vào SwapRequestList
+    if (tabId === "SwapRequestList" && pendingSwapCount === 0) {
+      fetchPendingCount();
+    }
+
     if (onNavigate) {
       onNavigate(tabId);
+    }
+  };
+
+  const fetchPendingCount = async () => {
+    try {
+      const result = await getList({ status: "PendingManagerApproval" });
+      setPendingSwapCount(result.totalElements);
+    } catch (error) {
+      console.error("Failed to fetch pending swap count:", error);
     }
   };
 
@@ -78,7 +97,6 @@ export default function SupervisorHomeScreen({ onNavigate }: Props) {
 
   const navigationTabs = [
     { icon: "📊", label: "Dashboard", id: "dashboard" },
-    { icon: "📋", label: "Tasks", id: "tasks" },
     { icon: "👥", label: "Workers", id: "workers" },
     { icon: "📈", label: "Reports", id: "reports" },
     { icon: "⚙️", label: "Settings", id: "settings" },
@@ -156,34 +174,27 @@ export default function SupervisorHomeScreen({ onNavigate }: Props) {
             <Text style={styles.sectionLabel}>Quick Actions</Text>
             <View style={styles.quickGrid}>
               <QuickActionButton
-                icon="➕"
-                label="Ad-hoc Task"
-                onPress={() => handleTabPress("create-task")}
+                icon="🗺️"
+                label="Xem Bản Đồ"
+                onPress={() => handleTabPress("map-view")}
               />
               <QuickActionButton
-                icon="📝"
-                label="Review Tasks"
-                onPress={() => handleTabPress("review")}
+                icon="➕"
+                label="Ad-hoc Task"
+                onPress={() => handleTabPress("map-adhoc")}
               />
             </View>
             <View style={styles.quickGrid}>
               <QuickActionButton
-                icon="👤"
-                label="View Workers"
-                onPress={() => handleTabPress("workers")}
+                icon="�"
+                label="Review Tasks"
+                onPress={() => handleTabPress("review")}
               />
               <QuickActionButton
                 icon="🔄"
                 label="Swap Requests"
                 badge={pendingSwapCount}
                 onPress={() => handleTabPress("SwapRequestList")}
-              />
-            </View>
-            <View style={styles.quickGrid}>
-              <QuickActionButton
-                icon="🚨"
-                label="Issues Hub"
-                onPress={() => handleTabPress("issues")}
               />
             </View>
           </Animated.View>
