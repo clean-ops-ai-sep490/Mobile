@@ -7,6 +7,7 @@
 //   EXPO_PUBLIC_SIGNALR_URL=ws://localhost:5000/hubs/compliance     ← docker  (default)
 //   EXPO_PUBLIC_SIGNALR_URL=wss://localhost:7298/hubs/compliance    ← dotnet
 
+import { SIGNALR_URL } from "@/constants/signalr";
 import axiosInstance from "@/lib/axios";
 import {
   HttpTransportType,
@@ -16,11 +17,6 @@ import {
   LogLevel,
 } from "@microsoft/signalr";
 import { useCallback, useEffect, useRef, useState } from "react";
-
-// ─── Hub URL — đọc từ env, fallback về dotnet local ───────────────────────────
-const SIGNALR_HUB_URL: string =
-  (typeof process !== "undefined" && process.env?.EXPO_PUBLIC_SIGNALR_URL) ||
-  "http://192.168.1.8:5000/hubs/compliance";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -202,7 +198,7 @@ export function useComplianceCheck() {
       // Dùng LongPolling để tránh lỗi 'Cannot resolve ws://' trên RN/Expo.
       // SignalR sẽ negotiate qua HTTP trước rồi tự upgrade lên WebSocket nếu BE hỗ trợ.
       const connection = new HubConnectionBuilder()
-        .withUrl(SIGNALR_HUB_URL, {
+        .withUrl(SIGNALR_URL, {
           transport: HttpTransportType.LongPolling,
         })
         .withAutomaticReconnect()
@@ -249,7 +245,7 @@ export function useComplianceCheck() {
 
       try {
         await connection.start();
-        console.log("📡 [SignalR] Connected →", SIGNALR_HUB_URL);
+        console.log("📡 [SignalR] Connected →", SIGNALR_URL);
 
         // BE method: JoinExecution(Guid taskStepExecutionId)
         // SignalR tự convert string → Guid nếu đúng format "xxxxxxxx-xxxx-..."

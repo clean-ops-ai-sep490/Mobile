@@ -11,7 +11,9 @@ function EquipmentComponent({ config, state, onChange }: StepPluginProps) {
   return (
     <View style={s.container}>
       <View style={s.header}>
-        <Text style={s.label}>Confirm all required equipment is ready</Text>
+        <Text style={s.label}>
+          Hãy chắc chắn tất cả thiết bị yêu cầu đều sẵn sàng !
+        </Text>
       </View>
 
       <View style={s.list}>
