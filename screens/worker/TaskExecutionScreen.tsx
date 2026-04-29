@@ -14,6 +14,8 @@ import { useSteps } from "@/hooks/useStep";
 import { useTaskAssignments } from "@/hooks/useTaskAssignment";
 import { useTaskSchedules } from "@/hooks/useTaskSchedule";
 import useTaskStepExecution from "@/hooks/useTaskStepExecution";
+import { sendWorkerGps } from "@/hooks/useWorkerGps";
+import { getCurrentLocation } from "@/services/workergps.service";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -130,6 +132,27 @@ export default function TaskExecutionScreen() {
     })();
   }, []);
 
+  useEffect(() => {
+    if (!workerId || !taskAssignmentId) return;
+
+    const sendGps = async () => {
+      try {
+        const loc = await getCurrentLocation();
+        await sendWorkerGps(workerId, loc.latitude, loc.longitude, true);
+      } catch {
+        // Không lấy được vị trí, vẫn ping để BE biết worker online
+        try {
+          await sendWorkerGps(workerId, null, null, false);
+        } catch {}
+      }
+    };
+
+    sendGps(); // Gửi ngay khi vào màn
+
+    const interval = setInterval(sendGps, 3 * 60 * 1000); // 3 phút
+    return () => clearInterval(interval); // Cleanup khi rời màn
+  }, [workerId, taskAssignmentId]);
+
   // ─── Load task data ───────────────────────────────────────────────────────
   useEffect(() => {
     if (!taskAssignmentId) return;
@@ -139,18 +162,6 @@ export default function TaskExecutionScreen() {
       try {
         const task = await getTaskAssignmentById(taskAssignmentId);
         if (!task) throw new Error("Task not found");
-        // Alert.alert(
-        //   "Raw step[0]",
-        //   JSON.stringify(
-        //     {
-        //       configSnapshot: task.steps[0]?.configSnapshot,
-        //       detail: task.steps[0]?.configSnapshot?.detail, // ← thêm dòng này
-        //       keys: Object.keys(task.steps[0] ?? {}),
-        //     },
-        //     null,
-        //     2,
-        //   ).slice(0, 800),
-        // );
 
         const sorted = [...task.steps].sort(
           (a, b) => a.stepOrder - b.stepOrder,
@@ -420,9 +431,16 @@ export default function TaskExecutionScreen() {
     <View style={s.headerActions}>
       <TouchableOpacity
         style={s.headerBtn}
-        onPress={() => navigation.navigate("BleTest")}
+        onPress={() =>
+          navigation.navigate(
+            "EmergencyLeave" as never,
+            {
+              taskAssignmentId: taskAssignmentId ?? null, // TH1: có id, TH2: null
+            } as never,
+          )
+        }
       >
-        <Text style={{ fontSize: 11, color: "#0F172A" }}>BLE Test</Text>
+        <Ionicons name="medkit-outline" size={22} color="#db0614" />
       </TouchableOpacity>
       <TouchableOpacity
         style={s.headerBtn}

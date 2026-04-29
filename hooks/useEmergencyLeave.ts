@@ -27,6 +27,7 @@ export interface EmergencyLeaveRequestDto {
   transcription?: string;
   status: RequestStatus;
   reviewedByUserId?: string;
+  reviewedByUserName?: string;
   approvedAt?: string;
   created: string;
   lastModified?: string;

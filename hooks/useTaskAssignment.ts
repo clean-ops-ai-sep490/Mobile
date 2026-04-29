@@ -36,6 +36,7 @@ export interface TaskAssignmentDto {
   originalAssigneeId: string;
   status: TaskAssignmentStatus;
   scheduledStartAt: string;
+  scheduleEndAt: string;
   isAdhocTask: boolean;
   nameAdhocTask?: string;
   displayLocation?: string;
@@ -107,6 +108,7 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
         params.sortDescending = pagination.sortDescending;
 
       const response = await axiosInstance.get(baseUrl, { params });
+      // console.log("[TaskList] getTaskAssignments response:", response.data);
       return response.data;
     } catch (err: any) {
       const message =
@@ -127,7 +129,22 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
 
     try {
       const response = await axiosInstance.get(`${baseUrl}/${id}`);
-      return response.data;
+      const data: any = response.data;
+      // Log to help debug why `taskName` might be missing / where it's located
+      // console.log("[useTaskAssignments] getTaskAssignmentById response:", data);
+
+      // Normalize common shapes so callers can reliably read `taskName`
+      const derivedName =
+        data?.taskName ||
+        data?.nameAdhocTask ||
+        data?.task?.taskName ||
+        data?.task?.name ||
+        data?.taskSchedule?.taskName ||
+        undefined;
+
+      if (derivedName && !data.taskName) data.taskName = derivedName;
+
+      return data as TaskAssignmentDto;
     } catch (err: any) {
       if (err?.response?.status === 404) {
         setError("Không tìm thấy công việc");
