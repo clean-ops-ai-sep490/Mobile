@@ -5,7 +5,7 @@ import Header from "@/components/common/Header";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEmergencyLeaveRequest } from "@/hooks/useEmergencyLeave";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { Audio } from "expo-av";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -19,13 +19,14 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { savePendingLeave } from "./TaskListScreen";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type RecordState = "idle" | "recording" | "recorded";
 type PlayState = "idle" | "playing" | "paused";
 
 interface Props {
-  taskAssignmentId: string;
+  taskAssignmentId?: string | null;
   onClose?: () => void;
   onSubmitSuccess?: (id: string) => void;
 }
@@ -232,10 +233,21 @@ const StatusBadge = ({ status }: { status: string }) => {
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function EmergencyLeaveScreen({
-  taskAssignmentId,
+  taskAssignmentId: taskAssignmentIdProp,
   onClose,
   onSubmitSuccess,
 }: Props) {
+  const route = useRoute<any>();
+
+  // Ưu tiên route.params, fallback về props
+  const taskAssignmentId: string | null =
+    route.params?.taskAssignmentId ?? taskAssignmentIdProp ?? null;
+
+  // TH1: có taskAssignmentId (đang làm task)
+  // TH2: không có (xin nghỉ từ ngoài)
+  // Cả 2 TH đều cần chọn ngày → luôn hiển thị date picker
+  const isTH1 = !!taskAssignmentId;
+
   const { getWorkerProfile } = useAuth();
   const [workerId, setWorkerId] = useState<string | null>(null);
   const [loadingWorker, setLoadingWorker] = useState(true);
@@ -250,12 +262,9 @@ export default function EmergencyLeaveScreen({
   );
   const [leaveDateTo, setLeaveDateTo] = useState<Date | undefined>(undefined);
   const [transcription, setTranscription] = useState<string>("");
-
   const [showDatePicker, setShowDatePicker] = useState<"from" | "to" | null>(
     null,
   );
-  const [tempDate, setTempDate] = useState(new Date());
-  // Track result after successful submission
   const [submittedStatus, setSubmittedStatus] = useState<string | null>(null);
 
   const recordingRef = useRef<Audio.Recording | null>(null);
@@ -283,24 +292,19 @@ export default function EmergencyLeaveScreen({
   const recSec = recSeconds % 60;
   const progress = duration > 0 ? playSeconds / duration : 0;
 
+  // ── Load worker ────────────────────────────────────────────────────────────
   useEffect(() => {
-    const fetchWorkerId = async () => {
+    (async () => {
       try {
         setLoadingWorker(true);
         const profile = await getWorkerProfile();
-
-        // Nếu lấy thành công, gán id vào state workerId
-        if (profile && profile.id) {
-          setWorkerId(profile.id);
-        }
-      } catch (error) {
-        console.error("Error fetching worker profile:", error);
+        if (profile?.id) setWorkerId(profile.id);
+      } catch (e) {
+        console.error("Error fetching worker profile:", e);
       } finally {
         setLoadingWorker(false);
       }
-    };
-
-    fetchWorkerId();
+    })();
   }, []);
 
   useEffect(() => {
@@ -426,6 +430,21 @@ export default function EmergencyLeaveScreen({
     }
   };
 
+  // ── Date helpers ───────────────────────────────────────────────────────────
+  const toLocalMidnight = (date: Date): Date =>
+    new Date(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+
+  const handleConfirmDate = (selectedDate: Date) => {
+    if (showDatePicker === "from") {
+      setLeaveDateFrom(selectedDate);
+      if (leaveDateTo && selectedDate > leaveDateTo)
+        setLeaveDateTo(selectedDate);
+    } else if (showDatePicker === "to") {
+      setLeaveDateTo(selectedDate);
+    }
+    setShowDatePicker(null);
+  };
+
   // ── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (loadingWorker) {
@@ -433,19 +452,16 @@ export default function EmergencyLeaveScreen({
       return;
     }
     if (!workerId) {
-      Alert.alert(
-        "Phiên hết hạn",
-        "Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại để gửi yêu cầu.",
-      );
+      Alert.alert("Phiên hết hạn", "Vui lòng đăng nhập lại để gửi yêu cầu.");
       return;
     }
     if (!isRecorded || !recordingUri) {
       Alert.alert("Chưa có bản ghi", "Vui lòng ghi âm lý do trước khi gửi.");
       return;
     }
-
-    // ✅ Validate: nếu không có taskAssignmentId thì phải có dates
-    if (!taskAssignmentId && (!leaveDateFrom || !leaveDateTo)) {
+    // Nếu đang xin nghỉ trong khi thực hiện task (TH1), server chấp nhận
+    // chỉ `taskAssignmentId` và bỏ qua `leaveDateFrom`/`leaveDateTo`.
+    if (!isTH1 && (!leaveDateFrom || !leaveDateTo)) {
       Alert.alert(
         "Thiếu ngày",
         "Vui lòng chọn cả ngày bắt đầu và kết thúc cho kỳ nghỉ.",
@@ -453,60 +469,74 @@ export default function EmergencyLeaveScreen({
       return;
     }
 
-    // ✅ Khai báo fromDate và toDate ở ngoài để dùng sau
-    let fromDate: Date | undefined;
-    let toDate: Date | undefined;
+    // ── Helper build date string theo local time, tránh UTC lệch giờ ──
+    const toLocalDateStr = (date: Date): string => {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, "0");
+      const d = String(date.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    };
 
-    // ✅ Validate và chuẩn bị dates
-    if (leaveDateFrom && leaveDateTo) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+    const fromDateStr = leaveDateFrom ? toLocalDateStr(leaveDateFrom) : null; // "2026-04-28" or null for TH1
+    const toDateStr = leaveDateTo ? toLocalDateStr(leaveDateTo) : null; // "2026-04-28" or null for TH1
+    const todayStr = toLocalDateStr(new Date()); // "2026-04-28"
 
-      fromDate = new Date(leaveDateFrom);
-      fromDate.setHours(0, 0, 0, 0);
-
-      toDate = new Date(leaveDateTo);
-      toDate.setHours(23, 59, 59, 999); // ✅ Cuối ngày
-
-      // Validate: không được ở quá khứ
-      if (fromDate < today) {
-        Alert.alert(
-          "Ngày không hợp lệ",
-          "Ngày bắt đầu không được trước ngày hiện tại.",
-        );
-        return;
-      }
-
-      // Validate: fromDate <= toDate
-      if (fromDate > toDate) {
-        Alert.alert(
-          "Ngày không hợp lệ",
-          "Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.",
-        );
-        return;
-      }
+    if (!isTH1 && fromDateStr && fromDateStr < todayStr) {
+      Alert.alert(
+        "Ngày không hợp lệ",
+        "Ngày bắt đầu không được trước ngày hiện tại.",
+      );
+      return;
     }
+    if (!isTH1 && fromDateStr && toDateStr && fromDateStr > toDateStr) {
+      Alert.alert(
+        "Ngày không hợp lệ",
+        "Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.",
+      );
+      return;
+    }
+
+    const toUTCZ = (dateStr: string, endOfDay: boolean): string => {
+      const [y, m, d] = dateStr.split("-").map(Number);
+      const date = endOfDay
+        ? new Date(Date.UTC(y, m - 1, d, 23, 59, 59, 999))
+        : new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
+      // Bỏ milliseconds: "2026-04-28T00:00:00Z" thay vì "2026-04-28T00:00:00.000Z"
+      return date.toISOString();
+    };
 
     const uriParts = recordingUri.split("/");
     const rawName =
       uriParts[uriParts.length - 1] ?? `recording_${Date.now()}.m4a`;
 
     try {
-      const result = await createRequest({
+      const payload: any = {
         workerId,
-        taskAssignmentId: taskAssignmentId || null,
-        // ✅ Dùng fromDate và toDate đã set giờ chính xác
-        leaveDateFrom: fromDate ? fromDate.toISOString() : undefined,
-        leaveDateTo: toDate ? toDate.toISOString() : undefined,
-        audioFile: {
-          uri: recordingUri,
-          name: rawName,
-          type: "audio/m4a",
-        },
+        taskAssignmentId: isTH1 ? taskAssignmentId : null,
+        audioFile: { uri: recordingUri, name: rawName, type: "audio/m4a" },
         transcription: transcription || null,
-      });
+      };
+
+      if (!isTH1 && fromDateStr && toDateStr) {
+        payload.leaveDateFrom = toUTCZ(fromDateStr, false);
+        payload.leaveDateTo = toUTCZ(toDateStr, true);
+      } else {
+        // TH1: explicitly send null dates so backend knows this is task-based leave
+        payload.leaveDateFrom = null;
+        payload.leaveDateTo = null;
+      }
+
+      const result = await createRequest(payload);
 
       setSubmittedStatus(result.status);
+
+      await savePendingLeave({
+        id: result.id,
+        from: isTH1 ? null : fromDateStr,
+        to: isTH1 ? null : toDateStr,
+        taskAssignmentId: isTH1 ? taskAssignmentId || null : null,
+        status: "Pending",
+      });
 
       Alert.alert(
         "Đã gửi yêu cầu",
@@ -528,47 +558,9 @@ export default function EmergencyLeaveScreen({
         err?.response?.data?.message ||
         err?.response?.data?.errors?.[0] ||
         err?.message ||
-        "Could not submit the request. Please try again.";
+        "Không thể gửi yêu cầu. Vui lòng thử lại.";
       Alert.alert("Gửi thất bại", beErr);
     }
-  };
-  const handleConfirmDate = (selectedDate: Date) => {
-    // Component con đã đảm bảo selectedDate là 00:00:00
-    console.debug("[EmergencyLeave] handleConfirmDate called", {
-      showDatePicker,
-      selectedDateIso: selectedDate?.toISOString(),
-      leaveDateFromIso: leaveDateFrom?.toISOString(),
-      leaveDateToIso: leaveDateTo?.toISOString(),
-    });
-
-    if (showDatePicker === "from") {
-      setLeaveDateFrom(selectedDate);
-
-      // UX Logic: Tự đẩy ngày 'To' lên nếu 'From' vượt qua 'To' hiện tại
-      if (leaveDateTo && selectedDate > leaveDateTo) {
-        setLeaveDateTo(selectedDate);
-      }
-    } else if (showDatePicker === "to") {
-      setLeaveDateTo(selectedDate);
-    }
-
-    // Log after state updates (note: state updates are async; log current values)
-    console.debug("[EmergencyLeave] after handleConfirmDate (post set)", {
-      selectedDateIso: selectedDate?.toISOString(),
-      leaveDateFromIso: leaveDateFrom?.toISOString(),
-      leaveDateToIso: leaveDateTo?.toISOString(),
-    });
-
-    // Đóng Modal/Dialog
-    setShowDatePicker(null);
-  };
-  // Thêm helper này trong EmergencyLeaveScreen
-  const toLocalMidnight = (date: Date): Date => {
-    return new Date(
-      date.getUTCFullYear(),
-      date.getUTCMonth(),
-      date.getUTCDate(),
-    );
   };
 
   // ── Mic icon ───────────────────────────────────────────────────────────────
@@ -584,7 +576,7 @@ export default function EmergencyLeaveScreen({
 
       <Header
         title="Yêu cầu nghỉ khẩn cấp"
-        onBack={() => handleNavigate("Home")}
+        onBack={() => navigation.goBack()}
         style={{ backgroundColor: "#db0614" }}
         titleStyle={{ color: "#FFFFFF" }}
       />
@@ -595,6 +587,20 @@ export default function EmergencyLeaveScreen({
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        {/* ── Info banner TH1 ── */}
+        {isTH1 && (
+          <View style={styles.th1Banner}>
+            <Ionicons
+              name="information-circle-outline"
+              size={16}
+              color="#1D4ED8"
+            />
+            <Text style={styles.th1BannerText}>
+              Bạn đang xin nghỉ trong khi thực hiện task.
+            </Text>
+          </View>
+        )}
+
         {/* ── Title ── */}
         <Text style={styles.title}>
           {isRecording
@@ -603,14 +609,13 @@ export default function EmergencyLeaveScreen({
               ? "Đã ghi âm"
               : "Chạm để bắt đầu ghi âm"}
         </Text>
-
         <Text style={styles.subtitle}>
           {isRecorded
             ? "Nghe lại hoặc ghi lại nếu cần."
             : "Nêu rõ lý do. Quản lý của bạn\nsẽ được thông báo ngay lập tức."}
         </Text>
 
-        {/* ── Status badge (shown after submit) ── */}
+        {/* ── Status badge ── */}
         {submittedStatus && (
           <View style={styles.statusRow}>
             <Text style={styles.statusLabel}>Trạng thái yêu cầu: </Text>
@@ -697,7 +702,7 @@ export default function EmergencyLeaveScreen({
           </TouchableOpacity>
         )}
 
-        {/* ── Audio size note ── */}
+        {/* ── Audio note ── */}
         {isRecorded && (
           <Text style={styles.audioNote}>
             Âm thanh sẽ được gửi tới quản lý để xem xét (khuyến nghị tối đa 10
@@ -705,12 +710,12 @@ export default function EmergencyLeaveScreen({
           </Text>
         )}
 
-        {/* ── Leave Dates (chỉ hiện khi không có taskAssignmentId) ── */}
-        {!taskAssignmentId && (
+        {/* ── Leave Dates — Hidden in TH1 (task execution) ── */}
+        {!isTH1 ? (
           <View style={styles.datesSection}>
             <Text style={styles.datesSectionTitle}>Thời gian nghỉ</Text>
 
-            {/* Nút bấm From Date */}
+            {/* From Date */}
             <TouchableOpacity
               style={styles.dateInputRow}
               onPress={() => setShowDatePicker("from")}
@@ -728,14 +733,14 @@ export default function EmergencyLeaveScreen({
                     : "Chọn ngày bắt đầu"}
                 </Text>
               </View>
-              <Ionicons name="chevron-down" size={18} color="#9CA3AF" />
+              <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
             </TouchableOpacity>
 
-            {/* Nút bấm To Date */}
+            {/* To Date */}
             <TouchableOpacity
               style={[
                 styles.dateInputRow,
-                !leaveDateFrom && { opacity: 0.5, backgroundColor: "#F3F4F6" },
+                !leaveDateFrom && styles.dateInputRowDisabled,
               ]}
               disabled={!leaveDateFrom}
               onPress={() => setShowDatePicker("to")}
@@ -762,7 +767,7 @@ export default function EmergencyLeaveScreen({
                     : "Chọn ngày kết thúc"}
                 </Text>
               </View>
-              <Ionicons name="chevron-down" size={18} color="#9CA3AF" />
+              <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
             </TouchableOpacity>
 
             <CustomDatePicker
@@ -779,10 +784,18 @@ export default function EmergencyLeaveScreen({
                       ? toLocalMidnight(leaveDateFrom)
                       : new Date()
               }
-              minimumDate={showDatePicker === "to" ? leaveDateFrom : null}
+              minimumDate={showDatePicker === "to" ? leaveDateFrom : new Date()}
               onConfirm={handleConfirmDate}
               onCancel={() => setShowDatePicker(null)}
             />
+          </View>
+        ) : (
+          <View style={[styles.datesSection, { alignItems: "flex-start" }]}>
+            <Text style={styles.datesSectionTitle}>Thời gian nghỉ</Text>
+            <Text style={{ color: "#6B7280", marginTop: 6 }}>
+              Đang xin nghỉ trong khi thực hiện task — ngày sẽ được lấy từ task,
+              không cần chọn.
+            </Text>
           </View>
         )}
 
@@ -801,14 +814,12 @@ export default function EmergencyLeaveScreen({
       <BottomTabBar
         activeTab="Home"
         onNavigate={handleNavigate}
-        onEmergencyPress={() => {
+        onEmergencyPress={() =>
           navigation.navigate(
             "EmergencyLeave" as never,
-            {
-              taskAssignmentId: selectedTaskId || null,
-            } as never,
-          );
-        }}
+            { taskAssignmentId: null } as never,
+          )
+        }
       />
     </SafeAreaView>
   );
@@ -819,6 +830,19 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#f5f6fa" },
   scroll: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 40 },
+
+  th1Banner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    backgroundColor: "#EFF6FF",
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+  },
+  th1BannerText: { flex: 1, fontSize: 13, color: "#1D4ED8", lineHeight: 18 },
 
   title: {
     fontSize: 22,
@@ -978,10 +1002,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E5E7EB",
   },
-  dateInputContent: {
-    flex: 1,
-    marginLeft: 10,
-  },
+  dateInputRowDisabled: { opacity: 0.5, backgroundColor: "#F3F4F6" },
+  dateInputContent: { flex: 1, marginLeft: 10 },
   dateInputLabel: {
     fontSize: 11,
     color: "#6B7280",
@@ -989,39 +1011,5 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
-  dateInputValue: {
-    fontSize: 14,
-    color: "#111827",
-    fontWeight: "500",
-  },
-
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
-  },
-  modalBottomSheet: {
-    backgroundColor: "#FFFFFF",
-    paddingBottom: 20, // SafeArea padding cho iPhone
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
-  },
-  modalCancelText: {
-    color: "#6B7280",
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  modalDoneText: {
-    color: "#3B82F6", // Màu xanh lam nổi bật
-    fontSize: 16,
-    fontWeight: "600",
-  },
+  dateInputValue: { fontSize: 14, color: "#111827", fontWeight: "500" },
 });

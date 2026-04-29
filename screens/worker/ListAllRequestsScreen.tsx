@@ -7,6 +7,7 @@ import {
 } from "@/hooks/useEmergencyLeave";
 import useEquipment, { EquipmentRequestItem } from "@/hooks/useEquipment";
 import { IssueReport, useIssueReport } from "@/hooks/useIssueReport";
+import { useTaskAssignments } from "@/hooks/useTaskAssignment";
 import {
   SwapRequest,
   TaskSwapRequestListItem,
@@ -15,7 +16,7 @@ import {
 import { WorkerStackParamList } from "@/navigation/AppNavigator";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   RefreshControl,
   SafeAreaView,
@@ -53,6 +54,12 @@ const TABS: TabConfig[] = [
   },
   { key: "emergency", label: "Nghỉ khẩn cấp", icon: "medkit-outline" },
 ];
+
+// ─── Extend DTO locally để thêm taskName ─────────────────────────────────────
+
+interface EnrichedEmergencyLeaveDto extends EmergencyLeaveRequestDto {
+  taskName?: string;
+}
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
@@ -134,7 +141,7 @@ function EquipmentCard({ item }: { item: EquipmentRequestItem }) {
   return (
     <Card>
       <CardHeader
-        title={`Yêu cầu thiết bị`}
+        title="Yêu cầu thiết bị"
         status={item.status ?? "Đang chờ"}
         date={item?.created}
       />
@@ -145,10 +152,13 @@ function EquipmentCard({ item }: { item: EquipmentRequestItem }) {
 // ─── Issue card ───────────────────────────────────────────────────────────────
 
 function IssueCard({ item }: { item: IssueReport }) {
-  const preview = "Báo cáo sự cố";
   return (
     <Card>
-      <CardHeader title={preview} status={item.status} date={item.created} />
+      <CardHeader
+        title="Báo cáo sự cố"
+        status={item.status}
+        date={item.created}
+      />
       <View style={styles.divider} />
       {item.resolvedAt && (
         <CardRow
@@ -162,21 +172,51 @@ function IssueCard({ item }: { item: IssueReport }) {
 
 // ─── Emergency card ───────────────────────────────────────────────────────────
 
-function EmergencyCard({ item }: { item: EmergencyLeaveRequestDto }) {
+function EmergencyCard({ item }: { item: EnrichedEmergencyLeaveDto }) {
   const preview = item.transcription
     ? item.transcription.length > 70
       ? item.transcription.slice(0, 70) + "…"
       : item.transcription
-    : `Nghỉ khẩn cấp`;
+    : "Nghỉ khẩn cấp";
+
+  const isDefaultDate = (d?: string) => !d || d.startsWith("0001");
+
+  const formatDateRange = (): string | null => {
+    if (isDefaultDate(item.leaveDateFrom)) return null;
+    const from = new Date(item.leaveDateFrom).toLocaleString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      day: "2-digit",
+      month: "short",
+    });
+    const to = new Date(item.leaveDateTo).toLocaleString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      day: "2-digit",
+      month: "short",
+    });
+    return `${from} – ${to}`;
+  };
+
+  const dateRange = formatDateRange();
+
   return (
     <Card>
       <CardHeader title={preview} status={item.status} date={item.created} />
       <View style={styles.divider} />
-      <CardRow label="Công việc" value={item.taskAssignmentId} />
+      {/* Tên task (TH1) hoặc khoảng ngày (TH2) */}
+      {item.taskName ? (
+        <CardRow label="Công việc" value={item.taskName} />
+      ) : dateRange ? (
+        <CardRow label="Thời gian nghỉ" value={dateRange} />
+      ) : null}
       {item.transcription && (
         <CardRow label="Bản ghi" value={item.transcription} />
       )}
-      <CardRow label="Đã xem bởi" value={item.reviewedByUserId ?? undefined} />
+      <CardRow
+        label="Đã xem bởi"
+        value={item.reviewedByUserName ?? undefined}
+      />
     </Card>
   );
 }
@@ -186,7 +226,7 @@ function EmergencyCard({ item }: { item: EmergencyLeaveRequestDto }) {
 function SwapCard({ item }: { item: SwapRequest }) {
   return (
     <Card>
-      <CardHeader title={`Đổi công việc`} status={item.status} />
+      <CardHeader title="Đổi công việc" status={item.status} />
       <View style={styles.divider} />
       <CardRow label="Người nhận" value={item.targetWorkerName ?? "—"} />
     </Card>
@@ -233,11 +273,13 @@ export default function MyRequestsScreen({ navigation }: Props) {
   const { loading: swLoading, getMine: swGet } = useTaskSwap();
   const { loading: elLoading, getListByWorkerId: elGet } =
     useEmergencyLeaveRequest();
+  const { getTaskAssignmentById } = useTaskAssignments(); // ✅ thêm
 
   const [eqItems, setEqItems] = useState<EquipmentRequestItem[]>([]);
   const [issItems, setIssItems] = useState<IssueReport[]>([]);
   const [swItems, setSwItems] = useState<TaskSwapRequestListItem[]>([]);
-  const [elItems, setElItems] = useState<EmergencyLeaveRequestDto[]>([]);
+  const [elItems, setElItems] = useState<EnrichedEmergencyLeaveDto[]>([]); // ✅ đổi type
+
   const [emModalVisible, setEmModalVisible] = useState(false);
   const [emModalId, setEmModalId] = useState<string | null>(null);
   const [issueModalVisible, setIssueModalVisible] = useState(false);
@@ -250,26 +292,61 @@ export default function MyRequestsScreen({ navigation }: Props) {
   const isLoading =
     eqLoading || issLoading || swLoading || elLoading || loadingWorker;
 
+  // ── Load workerId ──────────────────────────────────────────────────────────
   useEffect(() => {
     const fetchWorkerId = async () => {
       try {
         setLoadingWorker(true);
         const profile = await getWorkerProfile();
-        if (profile && profile.id) {
-          setWorkerId(profile.id);
-        }
+        if (profile?.id) setWorkerId(profile.id);
       } catch (error) {
         console.error("Error fetching worker profile:", error);
       } finally {
         setLoadingWorker(false);
       }
     };
-
     fetchWorkerId();
   }, []);
 
+  type EnrichFn = (
+    items: EmergencyLeaveRequestDto[],
+  ) => Promise<EnrichedEmergencyLeaveDto[]>;
+
+  // Trong component:
+  const enrichRef = useRef<EnrichFn>(undefined as any);
+
+  enrichRef.current = async (
+    items: EmergencyLeaveRequestDto[],
+  ): Promise<EnrichedEmergencyLeaveDto[]> => {
+    const th1Items = items.filter((i) => !!i.taskAssignmentId);
+    if (!th1Items.length) return items;
+
+    const enriched = await Promise.all(
+      th1Items.map(async (item): Promise<EnrichedEmergencyLeaveDto> => {
+        try {
+          const assignment = await getTaskAssignmentById(
+            item.taskAssignmentId!,
+          );
+          if (!assignment) return item;
+          return {
+            ...item,
+            taskName:
+              assignment.taskName || assignment.nameAdhocTask || undefined,
+            leaveDateFrom: item.leaveDateFrom?.startsWith("0001")
+              ? assignment.scheduledStartAt
+              : item.leaveDateFrom,
+          };
+        } catch {
+          return item;
+        }
+      }),
+    );
+
+    const enrichedMap = new Map(enriched.map((i) => [i.id, i]));
+    return items.map((i) => enrichedMap.get(i.id) ?? i);
+  };
+
   const fetchAll = useCallback(async () => {
-    // don't fetch if we don't have a valid workerId yet — avoids returning all users
     if (!workerId) return;
     const p = { pageNumber: 1, pageSize: PAGE_SIZE };
     const [eq, iss, sw, el] = await Promise.allSettled([
@@ -281,14 +358,21 @@ export default function MyRequestsScreen({ navigation }: Props) {
     if (eq.status === "fulfilled") setEqItems(eq.value?.content ?? []);
     if (iss.status === "fulfilled") setIssItems(iss.value?.content ?? []);
     if (sw.status === "fulfilled") setSwItems(sw.value?.content ?? []);
-    if (el.status === "fulfilled") setElItems(el.value?.content ?? []);
+    if (el.status === "fulfilled") {
+      const raw = el.value?.content ?? [];
+      setElItems(raw);
+      // ✅ Gọi qua ref — không tạo deps loop
+      enrichRef.current?.(raw).then(setElItems);
+    }
+    // ✅ Không có enrichEmergencyItems trong deps nữa
   }, [workerId]);
 
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
 
-  const openEmergencyModal = (item: EmergencyLeaveRequestDto) => {
+  // ── Modal handlers ─────────────────────────────────────────────────────────
+  const openEmergencyModal = (item: EnrichedEmergencyLeaveDto) => {
     setEmModalId(item.id);
     setEmModalVisible(true);
   };
@@ -300,15 +384,15 @@ export default function MyRequestsScreen({ navigation }: Props) {
     setSwapModalId(item.id);
     setSwapModalVisible(true);
   };
+  const openEquipmentModal = (item: EquipmentRequestItem) => {
+    setEquipmentModalItem(item);
+    setEquipmentModalVisible(true);
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
     await fetchAll();
     setRefreshing(false);
-  };
-  const openEquipmentModal = (item: EquipmentRequestItem) => {
-    setEquipmentModalItem(item);
-    setEquipmentModalVisible(true);
   };
 
   const counts: Record<TabKey2, number> = {
@@ -318,14 +402,12 @@ export default function MyRequestsScreen({ navigation }: Props) {
     emergency: elItems.length,
   };
 
-  const handleNavigate = (screen: TabKey) => {
+  const handleNavigate = (screen: TabKey) =>
     navigation.navigate(screen as never);
-  };
 
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" />
-
       <Header title="Yêu cầu của tôi" onBack={() => navigation.goBack()} />
 
       {/* ── Tab bar ── */}
@@ -454,6 +536,7 @@ export default function MyRequestsScreen({ navigation }: Props) {
           </>
         )}
       </ScrollView>
+
       <EmergencyLeaveDetailModal
         visible={emModalVisible}
         leaveId={emModalId!}
@@ -480,12 +563,9 @@ export default function MyRequestsScreen({ navigation }: Props) {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
+// ─── Styles (giữ nguyên) ──────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#F5F6FA" },
-
-  // Tab bar
   tabBar: {
     flexDirection: "row",
     backgroundColor: "#FFF",
@@ -505,18 +585,9 @@ const styles = StyleSheet.create({
     marginRight: 8,
     minWidth: 110,
   },
-  tabActive: {
-    borderBottomColor: "#4F46E5",
-  },
-  tabLabel: {
-    fontSize: 11,
-    fontWeight: "500",
-    color: "#94A3B8",
-  },
-  tabLabelActive: {
-    color: "#4F46E5",
-    fontWeight: "700",
-  },
+  tabActive: { borderBottomColor: "#4F46E5" },
+  tabLabel: { fontSize: 11, fontWeight: "500", color: "#94A3B8" },
+  tabLabelActive: { color: "#4F46E5", fontWeight: "700" },
   countBadge: {
     borderRadius: 10,
     paddingHorizontal: 5,
@@ -524,24 +595,13 @@ const styles = StyleSheet.create({
     minWidth: 18,
     alignItems: "center",
   },
-  countText: {
-    fontSize: 10,
-    fontWeight: "700",
-  },
-
+  countText: { fontSize: 10, fontWeight: "700" },
   tabBarContent: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 4,
   },
-
-  // List
-  list: {
-    padding: 16,
-    paddingBottom: 100,
-  },
-
-  // Card
+  list: { padding: 16, paddingBottom: 100 },
   card: {
     backgroundColor: "#FFF",
     borderRadius: 14,
@@ -561,25 +621,15 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 8,
   },
-  cardHeaderLeft: {
-    flex: 1,
-  },
+  cardHeaderLeft: { flex: 1 },
   cardTitle: {
     fontSize: 14,
     fontWeight: "700",
     color: "#1E293B",
     flexShrink: 1,
   },
-  cardDate: {
-    fontSize: 11,
-    color: "#94A3B8",
-    marginTop: 3,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: "#F1F5F9",
-    marginVertical: 10,
-  },
+  cardDate: { fontSize: 11, color: "#94A3B8", marginTop: 3 },
+  divider: { height: 1, backgroundColor: "#F1F5F9", marginVertical: 10 },
   cardRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -600,35 +650,19 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "right",
   },
-
-  // Badge
-  badge: {
-    borderRadius: 20,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: "700",
-  },
-
-  // Skeleton
+  badge: { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
+  badgeText: { fontSize: 11, fontWeight: "700" },
   skeleton: {
     height: 110,
     backgroundColor: "#E5E7EB",
     borderRadius: 14,
     marginBottom: 12,
   },
-
-  // Empty
   emptyWrap: {
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 60,
     gap: 10,
   },
-  emptyText: {
-    fontSize: 14,
-    color: "#94A3B8",
-  },
+  emptyText: { fontSize: 14, color: "#94A3B8" },
 });

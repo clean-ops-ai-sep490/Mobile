@@ -4,6 +4,7 @@ import {
   EmergencyLeaveRequestDto,
   useEmergencyLeaveRequest,
 } from "@/hooks/useEmergencyLeave";
+import { useTaskAssignments } from "@/hooks/useTaskAssignment";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -18,6 +19,10 @@ import {
   View,
 } from "react-native";
 
+interface ExtendedEmergencyLeaveDto extends EmergencyLeaveRequestDto {
+  taskName?: string;
+}
+
 interface EmergencyLeaveDetailModalProps {
   visible: boolean;
   onClose: () => void;
@@ -30,7 +35,8 @@ export default function EmergencyLeaveDetailModal({
   leaveId,
 }: EmergencyLeaveDetailModalProps) {
   const { getById } = useEmergencyLeaveRequest();
-  const [item, setItem] = useState<EmergencyLeaveRequestDto | null>(null);
+  const { getTaskAssignmentById } = useTaskAssignments();
+  const [item, setItem] = useState<ExtendedEmergencyLeaveDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,7 +47,25 @@ export default function EmergencyLeaveDetailModal({
       setError(null);
       try {
         const res = await getById(leaveId);
-        setItem(res);
+        console.log(
+          "[LeaveDetail] full response:",
+          JSON.stringify(res, null, 2),
+        );
+        // Enrich with taskName when possible (same logic as ListAllRequestsScreen)
+        if (res?.taskAssignmentId) {
+          try {
+            const assignment = await getTaskAssignmentById(
+              res.taskAssignmentId,
+            );
+            const taskName =
+              assignment?.taskName || assignment?.nameAdhocTask || undefined;
+            setItem({ ...res, taskName });
+          } catch (e) {
+            setItem(res);
+          }
+        } else {
+          setItem(res);
+        }
       } catch (err: any) {
         console.error("Không tải được nghỉ khẩn cấp", err);
         setError("Tải dữ liệu nghỉ khẩn cấp thất bại. Vui lòng thử lại.");
@@ -87,7 +111,7 @@ export default function EmergencyLeaveDetailModal({
             ) : (
               <View style={styles.card}>
                 <Text style={styles.row}>
-                  Công việc: {item.taskAssignmentId ?? "—"}
+                  Công việc: {item.taskName ?? item.taskAssignmentId ?? "—"}
                 </Text>
 
                 <Text style={styles.row}>
