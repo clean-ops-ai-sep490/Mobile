@@ -1,19 +1,25 @@
+// src/hooks/useNotification.ts
+
 import axiosInstance from "@/config/axiosInstance";
 
-// --- TYPES (Dựa trên DTOs Backend) ---
+// =====================
+// TYPES
+// =====================
+
 export interface FcmTokenCreateDto {
   token: string;
   uniqueId: string;
-  platform: 0 | 1 | 2; // Ví dụ: 0: Android, 1: iOS, 2: Web
+  platform: 0 | 1 | 2; // 0: Android, 1: iOS, 2: Web
   deviceName?: string;
   workerId?: string | null;
 }
 
 export interface NotificationListItemDto {
-  id: string; // Id của bảng trung gian NotificationRecipient
-  notificationId: string;
+  id: string; // ✅ Id của NotificationRecipient — dùng cho getDetail, markAsRead
+  notificationId: string; // Id của Notification — KHÔNG dùng cho API calls
   title: string;
   body: string;
+  payload: string; // JsonElement từ BE — là object, không phải string
   priority: string;
   senderType: string;
   senderId: string | null;
@@ -22,16 +28,7 @@ export interface NotificationListItemDto {
   created: string;
 }
 
-export interface NotificationDetailDto extends NotificationListItemDto {
-  payload: string; // JSON string
-}
-
-export interface PaginatedResult<T> {
-  pageNumber: number;
-  pageSize: number;
-  totalElements: number;
-  content: T[];
-}
+export type NotificationDetailDto = NotificationListItemDto;
 
 export interface NotificationPagedResponse {
   unreadCount: number;
@@ -44,7 +41,10 @@ export interface NotificationPagedResponse {
   content: NotificationListItemDto[];
 }
 
-// --- API SERVICES ---
+// =====================
+// API
+// =====================
+
 export const NotificationApi = {
   // Đăng ký FCM Token
   registerToken: async (data: FcmTokenCreateDto) => {
@@ -57,14 +57,17 @@ export const NotificationApi = {
     await axiosInstance.patch(`/FcmTokens/deactivate?uniqueId=${uniqueId}`);
   },
 
-  // Lấy danh sách thông báo
+  // Lấy danh sách thông báo (phân trang)
+  // Worker bắt buộc truyền workerId, Supervisor không cần
   getPaged: async (
     pageNumber: number,
     pageSize: number = 10,
     isRead?: boolean,
-  ) => {
-    const params: any = { pageNumber, pageSize };
+    workerId?: string,
+  ): Promise<NotificationPagedResponse> => {
+    const params: Record<string, any> = { pageNumber, pageSize };
     if (isRead !== undefined) params.isRead = isRead;
+    if (workerId) params.workerId = workerId;
 
     const response = await axiosInstance.get<NotificationPagedResponse>(
       "/NotificationRecipients",
@@ -73,23 +76,47 @@ export const NotificationApi = {
     return response.data;
   },
 
-  // Lấy chi tiết thông báo (để lấy Payload)
-  getDetail: async (notificationId: string) => {
+  // Lấy chi tiết 1 thông báo
+  // ✅ Truyền item.id (NotificationRecipient id), KHÔNG phải item.notificationId
+  getDetail: async (
+    recipientId: string, // = item.id
+    workerId?: string,
+  ): Promise<NotificationDetailDto> => {
+    const params: Record<string, any> = {};
+    if (workerId) params.workerId = workerId;
+
     const response = await axiosInstance.get<NotificationDetailDto>(
-      `/NotificationRecipients/${notificationId}`,
+      `/NotificationRecipients/${recipientId}`,
+      { params },
     );
     return response.data;
   },
 
-  // Đánh dấu 1 tin đã đọc
-  markAsRead: async (notificationId: string) => {
-    await axiosInstance.patch(`/NotificationRecipients/${notificationId}/read`);
+  // Đánh dấu 1 thông báo đã đọc
+  // ✅ Truyền item.id (NotificationRecipient id), KHÔNG phải item.notificationId
+  markAsRead: async (
+    recipientId: string, // = item.id
+    workerId?: string,
+  ): Promise<void> => {
+    const params: Record<string, any> = {};
+    if (workerId) params.workerId = workerId;
+
+    await axiosInstance.patch(
+      `/NotificationRecipients/${recipientId}/read`,
+      null,
+      { params },
+    );
   },
 
   // Đánh dấu tất cả đã đọc
-  markAllAsRead: async () => {
+  markAllAsRead: async (workerId?: string): Promise<number> => {
+    const params: Record<string, any> = {};
+    if (workerId) params.workerId = workerId;
+
     const response = await axiosInstance.patch<number>(
       "/NotificationRecipients/read-all",
+      null,
+      { params },
     );
     return response.data;
   },

@@ -56,31 +56,26 @@ export const setupFirebaseMessaging = async (workerId?: string) => {
       async (remoteMessage) => {
         console.log(">>> Foreground message:", remoteMessage);
         try {
-          useNotificationStore.getState().fetchUnreadCount();
+          useNotificationStore.getState().fetchUnreadCount(workerId); // ✅
         } catch (e) {}
       },
     );
 
-    // Handle when a notification opens the app from background
+    // Background opened
     const unsubscribeOnNotificationOpened = messaging().onNotificationOpenedApp(
       (remoteMessage) => {
         console.log(">>> Notification opened (background):", remoteMessage);
         try {
-          useNotificationStore.getState().fetchUnreadCount();
+          useNotificationStore.getState().fetchUnreadCount(workerId); // ✅
         } catch (e) {}
-        // TODO: perform navigation handling in a component-level handler
       },
     );
 
     // Handle when the app is opened from a quit state by a notification
     const initialNotification = await messaging().getInitialNotification();
     if (initialNotification) {
-      console.log(
-        ">>> App opened from quit by notification:",
-        initialNotification,
-      );
       try {
-        useNotificationStore.getState().fetchUnreadCount();
+        useNotificationStore.getState().fetchUnreadCount(workerId); // ✅
       } catch (e) {}
     }
 

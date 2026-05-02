@@ -1,23 +1,25 @@
+// src/screens/notification/NotificationListScreen.tsx
+
 import Header from "@/components/common/Header";
 import { NotificationItem } from "@/components/notification/NotificationItem";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-    NotificationApi,
-    NotificationListItemDto,
+  NotificationApi,
+  NotificationListItemDto,
 } from "@/hooks/useNotification";
 import { useNotificationStore } from "@/store/notification.store";
 import { handleNotificationClick } from "@/utils/notification.action";
-import { Ionicons } from "@expo/vector-icons"; // Dùng icon cho đẹp
+import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    SafeAreaView, // Thêm SafeAreaView
-    StyleSheet,
-    Text,
-    TouchableOpacity
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
 } from "react-native";
 
 export const NotificationListScreen = () => {
@@ -29,94 +31,120 @@ export const NotificationListScreen = () => {
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
   const { user } = useAuth();
+  const userRole = (user?.role as "Worker" | "Supervisor") ?? "Worker";
 
-  const userRole = user?.role || "Worker";
+  // ✅ Lấy thẳng từ AuthContext — không cần gọi getWorkerProfile() nữa
+  const workerId = user?.workerId;
 
-  const loadData = async (pageNumber: number, isRefresh = false) => {
-    if (loading) return;
-    setLoading(true);
-    try {
-      const response = await NotificationApi.getPaged(pageNumber, 15);
-      const contentList = response.content || [];
+  // ============================
+  // LOAD DATA
+  // ============================
+  const loadData = useCallback(
+    async (pageNumber: number, isRefresh = false) => {
+      if (loading && !isRefresh) return;
+      setLoading(true);
+      try {
+        const response = await NotificationApi.getPaged(
+          pageNumber,
+          15,
+          undefined,
+          workerId,
+        );
+        const contentList = response.content ?? [];
 
-      if (isRefresh) {
-        setData(contentList);
-      } else {
-        setData((prev) => [...prev, ...contentList]);
+        setData((prev) =>
+          isRefresh ? contentList : [...prev, ...contentList],
+        );
+        setHasMore(response.hasNextPage);
+        setPage(pageNumber);
+      } catch (error) {
+        console.error("Lỗi fetch notifications:", error);
+        setHasMore(false);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
-
-      setHasMore(contentList.length === 15);
-      setPage(pageNumber);
-    } catch (error) {
-      console.error("Lỗi fetch data:", error);
-      setHasMore(false);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+    },
+    [workerId],
+  );
 
   useEffect(() => {
     loadData(1, true);
-  }, []);
+  }, [loadData]);
 
+  // ============================
+  // HANDLERS
+  // ============================
   const handleRefresh = () => {
     setRefreshing(true);
     loadData(1, true);
   };
 
   const handleLoadMore = () => {
-    if (hasMore && !loading && data.length > 0) {
+    if (hasMore && !loading) {
       loadData(page + 1);
     }
   };
 
   const handleItemPress = async (item: NotificationListItemDto) => {
     try {
-      const detail = await NotificationApi.getDetail(item.notificationId);
-
+      // Đánh dấu đã đọc nếu chưa đọc
       if (!item.isRead) {
-        await NotificationApi.markAsRead(item.notificationId);
+        await NotificationApi.markAsRead(item.notificationId, workerId);
         decrementUnread();
         setData((prev) =>
           prev.map((n) => (n.id === item.id ? { ...n, isRead: true } : n)),
         );
       }
 
-      if (detail.payload) {
-        handleNotificationClick(detail.payload, userRole, navigation);
+      // ✅ Dùng thẳng item.payload — không cần gọi getDetail nữa
+      // item.payload là JsonElement (object) từ NotificationListItemDto
+      if (item.payload) {
+        handleNotificationClick(item.payload, userRole, navigation);
+      } else {
+        // Không có payload → về Home
+        if (userRole === "Worker") {
+          navigation.navigate("Home" as never);
+        } else {
+          navigation.navigate("SupervisorHome" as never);
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error(
+        "handleItemPress error:",
+        error?.response?.status,
+        JSON.stringify(error?.response?.data),
+      );
       Alert.alert("Lỗi", "Không thể mở thông báo lúc này.");
     }
   };
 
-  const handleMarkAllRead = async () => {
-    // Thêm Alert confirm để user không bấm nhầm
+  const handleMarkAllRead = () => {
     Alert.alert("Xác nhận", "Đánh dấu tất cả thông báo là đã đọc?", [
       { text: "Hủy", style: "cancel" },
       {
         text: "Đồng ý",
         onPress: async () => {
           try {
-            await NotificationApi.markAllAsRead();
+            await NotificationApi.markAllAsRead(workerId);
             clearUnread();
             setData((prev) => prev.map((n) => ({ ...n, isRead: true })));
           } catch (error) {
-            console.error(error);
+            console.error("Mark all read error:", error);
+            Alert.alert("Lỗi", "Không thể đánh dấu đã đọc lúc này.");
           }
         },
       },
     ]);
   };
 
+  // ============================
+  // RENDER
+  // ============================
   return (
-    // Dùng SafeAreaView bao ngoài cùng
     <SafeAreaView style={styles.container}>
-      {/* Tích hợp Nút Back và Nút Read All ngay trên Header
-        Sử dụng Icon thay vì chữ dài để Header không bị lệch 
-      */}
       <Header
         title="Thông báo"
         onBack={() => navigation.goBack()}
@@ -124,17 +152,16 @@ export const NotificationListScreen = () => {
           <TouchableOpacity
             style={styles.rightActionBtn}
             onPress={handleMarkAllRead}
+            disabled={loading}
           >
             <Ionicons
               name="checkmark-done-circle-outline"
               size={24}
-              color="#007AFF"
+              color={loading ? "#ccc" : "#007AFF"}
             />
           </TouchableOpacity>
         }
       />
-
-      {/* Đã xóa <View style={styles.header}> cũ đi */}
 
       <FlatList
         data={data}
@@ -148,7 +175,7 @@ export const NotificationListScreen = () => {
         onEndReachedThreshold={0.5}
         ListFooterComponent={
           loading && !refreshing ? (
-            <ActivityIndicator style={{ margin: 20 }} />
+            <ActivityIndicator style={styles.loader} />
           ) : null
         }
         ListEmptyComponent={
@@ -164,12 +191,15 @@ export const NotificationListScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F6FA", // Sửa đồng bộ với màu nền của Header
+    backgroundColor: "#F5F6FA",
   },
   rightActionBtn: {
     padding: 6,
     justifyContent: "center",
     alignItems: "center",
+  },
+  loader: {
+    margin: 20,
   },
   empty: {
     textAlign: "center",
