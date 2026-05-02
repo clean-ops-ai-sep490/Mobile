@@ -98,13 +98,15 @@ function ComplianceBanner({
         <Ionicons name="time-outline" size={22} color="#92400E" />
         <View style={bs.bannerTextWrap}>
           <Text style={[bs.bannerTitle, { color: "#92400E" }]}>
-            Chờ supervisor xét duyệt
+            Đang chờ supervisor xét duyệt…
           </Text>
           <Text style={bs.bannerSub}>
-            Điểm thấp nhất: {result.minScore.toFixed(2)} —{" "}
-            {result.failedImageCount} ảnh cần xem xét.
+            {result.failedImageCount} ảnh cần xem xét (điểm thấp nhất:{" "}
+            {result.minScore.toFixed(2)}). Nút hoàn thành sẽ mở sau khi
+            supervisor duyệt.
           </Text>
         </View>
+        {/* Không có nút action — worker chỉ có thể chờ */}
       </View>
     );
   }
@@ -539,7 +541,7 @@ export const PhotoStepPlugin: StepPlugin = {
       if (compliance === "Failed") return false;
       // Pending / Processing → chưa fulfilled
       if (compliance === "Pending" || compliance === "Processing") return false;
-      // Passed hoặc PendingSupervisor → fulfilled
+      if (compliance === "PendingSupervisor") return false;
       return hasEnoughPhotos;
     }
 

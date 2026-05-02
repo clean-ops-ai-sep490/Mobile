@@ -57,9 +57,14 @@ interface InitiateAiCheckResult {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const PENDING_STATUSES: ComplianceStatus[] = ["Pending", "Processing"];
+const PENDING_STATUSES: ComplianceStatus[] = [
+  "Pending",
+  "Processing",
+  "PendingSupervisor",
+];
 const POLL_INTERVAL_MS = 1_000; // 1s
-const MAX_POLL_ATTEMPTS = 30; // 30 × 1s = 30 seconds (faster dev feedback)
+const MAX_POLL_ATTEMPTS = 999; // 30 × 1s = 30 seconds (faster dev feedback)
+const POLL_INTERVAL_SUPERVISOR_MS = 5_000;
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
@@ -76,6 +81,13 @@ export function useComplianceCheck() {
   const pollAttemptsRef = useRef(0);
   const isMountedRef = useRef(true);
   const activeExecutionRef = useRef<string | null>(null);
+  const statusRef = useRef<ComplianceStatus | null>(null);
+
+  // Mỗi khi setStatus thì đồng thời cập nhật ref:
+  const _setStatus = (s: ComplianceStatus | null) => {
+    statusRef.current = s;
+    setStatus(s);
+  };
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -128,62 +140,85 @@ export function useComplianceCheck() {
 
   // ─── Polling fallback ────────────────────────────────────────────────────────
 
-  const _poll = useCallback(async (executionId: string) => {
-    if (!isMountedRef.current) return;
-    if (activeExecutionRef.current !== executionId) return;
+  const _poll = useCallback(
+    async (executionId: string) => {
+      if (!isMountedRef.current) return;
+      if (activeExecutionRef.current !== executionId) return;
 
-    pollAttemptsRef.current += 1;
-    if (pollAttemptsRef.current > MAX_POLL_ATTEMPTS) {
-      if (isMountedRef.current) {
-        setError("AI scoring mất quá nhiều thời gian. Vui lòng thử lại.");
-        setIsChecking(false);
+      pollAttemptsRef.current += 1;
+
+      // Chỉ giới hạn attempt trong giai đoạn AI thuần (Pending/Processing)
+      // Khi đã PendingSupervisor thì poll vô hạn với interval chậm hơn
+      const isWaitingForAi =
+        statusRef.current === null ||
+        statusRef.current === "Pending" ||
+        statusRef.current === "Processing";
+
+      if (isWaitingForAi && pollAttemptsRef.current > MAX_POLL_ATTEMPTS) {
+        if (isMountedRef.current) {
+          setError("AI scoring mất quá nhiều thời gian. Vui lòng thử lại.");
+          setIsChecking(false);
+        }
+        return;
       }
-      return;
-    }
 
-    console.log(
-      `[useComplianceCheck] poll attempt ${pollAttemptsRef.current} for ${executionId}`,
-    );
-    try {
-      const { data } = await axiosInstance.get<ComplianceCheckStatusResponse>(
-        `/ComplianceChecks/task-step-executions/${executionId}`,
+      console.log(
+        `[useComplianceCheck] poll attempt ${pollAttemptsRef.current} for ${executionId}`,
       );
 
-      if (!isMountedRef.current || activeExecutionRef.current !== executionId)
-        return;
-
-      setStatus(data.status);
-      setResult(data);
-
-      if (PENDING_STATUSES.includes(data.status)) {
-        pollTimerRef.current = setTimeout(
-          () => _poll(executionId),
-          POLL_INTERVAL_MS,
+      try {
+        const { data } = await axiosInstance.get<ComplianceCheckStatusResponse>(
+          `/ComplianceChecks/task-step-executions/${executionId}`,
         );
-      } else {
-        _teardown();
-        setIsChecking(false);
+
+        if (!isMountedRef.current || activeExecutionRef.current !== executionId)
+          return;
+
+        setStatus(data.status);
+        setResult(data);
+
+        if (data.status === "Passed" || data.status === "Failed") {
+          // ── Terminal: dừng hẳn ────────────────────────────────────────
+          _teardown();
+          setIsChecking(false);
+        } else if (data.status === "PendingSupervisor") {
+          // ── Chờ supervisor: poll chậm hơn, GIỮ isChecking=false ──────
+          // isChecking=false để UI không hiển thị spinner "AI đang kiểm tra"
+          // banner PendingSupervisor sẽ tự hiển thị qua status
+          setIsChecking(false);
+          pollTimerRef.current = setTimeout(
+            () => _poll(executionId),
+            POLL_INTERVAL_SUPERVISOR_MS,
+          );
+        } else {
+          // ── Pending / Processing: poll nhanh, giữ isChecking=true ────
+          setIsChecking(true);
+          pollTimerRef.current = setTimeout(
+            () => _poll(executionId),
+            POLL_INTERVAL_MS,
+          );
+        }
+      } catch (err: any) {
+        if (!isMountedRef.current || activeExecutionRef.current !== executionId)
+          return;
+
+        if (err?.response?.status === 404) {
+          pollTimerRef.current = setTimeout(
+            () => _poll(executionId),
+            POLL_INTERVAL_MS,
+          );
+          console.log(
+            `[useComplianceCheck] poll 404, retrying for ${executionId}`,
+          );
+        } else {
+          setError("Không thể lấy kết quả kiểm tra. Vui lòng thử lại.");
+          _teardown();
+          setIsChecking(false);
+        }
       }
-    } catch (err: any) {
-      if (!isMountedRef.current || activeExecutionRef.current !== executionId)
-        return;
-
-      // 404 = check chưa tạo xong → thử lại
-      if (err?.response?.status === 404) {
-        pollTimerRef.current = setTimeout(
-          () => _poll(executionId),
-          POLL_INTERVAL_MS,
-        );
-        console.log(
-          `[useComplianceCheck] poll received 404, retrying for ${executionId}`,
-        );
-      } else {
-        setError("Không thể lấy kết quả kiểm tra. Vui lòng thử lại.");
-        _teardown();
-        setIsChecking(false);
-      }
-    }
-  }, []);
+    },
+    [status],
+  ); // thêm status vào deps để đọc được giá trị mới nhất
 
   // ─── SignalR ─────────────────────────────────────────────────────────────────
 

@@ -260,12 +260,13 @@ function Empty({ label }: { label: string }) {
 
 const PAGE_SIZE = 20;
 
-export default function MyRequestsScreen({ navigation }: Props) {
+export default function MyRequestsScreen({ navigation, route }: Props) {
   const { getWorkerProfile } = useAuth();
   const [workerId, setWorkerId] = useState<string | null>(null);
   const [loadingWorker, setLoadingWorker] = useState(true);
 
-  const [activeTab, setActiveTab] = useState<TabKey2>("equipment");
+  const initialTab = route.params?.initialTab ?? "equipment";
+  const [activeTab, setActiveTab] = useState<TabKey2>(initialTab);
   const [refreshing, setRefreshing] = useState(false);
 
   const { loading: eqLoading, getByWorker: eqGet } = useEquipment();

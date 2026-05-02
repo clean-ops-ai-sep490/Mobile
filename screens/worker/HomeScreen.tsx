@@ -136,6 +136,7 @@ export default function HomeScreen({ onNavigate }: Props) {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const { unreadCount, fetchUnreadCount } = useNotificationStore();
+  const { getWorkerProfile } = useAuth();
 
   const handleNavigate = (screen: TabKey) => {
     navigation.navigate(screen as never);
@@ -154,7 +155,20 @@ export default function HomeScreen({ onNavigate }: Props) {
         useNativeDriver: true,
       }),
     ]).start();
-    fetchUnreadCount();
+    (async () => {
+      try {
+        if (user?.role === "Worker") {
+          const profile = await getWorkerProfile();
+          if (profile?.id) {
+            fetchUnreadCount(profile.id); // ✅ truyền workerId
+          }
+        } else {
+          fetchUnreadCount(); // Supervisor/Manager không cần workerId
+        }
+      } catch (e) {
+        console.error("fetchUnreadCount error:", e);
+      }
+    })();
   }, []);
 
   const today = new Date().toLocaleDateString("vi-VN", {

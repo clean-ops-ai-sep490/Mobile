@@ -1,5 +1,8 @@
+// src/contexts/AuthContext.tsx
+
 import useAuthHook from "@/hooks/useAuth";
 import { setupFirebaseMessaging } from "@/services/firebase.service";
+import { useNotificationStore } from "@/store/notification.store";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import React, { createContext, useContext, useEffect, useState } from "react";
@@ -12,6 +15,8 @@ interface AuthUser {
   email: string;
   fullName: string;
   role: UserRole;
+  // ✅ Thêm workerId — chỉ có khi role = Worker
+  workerId?: string;
 }
 
 interface AuthContextType {
@@ -54,7 +59,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [appUser, setAppUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  //map BE → FE model
   const mapUser = (data: any): AuthUser => ({
     userId: data.userId,
     email: data.email,
@@ -62,7 +66,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     role: data.role,
   });
 
-  //check session khi mở app
   useEffect(() => {
     checkSession();
   }, []);
@@ -71,7 +74,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const me = await getMe();
       if (me) {
-        setAppUser(mapUser(me));
+        const mappedUser = mapUser(me);
+
+        // ✅ Nếu là Worker thì lấy workerId luôn khi restore session
+        if (mappedUser.role === "Worker") {
+          try {
+            const profile = await getWorkerProfile();
+            if (profile?.id) {
+              mappedUser.workerId = profile.id;
+            }
+          } catch (e) {
+            console.warn(
+              "Could not fetch worker profile on session restore:",
+              e,
+            );
+          }
+        }
+
+        setAppUser(mappedUser);
+
+        // ✅ Refresh unread count đúng cách sau khi restore session
+        try {
+          useNotificationStore.getState().fetchUnreadCount(mappedUser.workerId);
+        } catch (e) {}
       } else {
         setAppUser(null);
       }
@@ -82,7 +107,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  //LOGIN
   const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
@@ -93,17 +117,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (me) {
         const mappedUser = mapUser(me);
 
-        // Kiểm tra role có hợp lệ không
         if (mappedUser.role !== "Worker" && mappedUser.role !== "Supervisor") {
-          // Role không hợp lệ - logout ngay
           await logout();
           throw new Error(
             `Quyền của bạn hiện tại (${mappedUser.role}) không thể đăng nhập vào hệ thống được.`,
           );
         }
 
+        // ✅ Lấy workerId trước khi setup Firebase và set user
+        if (mappedUser.role === "Worker") {
+          try {
+            const profile = await getWorkerProfile();
+            if (profile?.id) {
+              mappedUser.workerId = profile.id;
+            }
+          } catch (e) {
+            console.warn("Could not fetch worker profile on login:", e);
+          }
+        }
+
         setAppUser(mappedUser);
-        await setupFirebaseMessaging(mappedUser.userId);
+
+        // ✅ Setup Firebase với workerId đúng
+        await setupFirebaseMessaging(mappedUser.workerId);
       }
     } catch (e) {
       throw e;
@@ -112,69 +148,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  //LOGOUT
   const logout = async () => {
     try {
       setIsLoading(true);
 
-      // 1. Gọi API logout (nếu backend có)
       try {
         await logoutApi();
       } catch (apiError) {
-        // ❗ Không block logout nếu API fail
         console.warn("Logout API failed:", apiError);
       }
 
-      // 2. Xoá token/local storage
       await AsyncStorage.multiRemove([
         "access_token",
         "refresh_token",
         "userInfo",
       ]);
 
-      // 3. Clear state user
+      // ✅ Clear unread count khi logout
+      useNotificationStore.getState().clearUnread();
+
       setAppUser(null);
 
-      // 4. (Optional) clear axios header
       delete axios.defaults.headers.common["Authorization"];
     } catch (error) {
       console.error("Logout error:", error);
-      throw error; // giữ lại nếu bạn muốn handle ở ngoài
+      throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
-  // FORGOT PASSWORD
   const forgotPassword = async (email: string) => {
-    try {
-      await forgotPasswordApi(email);
-    } catch (e) {
-      throw e;
-    }
+    await forgotPasswordApi(email);
   };
 
-  // VERIFY OTP
   const verifyOtp = async (email: string, otpCode: string): Promise<string> => {
-    try {
-      const token = await verifyOtpApi(email, otpCode);
-      return token;
-    } catch (e) {
-      throw e;
-    }
+    return await verifyOtpApi(email, otpCode);
   };
 
-  // RESET PASSWORD
   const resetPassword = async (
     email: string,
     token: string,
     newPassword: string,
   ) => {
-    try {
-      await resetPasswordApi(email, token, newPassword);
-    } catch (e) {
-      throw e;
-    }
+    await resetPasswordApi(email, token, newPassword);
   };
 
   return (
@@ -191,8 +208,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         forgotPassword,
         verifyOtp,
         resetPassword,
-        getWorkerProfile, // ✅ Export ra cho toàn app dùng được
-        updateWorkerProfile, // ✅ Export ra cho toàn app dùng được
+        getWorkerProfile,
+        updateWorkerProfile,
       }}
     >
       {children}
@@ -200,14 +217,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ─── Hook dùng global ──────────────────────────────────────────
 export function useAuth(): AuthContextType {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth phải được sử dụng bên trong AuthProvider");
   return ctx;
 }
 
-// ─── Role hooks ────────────────────────────────────────────────
 export function useIsWorker(): boolean {
   return useAuth().isWorker;
 }

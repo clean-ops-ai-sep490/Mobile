@@ -3,7 +3,8 @@ import { create } from "zustand";
 
 interface NotificationState {
   unreadCount: number;
-  fetchUnreadCount: () => Promise<void>;
+  // ✅ FIX: fetchUnreadCount nhận workerId (bắt buộc với Worker role)
+  fetchUnreadCount: (workerId?: string) => Promise<void>;
   decrementUnread: () => void;
   clearUnread: () => void;
 }
@@ -11,22 +12,20 @@ interface NotificationState {
 export const useNotificationStore = create<NotificationState>((set) => ({
   unreadCount: 0,
 
-  // Gọi API lấy page 1 chỉ để lấy unreadCount cập nhật lên Store
-  fetchUnreadCount: async () => {
+  fetchUnreadCount: async (workerId?: string) => {
     try {
-      const data = await NotificationApi.getPaged(1, 1);
+      // Truyền workerId vào getPaged
+      const data = await NotificationApi.getPaged(1, 1, undefined, workerId);
       set({ unreadCount: data.unreadCount });
     } catch (error) {
       console.error("Failed to fetch unread count:", error);
     }
   },
 
-  // Giảm đi 1 khi user click vào 1 tin chưa đọc
   decrementUnread: () =>
     set((state) => ({
       unreadCount: Math.max(0, state.unreadCount - 1),
     })),
 
-  // Xoá chấm đỏ khi click "Read All"
   clearUnread: () => set({ unreadCount: 0 }),
 }));

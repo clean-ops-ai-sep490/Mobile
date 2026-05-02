@@ -55,7 +55,9 @@ export type WorkerStackParamList = {
   IssueReport: undefined;
   RequestEquipment: undefined;
   SwapTask: undefined;
-  ListAllRequests: undefined;
+  ListAllRequests:
+    | { initialTab?: "equipment" | "issue" | "swap" | "emergency" }
+    | undefined;
   EmergencyLeaveDetail: { id: string };
   IssueReportDetail: { id: string };
   TaskSwapDetail: { id: string };
