@@ -34,6 +34,7 @@ export default function EquipmentRequestDetailModal({
 
   // States
   const [displayLocation, setDisplayLocation] = useState<string | null>(null);
+  const [taskName, setTaskName] = useState<string | null>(null);
   const [equipmentName, setEquipmentName] = useState<string | null>(null);
 
   const [isLoadingTask, setIsLoadingTask] = useState(false);
@@ -52,6 +53,7 @@ export default function EquipmentRequestDetailModal({
           setDisplayLocation(
             taskData?.displayLocation || "Vị trí không xác định",
           );
+        setTaskName(taskData?.taskName || taskData?.nameAdhocTask || null);
       } catch (error) {
         if (isMounted) setDisplayLocation("Không thể tải vị trí");
       } finally {
@@ -84,6 +86,7 @@ export default function EquipmentRequestDetailModal({
       if (!visible) {
         setDisplayLocation(null);
         setEquipmentName(null);
+        setTaskName(null);
       }
     };
   }, [visible, data.taskAssignmentId, data.equipmentId]);
@@ -108,6 +111,22 @@ export default function EquipmentRequestDetailModal({
 
           <ScrollView contentContainerStyle={styles.container}>
             <View style={styles.card}>
+              <View style={styles.rowContainer}>
+                <Text style={styles.rowLabel}>Công việc:</Text>
+                <View style={styles.rowValueContainer}>
+                  {isLoadingTask ? (
+                    <ActivityIndicator
+                      size="small"
+                      color="#1e90ff"
+                      style={styles.loader}
+                    />
+                  ) : (
+                    <Text style={styles.rowValue}>
+                      {taskName ?? data.taskAssignmentId ?? "—"}
+                    </Text>
+                  )}
+                </View>
+              </View>
               {/* 1. ROW LOCATION (Fixed wrapping) */}
               <View style={styles.rowContainer}>
                 <Text style={styles.rowLabel}>Vị trí:</Text>

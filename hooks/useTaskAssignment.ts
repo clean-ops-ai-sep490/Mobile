@@ -36,7 +36,7 @@ export interface TaskAssignmentDto {
   originalAssigneeId: string;
   status: TaskAssignmentStatus;
   scheduledStartAt: string;
-  scheduleEndAt: string;
+  scheduledEndAt: string;
   isAdhocTask: boolean;
   nameAdhocTask?: string;
   displayLocation?: string;

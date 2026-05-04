@@ -33,6 +33,7 @@ export default function IssueReportDetailModal({
   const [item, setItem] = useState<IssueReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [displayLocation, setDisplayLocation] = useState<string | null>(null);
+  const [taskName, setTaskName] = useState<string | null>(null);
   const [isLoadingTask, setIsLoadingTask] = useState(false);
 
   // 1. Effect: Fetch thông tin chi tiết của Issue
@@ -59,6 +60,7 @@ export default function IssueReportDetailModal({
       if (!visible) {
         setItem(null);
         setDisplayLocation(null);
+        setTaskName(null);
       }
     };
   }, [reportId, visible]);
@@ -76,6 +78,7 @@ export default function IssueReportDetailModal({
             setDisplayLocation(
               taskData?.displayLocation || "Vị trí không xác định",
             );
+            setTaskName(taskData?.taskName || taskData?.nameAdhocTask || null);
           }
         } catch (error) {
           if (isMounted) setDisplayLocation("Không thể tải vị trí");
@@ -121,6 +124,18 @@ export default function IssueReportDetailModal({
               <Text style={styles.info}>Không có dữ liệu</Text>
             ) : (
               <View style={styles.card}>
+                <View style={styles.rowContainer}>
+                  <Text style={styles.rowLabel}>Công việc:</Text>
+                  <View style={styles.rowValueContainer}>
+                    {isLoadingTask ? (
+                      <ActivityIndicator size="small" color="#1e90ff" />
+                    ) : (
+                      <Text style={styles.rowValue}>
+                        {taskName ?? item.taskAssignmentId ?? "—"}
+                      </Text>
+                    )}
+                  </View>
+                </View>
                 {/* ROW: Location (Sử dụng cấu trúc đồng nhất) */}
                 <View style={styles.rowContainer}>
                   <Text style={styles.rowLabel}>Vị trí:</Text>

@@ -138,6 +138,7 @@ function CardRow({ label, value }: { label: string; value?: string }) {
 // ─── Equipment card ───────────────────────────────────────────────────────────
 
 function EquipmentCard({ item }: { item: EquipmentRequestItem }) {
+  const itemCount = item.items?.length ?? 0;
   return (
     <Card>
       <CardHeader
@@ -145,6 +146,12 @@ function EquipmentCard({ item }: { item: EquipmentRequestItem }) {
         status={item.status ?? "Đang chờ"}
         date={item?.created}
       />
+      {itemCount > 0 && (
+        <>
+          <View style={styles.divider} />
+          <CardRow label="Số loại thiết bị" value={`${itemCount} loại`} />
+        </>
+      )}
     </Card>
   );
 }
@@ -152,6 +159,12 @@ function EquipmentCard({ item }: { item: EquipmentRequestItem }) {
 // ─── Issue card ───────────────────────────────────────────────────────────────
 
 function IssueCard({ item }: { item: IssueReport }) {
+  const preview = item.description
+    ? item.description.length > 60
+      ? item.description.slice(0, 60) + "…"
+      : item.description
+    : undefined;
+
   return (
     <Card>
       <CardHeader
@@ -160,6 +173,7 @@ function IssueCard({ item }: { item: IssueReport }) {
         date={item.created}
       />
       <View style={styles.divider} />
+      {preview && <CardRow label="Mô tả" value={preview} />}
       {item.resolvedAt && (
         <CardRow
           label="Đã xử lý vào"
@@ -477,7 +491,7 @@ export default function MyRequestsScreen({ navigation, route }: Props) {
           <>
             {activeTab === "equipment" &&
               (eqItems.length === 0 ? (
-                <Empty label="equipment requests" />
+                <Empty label="yêu cầu về thiết bị" />
               ) : (
                 eqItems.map((item) => (
                   <TouchableOpacity
@@ -492,7 +506,7 @@ export default function MyRequestsScreen({ navigation, route }: Props) {
 
             {activeTab === "issue" &&
               (issItems.length === 0 ? (
-                <Empty label="issue reports" />
+                <Empty label="báo cáo sự cố" />
               ) : (
                 issItems.map((item) => (
                   <TouchableOpacity
@@ -507,7 +521,7 @@ export default function MyRequestsScreen({ navigation, route }: Props) {
 
             {activeTab === "swap" &&
               (swItems.length === 0 ? (
-                <Empty label="task swap requests" />
+                <Empty label="yêu cầu đổi công việc" />
               ) : (
                 swItems.map((item) => (
                   <TouchableOpacity
@@ -522,7 +536,7 @@ export default function MyRequestsScreen({ navigation, route }: Props) {
 
             {activeTab === "emergency" &&
               (elItems.length === 0 ? (
-                <Empty label="emergency leave requests" />
+                <Empty label="yêu cầu nghỉ khẩn cấp" />
               ) : (
                 elItems.map((item) => (
                   <TouchableOpacity

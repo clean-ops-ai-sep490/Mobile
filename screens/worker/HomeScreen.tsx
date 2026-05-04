@@ -280,6 +280,38 @@ export default function HomeScreen({ onNavigate }: Props) {
             ]}
           >
             <QuickCard
+              icon="calendar-outline"
+              label="Lịch công việc của tôi"
+              subtitle="Xem công việc theo lịch biểu"
+              iconBg="#dfe0ec"
+              iconColor="#3B82F6"
+              delay={180}
+              onPress={() => onNavigate?.("TaskCalendar")}
+            />
+          </View>
+          <View
+            style={[
+              styles.quickGrid,
+              { gap: CARD_GAP, marginBottom: CARD_GAP },
+            ]}
+          >
+            <QuickCard
+              icon="list-outline"
+              label="Danh sách yêu cầu"
+              subtitle="Xem và quản lý tất cả yêu cầu"
+              iconBg="#FFF7ED"
+              iconColor="#F97316"
+              delay={260}
+              onPress={() => onNavigate?.("ListAllRequests")}
+            />
+          </View>
+          <View
+            style={[
+              styles.quickGrid,
+              { gap: CARD_GAP, marginBottom: CARD_GAP },
+            ]}
+          >
+            <QuickCard
               icon="person-outline"
               label="Hồ sơ của tôi"
               subtitle="Xem và quản lý thông tin của bạn"
@@ -295,18 +327,6 @@ export default function HomeScreen({ onNavigate }: Props) {
               }}
             />
           </View>
-          <View style={styles.quickGrid}>
-            <QuickCard
-              icon="list-outline"
-              label="Danh sách yêu cầu"
-              subtitle="Xem và quản lý tất cả yêu cầu"
-              iconBg="#FFF7ED"
-              iconColor="#F97316"
-              delay={260}
-              onPress={() => onNavigate?.("ListAllRequests")}
-            />
-          </View>
-
           <View style={{ height: 20 }} />
         </ScrollView>
 
