@@ -3,8 +3,14 @@ import BottomTabBar, { TabKey } from "@/components/common/BottomTabBar";
 import Header from "@/components/common/Header";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useNavigation } from "@react-navigation/native";
-import React, { useCallback, useEffect, useState } from "react";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -21,6 +27,8 @@ import {
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useEmergencyLeaveRequest } from "@/hooks/useEmergencyLeave";
+import useEquipment from "@/hooks/useEquipment";
+import { useIssueReport } from "@/hooks/useIssueReport";
 import {
   TaskAssignmentDto,
   TaskAssignmentStatus,
@@ -30,26 +38,45 @@ import { useTaskSchedules } from "@/hooks/useTaskSchedule";
 import { sendWorkerGps } from "@/hooks/useWorkerGps";
 import { getCurrentLocation } from "@/services/workergps.service";
 
-// ─── Constants ────────────────────────────────────────────────────────────────
 const STORAGE_KEY = "pendingLeaveRanges";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 const TODAY = new Date();
 
 export interface PendingLeaveRange {
   id: string;
-  from: string | null; // ISO date string "2025-05-01" hoặc null nếu TH1
-  to: string | null; // ISO date string "2025-05-03" hoặc null nếu TH1
-  taskAssignmentId: string | null; // null = TH2, có giá trị = TH1
-  status: "Pending" | "Approved" | "Rejected";
+  from: string | null;
+  to: string | null;
+  taskAssignmentId: string | null;
+  // Chỉ lưu Pending — Approved/Rejected không cần track client-side
+  status: "Pending";
 }
+
+// ─── Block reason ─────────────────────────────────────────────────────────────
+//
+// TH1 (task execution):
+//   Pending  → banner vàng + nút Tiếp tục bị khoá
+//   Approved → task biến mất (backend reassign, fetchTasks không trả về nữa)
+//   Rejected → banner xanh tạm thời (8s), nút mở lại
+//
+// TH2 (theo ngày):
+//   Pending  → chấm đỏ trên ngày, task vẫn hiện NotStarted bình thường, không lock
+//   Approved → task biến mất tự nhiên (backend reassign sang worker khác)
+//   Rejected → chấm đỏ biến mất, mọi thứ về bình thường
+//
+type BlockReason =
+  | "emergency_leave_pending" // TH1 only
+  | "issue_report_pending"
+  | "issue_report_approved"
+  | "equipment_request_pending"
+  | "equipment_request_approved"
+  | null;
+
+type TaskBlockMap = Record<string, BlockReason>;
 
 // ─── Storage helpers ──────────────────────────────────────────────────────────
 export const savePendingLeave = async (range: PendingLeaveRange) => {
   try {
     const raw = await AsyncStorage.getItem(STORAGE_KEY);
     const existing: PendingLeaveRange[] = raw ? JSON.parse(raw) : [];
-    // Tránh duplicate
     const filtered = existing.filter((r) => r.id !== range.id);
     await AsyncStorage.setItem(
       STORAGE_KEY,
@@ -99,10 +126,7 @@ const getDays = () =>
 const buildDateForOffset = (offset: number): string => {
   const d = new Date(TODAY);
   d.setDate(TODAY.getDate() + offset);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
 // ─── Task types ───────────────────────────────────────────────────────────────
@@ -122,7 +146,6 @@ interface Task {
   dayOffset: number;
 }
 
-// ─── Status / Tag config ──────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<
   TaskStatus,
   { label: string; color: string; bg: string; dot: string }
@@ -145,12 +168,7 @@ const STATUS_CONFIG: Record<
     bg: "#ECFDF5",
     dot: "#10B981",
   },
-  block: {
-    label: "Bị chặn",
-    color: "#DC2626",
-    bg: "#FEF2F2",
-    dot: "#DC2626",
-  },
+  block: { label: "Bị chặn", color: "#DC2626", bg: "#FEF2F2", dot: "#DC2626" },
 };
 
 const TAG_CONFIG: Record<
@@ -160,6 +178,48 @@ const TAG_CONFIG: Record<
   Biohazard: { color: "#EF4444", bg: "#FEE2E2", icon: "warning-outline" },
   "High-Traffic": { color: "#8B5CF6", bg: "#EDE9FE", icon: "people-outline" },
   "High-Rise": { color: "#0EA5E9", bg: "#E0F2FE", icon: "arrow-up-outline" },
+};
+
+// ─── Banner config ─────────────────────────────────────────────────────────────
+const BLOCK_REASON_CONFIG: Record<
+  Exclude<BlockReason, null>,
+  {
+    icon: keyof typeof Ionicons.glyphMap;
+    bg: string;
+    color: string;
+    text: string;
+  }
+> = {
+  emergency_leave_pending: {
+    icon: "time-outline",
+    bg: "#FEF3C7",
+    color: "#92400E",
+    text: "Đang chờ quản lý xét duyệt yêu cầu nghỉ — vui lòng chờ",
+  },
+  issue_report_pending: {
+    icon: "warning-outline",
+    bg: "#FEF3C7",
+    color: "#92400E",
+    text: "Đang chờ xử lý báo cáo sự cố",
+  },
+  issue_report_approved: {
+    icon: "checkmark-circle-outline",
+    bg: "#ECFDF5",
+    color: "#065F46",
+    text: "Sự cố đã được xác nhận — công việc tạm dừng",
+  },
+  equipment_request_pending: {
+    icon: "construct-outline",
+    bg: "#EFF6FF",
+    color: "#1E40AF",
+    text: "Đang chờ duyệt yêu cầu thiết bị",
+  },
+  equipment_request_approved: {
+    icon: "checkmark-circle-outline",
+    bg: "#ECFDF5",
+    color: "#065F46",
+    text: "Yêu cầu thiết bị đã được duyệt — đang xử lý",
+  },
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -187,15 +247,32 @@ const TagBadge = ({ tag }: { tag: string }) => {
   );
 };
 
-// ─── Pending Leave Banner ─────────────────────────────────────────────────────
-const PendingLeaveBanner = ({ isTH1 }: { isTH1: boolean }) => (
-  <View style={styles.pendingLeaveBanner}>
-    <Ionicons name="time-outline" size={15} color="#92400E" />
-    <Text style={styles.pendingLeaveText}>
-      {isTH1
-        ? "Công việc đang chờ quản lý duyệt yêu cầu nghỉ khẩn cấp"
-        : "Bạn có yêu cầu nghỉ đang chờ duyệt cho ngày này"}
+const BlockReasonBanner = ({ reason }: { reason: BlockReason }) => {
+  if (!reason) return null;
+  const cfg = BLOCK_REASON_CONFIG[reason];
+  return (
+    <View style={[styles.blockBanner, { backgroundColor: cfg.bg }]}>
+      <Ionicons name={cfg.icon} size={15} color={cfg.color} />
+      <Text style={[styles.blockBannerText, { color: cfg.color }]}>
+        {cfg.text}
+      </Text>
+    </View>
+  );
+};
+
+// TH1 Rejected — banner xanh tạm thời, worker tự dismiss hoặc 8s tự mất
+const RejectedLeaveBanner = ({ onDismiss }: { onDismiss: () => void }) => (
+  <View style={styles.rejectedBanner}>
+    <Ionicons name="refresh-circle-outline" size={15} color="#065F46" />
+    <Text style={styles.rejectedBannerText}>
+      Yêu cầu nghỉ đã bị từ chối — tiếp tục công việc bình thường
     </Text>
+    <TouchableOpacity
+      onPress={onDismiss}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+    >
+      <Ionicons name="close" size={14} color="#065F46" />
+    </TouchableOpacity>
   </View>
 );
 
@@ -205,33 +282,52 @@ const TaskCard = ({
   onStart,
   onContinue,
   canAct = true,
-  hasPendingLeave = false,
+  canStart = false,
+  blockReason = null,
+  showRejectedBanner = false,
+  onDismissRejected,
 }: {
   task: Task;
   onStart?: (id: string) => void;
   onContinue?: (id: string) => void;
   canAct?: boolean;
-  hasPendingLeave?: boolean;
+  canStart?: boolean;
+  blockReason?: BlockReason;
+  showRejectedBanner?: boolean;
+  onDismissRejected?: () => void;
 }) => {
   const isInProgress = task.status === "in_progress";
   const isCompleted = task.status === "completed";
   const isNotStarted = task.status === "not_started";
   const isBlock = task.status === "block";
+
+  // Chỉ TH1 Pending mới lock nút — TH2 không lock gì cả
+  const isLeaveRequestPending = blockReason === "emergency_leave_pending";
+
   const hasActions =
-    canAct && (isInProgress || isNotStarted) && !hasPendingLeave;
+    canAct &&
+    (isInProgress || (isNotStarted && canStart)) &&
+    !isLeaveRequestPending;
 
   return (
     <View
       style={[
         styles.card,
-        isInProgress && styles.cardActive,
-        isBlock && hasPendingLeave && styles.cardPendingLeave,
+        isInProgress && !isLeaveRequestPending && styles.cardActive,
+        isBlock && blockReason && styles.cardBlocked,
+        isLeaveRequestPending && styles.cardPendingLeave,
       ]}
     >
-      {/* Banner TH1: task bị Block do pending leave */}
-      {isBlock && hasPendingLeave && <PendingLeaveBanner isTH1={true} />}
+      {/* TH1 Rejected banner — ưu tiên hiện trước blockReason */}
+      {showRejectedBanner && (
+        <RejectedLeaveBanner onDismiss={onDismissRejected ?? (() => {})} />
+      )}
 
-      {/* Top row */}
+      {/* Block reason banner */}
+      {!showRejectedBanner && blockReason && (
+        <BlockReasonBanner reason={blockReason} />
+      )}
+
       <View style={styles.cardTopRow}>
         <View style={styles.cardBadges}>
           <StatusBadge status={task.status} />
@@ -242,7 +338,7 @@ const TaskCard = ({
         <Text style={styles.cardTime}>
           {isCompleted
             ? `Hoàn thành ${task.finishedAt || ""}`
-            : `${task.startTime} ${task.endTime ? `– ${task.endTime}` : ""}`}
+            : `${task.startTime}${task.endTime ? ` – ${task.endTime}` : ""}`}
         </Text>
       </View>
 
@@ -256,6 +352,17 @@ const TaskCard = ({
         </Text>
       </View>
 
+      {/* Nút khoá — chỉ TH1 Pending */}
+      {isLeaveRequestPending && (isInProgress || isNotStarted) && (
+        <View style={styles.cardActions}>
+          <View style={styles.lockedBtn}>
+            <Ionicons name="lock-closed-outline" size={15} color="#92400E" />
+            <Text style={styles.lockedBtnText}>Đang chờ duyệt — tạm khoá</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Nút bình thường */}
       {hasActions && (
         <View style={styles.cardActions}>
           {isInProgress && (
@@ -281,19 +388,6 @@ const TaskCard = ({
   );
 };
 
-// ─── Empty Day (TH2: toàn bộ ngày bị pending leave) ──────────────────────────
-const PendingLeaveDayNotice = () => (
-  <View style={styles.pendingLeaveDayNotice}>
-    <View style={styles.pendingLeaveDayIcon}>
-      <Ionicons name="medkit-outline" size={28} color="#db0614" />
-    </View>
-    <Text style={styles.pendingLeaveDayTitle}>Yêu cầu nghỉ đang chờ duyệt</Text>
-    <Text style={styles.pendingLeaveDayText}>
-      Các công việc của ngày này sẽ hiện lại nếu quản lý từ chối yêu cầu.
-    </Text>
-  </View>
-);
-
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function TaskListScreen() {
   const [selectedDay, setSelectedDay] = useState(0);
@@ -302,10 +396,23 @@ export default function TaskListScreen() {
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [tasks, setTasks] = useState<TaskAssignmentDto[]>([]);
   const [workerId, setWorkerId] = useState<string | null>(null);
-  const [loadingWorker, setLoadingWorker] = useState(false);
 
-  // ── Pending leave state ──
-  const [pendingLeaves, setPendingLeaves] = useState<PendingLeaveRange[]>([]);
+  // TH2: chỉ lưu Pending để vẽ chấm đỏ
+  // Approved/Rejected → task tự biến mất / chấm tự mất theo server state
+  const [th2PendingLeaves, setTh2PendingLeaves] = useState<PendingLeaveRange[]>(
+    [],
+  );
+
+  // TH1: blockMap taskId → reason
+  const [taskBlockMap, setTaskBlockMap] = useState<TaskBlockMap>({});
+
+  // TH1 Rejected: taskId hiện banner xanh tạm thời
+  const [rejectedTaskIds, setRejectedTaskIds] = useState<Set<string>>(
+    new Set(),
+  );
+
+  // Ref để detect TH1 Pending → gone (Rejected hoặc Approved)
+  const prevBlockMapRef = useRef<TaskBlockMap>({});
 
   const days = getDays();
   const navigation = useNavigation();
@@ -317,136 +424,192 @@ export default function TaskListScreen() {
     getTaskAssignmentById,
   } = useTaskAssignments();
   const { getTaskScheduleById } = useTaskSchedules();
-  const { getById: getLeaveRequestById, getListByWorkerId } =
-    useEmergencyLeaveRequest();
+  const { getListByWorkerId } = useEmergencyLeaveRequest();
+  const { getByWorker: getIssueReportsByWorker } = useIssueReport();
+  const { getByWorker: getEquipmentRequestsByWorker } = useEquipment();
+  const getListByWorkerIdRef = useRef(getListByWorkerId);
+  const getIssueReportsByWorkerRef = useRef(getIssueReportsByWorker);
+  const getEquipmentRequestsByWorkerRef = useRef(getEquipmentRequestsByWorker);
+
+  useEffect(() => {
+    getListByWorkerIdRef.current = getListByWorkerId;
+    getIssueReportsByWorkerRef.current = getIssueReportsByWorker;
+    getEquipmentRequestsByWorkerRef.current = getEquipmentRequestsByWorker;
+  });
 
   // ── Load workerId ──────────────────────────────────────────────────────────
   useEffect(() => {
-    const fetchWorkerId = async () => {
+    (async () => {
       try {
-        setLoadingWorker(true);
         const profile = await getWorkerProfile();
         if (profile?.id) setWorkerId(profile.id);
       } catch (e) {
         console.error("Error fetching worker profile:", e);
-      } finally {
-        setLoadingWorker(false);
       }
-    };
-    fetchWorkerId();
+    })();
   }, []);
 
-  const hasPendingLeaveForToday = pendingLeaves.some(
-    (r) =>
-      r.status === "Pending" &&
-      r.from !== null &&
-      r.to !== null &&
-      currentDateStr >= r.from! &&
-      currentDateStr <= r.to!,
-  );
+  const route = useRoute<any>();
 
-  // ── Load + sync pending leaves ────────────────────────────────────────────
-  // Hàm này load từ AsyncStorage và poll API để cập nhật status
-  const syncPendingLeaves = useCallback(async () => {
-    const leaves = await loadPendingLeaves();
+  // Refresh khi quay lại từ TaskExecution
+  useEffect(() => {
+    const refreshParam = route.params?.refresh;
+    if (!refreshParam) return;
+    fetchTasks();
+    syncBlockReasons();
+  }, [route.params?.refresh]);
 
-    // Fetch từ backend theo workerId — source of truth
-    if (workerId) {
-      try {
-        const res = await getListByWorkerId(workerId, {
+  // ── Sync block reasons từ server ──────────────────────────────────────────
+  const syncBlockReasons = useCallback(async () => {
+    if (!workerId) return;
+
+    try {
+      const [leaveRes, issueRes, equipRes] = await Promise.allSettled([
+        getListByWorkerIdRef.current(workerId, { pageNumber: 1, pageSize: 50 }),
+        getIssueReportsByWorkerRef.current(workerId, {
           pageNumber: 1,
           pageSize: 50,
-        });
+        }),
+        getEquipmentRequestsByWorkerRef.current(workerId, {
+          pageNumber: 1,
+          pageSize: 50,
+        }),
+      ]);
 
-        const pendingFromServer: PendingLeaveRange[] = res.content
-          .filter((r) => r.status === "Pending")
-          .map((r) => ({
-            id: r.id,
-            from: r.leaveDateFrom?.split("T")[0] ?? null, // "2026-04-28"
-            to: r.leaveDateTo?.split("T")[0] ?? null,
-            taskAssignmentId: r.taskAssignmentId ?? null,
-            status: "Pending" as const,
-          }));
+      // ── TH2: chỉ cần Pending để vẽ chấm đỏ ──────────────────────────────
+      // Approved → task biến mất tự nhiên (backend reassign)
+      // Rejected → Pending biến mất khỏi list → chấm đỏ tự mất
+      const newTH2Pending: PendingLeaveRange[] =
+        leaveRes.status === "fulfilled"
+          ? leaveRes.value.content
+              .filter((r) => r.status === "Pending" && !r.taskAssignmentId)
+              .map((r) => ({
+                id: r.id,
+                from: r.leaveDateFrom?.split("T")[0] ?? null,
+                to: r.leaveDateTo?.split("T")[0] ?? null,
+                taskAssignmentId: null,
+                status: "Pending" as const,
+              }))
+          : await loadPendingLeaves();
 
-        // Merge: server là source of truth cho Pending
-        // Giữ local những cái Approved/Rejected (để cleanup 7 ngày vẫn hoạt động)
-        const localNonPending = leaves.filter((l) => l.status !== "Pending");
-        const merged = [...pendingFromServer, ...localNonPending];
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newTH2Pending));
+      setTh2PendingLeaves(newTH2Pending);
 
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-        setPendingLeaves(merged);
-        return;
-      } catch (e) {
-        console.warn(
-          "[PendingLeave] fetch from server failed, fallback local",
-          e,
-        );
+      // ── Build taskBlockMap ────────────────────────────────────────────────
+      const newBlockMap: TaskBlockMap = {};
+
+      // TH1: chỉ Pending (taskAssignmentId !== null)
+      if (leaveRes.status === "fulfilled") {
+        leaveRes.value.content
+          .filter((r) => r.status === "Pending" && !!r.taskAssignmentId)
+          .forEach((r) => {
+            newBlockMap[r.taskAssignmentId!] = "emergency_leave_pending";
+          });
       }
+
+      // Issue reports
+      if (issueRes.status === "fulfilled") {
+        issueRes.value.content
+          .filter((r) => r.status === "Pending" || r.status === "Approved")
+          .forEach((r) => {
+            if (!newBlockMap[r.taskAssignmentId]) {
+              newBlockMap[r.taskAssignmentId] =
+                r.status === "Pending"
+                  ? "issue_report_pending"
+                  : "issue_report_approved";
+            }
+          });
+      }
+
+      // Equipment requests
+      if (equipRes.status === "fulfilled") {
+        equipRes.value.content
+          .filter((r) => r.status === "Pending" || r.status === "Approved")
+          .forEach((r) => {
+            if (!newBlockMap[r.taskAssignmentId]) {
+              newBlockMap[r.taskAssignmentId] =
+                r.status === "Pending"
+                  ? "equipment_request_pending"
+                  : "equipment_request_approved";
+            }
+          });
+      }
+
+      // ── Detect TH1 Rejected ───────────────────────────────────────────────
+      // Task trước đó có emergency_leave_pending mà bây giờ không còn
+      // → manager đã Rejected (Approved thì task biến mất khỏi list luôn)
+      const prevMap = prevBlockMapRef.current;
+      const prevTH1PendingIds = Object.entries(prevMap)
+        .filter(([, v]) => v === "emergency_leave_pending")
+        .map(([k]) => k);
+
+      const justRejectedIds = prevTH1PendingIds.filter(
+        (id) => newBlockMap[id] !== "emergency_leave_pending",
+      );
+
+      if (justRejectedIds.length > 0) {
+        setRejectedTaskIds((prev) => new Set([...prev, ...justRejectedIds]));
+        setTimeout(() => {
+          setRejectedTaskIds((prev) => {
+            const next = new Set(prev);
+            justRejectedIds.forEach((id) => next.delete(id));
+            return next;
+          });
+        }, 8000);
+      }
+
+      prevBlockMapRef.current = newBlockMap;
+      setTaskBlockMap(newBlockMap);
+    } catch (e) {
+      console.warn("[BlockReasons] sync failed", e);
     }
-
-    // Fallback: dùng local nếu fetch server lỗi hoặc chưa có workerId
-    setPendingLeaves(leaves);
-  }, [workerId, getListByWorkerId]);
+  }, [workerId]);
 
   useEffect(() => {
-    syncPendingLeaves();
-  }, [syncPendingLeaves]);
+    if (workerId) {
+      syncBlockReasons();
+    }
+  }, [workerId]);
 
   useEffect(() => {
-    // Poll mỗi 30 giây khi màn đang active
-    const interval = setInterval(() => {
-      syncPendingLeaves();
-    }, 15_000);
-
+    const interval = setInterval(syncBlockReasons, 15_000);
     return () => clearInterval(interval);
-  }, [syncPendingLeaves]);
+  }, [syncBlockReasons]);
 
-  // Sync lại khi app trở lại foreground
   useEffect(() => {
-    const sub = AppState.addEventListener("change", (state) => {
-      if (state === "active") syncPendingLeaves();
+    const sub = AppState.addEventListener("change", (s) => {
+      if (s === "active") syncBlockReasons();
     });
     return () => sub.remove();
-  }, [syncPendingLeaves]);
+  }, [syncBlockReasons]);
 
-  // ── Helpers: check pending leave cho ngày/task cụ thể ────────────────────
+  // ── Derived state ──────────────────────────────────────────────────────────
   const currentDateStr = buildDateForOffset(selectedDay);
 
-  /**
-   * TH2: Ngày đang xem có pending leave không có taskAssignmentId
-   * → ẩn toàn bộ task list của ngày đó
-   */
-  const pendingLeaveForDay = pendingLeaves.find(
-    (r) =>
-      r.status === "Pending" &&
-      r.taskAssignmentId === null &&
-      r.from !== null &&
-      r.to !== null &&
-      currentDateStr >= r.from! &&
-      currentDateStr <= r.to!,
-  );
-
-  /**
-   * TH1: Kiểm tra 1 taskAssignmentId cụ thể có pending leave không
-   * → hiển thị banner trên task card
-   */
-  const isTaskPendingLeave = (taskId: string): boolean =>
-    pendingLeaves.some(
-      (r) => r.status === "Pending" && r.taskAssignmentId === taskId,
+  // TH2: chấm đỏ trên ngày nào đang có Pending leave theo ngày
+  const hasPendingDotForDay = (dayFull: string): boolean =>
+    th2PendingLeaves.some(
+      (r) =>
+        r.from !== null &&
+        r.to !== null &&
+        dayFull >= r.from! &&
+        dayFull <= r.to!,
     );
+
+  // BlockReason cho từng task — chỉ TH1 và issue/equipment
+  const getBlockReasonForTask = (taskId: string): BlockReason =>
+    taskBlockMap[taskId] ?? null;
 
   // ── Fetch tasks ────────────────────────────────────────────────────────────
   const fetchTasks = useCallback(async () => {
     if (!workerId) return;
     setLoadingTasks(true);
-
     const baseDate = buildDateForOffset(selectedDay);
     const filterReq: any = {
       assigneeId: workerId,
       fromDate: `${baseDate}T00:00:00Z`,
       toDate: `${baseDate}T23:59:59Z`,
     };
-
     if (filter !== "all") {
       const statusMap: Record<string, string> = {
         in_progress: "InProgress",
@@ -456,7 +619,6 @@ export default function TaskListScreen() {
       };
       if (statusMap[filter]) filterReq.status = statusMap[filter];
     }
-
     const resp = await getTaskAssignments(filterReq, {
       pageNumber: 1,
       pageSize: 20,
@@ -471,7 +633,7 @@ export default function TaskListScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([fetchTasks(), syncPendingLeaves()]);
+    await Promise.all([fetchTasks(), syncBlockReasons()]);
     setRefreshing(false);
   };
 
@@ -492,15 +654,21 @@ export default function TaskListScreen() {
     }
   };
 
-  // ── Map tasks ──────────────────────────────────────────────────────────────
   const mappedTasks: Task[] = tasks.map((t) => {
-    const dateObj = new Date(t.scheduledStartAt);
-    const time = dateObj.toLocaleTimeString("vi-VN", {
+    const time = new Date(t.scheduledStartAt).toLocaleTimeString("vi-VN", {
       hour: "2-digit",
       minute: "2-digit",
       hour12: false,
       timeZone: "UTC",
     });
+    const endTime = t.scheduledEndAt
+      ? new Date(t.scheduledEndAt).toLocaleTimeString("vi-VN", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+          timeZone: "UTC",
+        })
+      : undefined;
     return {
       id: t.id,
       title:
@@ -512,17 +680,25 @@ export default function TaskListScreen() {
       sublocation: "",
       status: mapStatus(t.status),
       startTime: time,
+      endTime,
       tags: [],
       dayOffset: 0,
     };
   });
 
-  // TH2: nếu ngày này có pending leave (không có taskAssignmentId) → ẩn hết
-  const visibleTasks = pendingLeaveForDay
-    ? []
-    : mappedTasks.filter((t) => filter === "all" || t.status === filter);
+  const visibleTasks = mappedTasks.filter(
+    (t) => filter === "all" || t.status === filter,
+  );
 
   const remaining = mappedTasks.filter((t) => t.status !== "completed").length;
+
+  const earliestNotStartedId = useMemo(() => {
+    if (selectedDay !== 0) return null;
+    const notStarted = mappedTasks
+      .filter((t) => t.status === "not_started")
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+    return notStarted[0]?.id ?? null;
+  }, [mappedTasks, selectedDay]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleNavigate = (screen: TabKey) =>
@@ -538,13 +714,13 @@ export default function TaskListScreen() {
     }
     try {
       setLoadingTasks(true);
-      let latitude: number | null = null;
-      let longitude: number | null = null;
-      let isConfirmed = true;
+      let latitude: number | null = null,
+        longitude: number | null = null,
+        isConfirmed = true;
       try {
-        const location = await getCurrentLocation();
-        latitude = location.latitude;
-        longitude = location.longitude;
+        const loc = await getCurrentLocation();
+        latitude = loc.latitude;
+        longitude = loc.longitude;
       } catch {
         isConfirmed = false;
         Alert.alert(
@@ -601,7 +777,6 @@ export default function TaskListScreen() {
     }
   };
 
-  // ── Filter pills ───────────────────────────────────────────────────────────
   const FILTERS: { key: FilterType; label: string }[] = [
     { key: "all", label: "Tất cả" },
     { key: "not_started", label: "Chưa bắt đầu" },
@@ -623,16 +798,7 @@ export default function TaskListScreen() {
       <View style={styles.dayRow}>
         {days.map((d) => {
           const isSelected = d.offset === selectedDay;
-          // Kiểm tra ngày này có pending leave TH2 không (để hiện dấu chấm đỏ)
-          const hasPendingDot = pendingLeaves.some(
-            (r) =>
-              r.status === "Pending" &&
-              r.taskAssignmentId === null &&
-              r.from !== null &&
-              r.to !== null &&
-              d.full >= r.from! &&
-              d.full <= r.to!,
-          );
+          const hasDot = hasPendingDotForDay(d.full);
           return (
             <TouchableOpacity
               key={d.offset}
@@ -649,8 +815,7 @@ export default function TaskListScreen() {
               >
                 {d.date}
               </Text>
-              {/* Chấm đỏ nếu ngày có pending leave TH2 */}
-              {hasPendingDot && (
+              {hasDot && (
                 <View
                   style={[
                     styles.pendingDot,
@@ -674,7 +839,6 @@ export default function TaskListScreen() {
           />
         }
       >
-        {/* ── Section header ── */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>
             {selectedDay === 0
@@ -738,9 +902,6 @@ export default function TaskListScreen() {
         <View style={styles.taskList}>
           {loadingTasks || hookLoading ? (
             <ActivityIndicator size="large" color="#2563EB" />
-          ) : pendingLeaveForDay ? (
-            // TH2: ẩn task, hiện notice
-            <PendingLeaveDayNotice />
           ) : visibleTasks.length === 0 ? (
             <View style={styles.emptyState}>
               <View style={styles.emptyIconWrap}>
@@ -758,9 +919,17 @@ export default function TaskListScreen() {
                 task={task}
                 onStart={handleStartTask}
                 onContinue={handleContinue}
-                canAct={selectedDay === 0 && !hasPendingLeaveForToday}
-                // TH1: truyền flag nếu task này có pending leave
-                hasPendingLeave={isTaskPendingLeave(task.id)}
+                canAct={selectedDay === 0}
+                canStart={task.id === earliestNotStartedId}
+                blockReason={getBlockReasonForTask(task.id)}
+                showRejectedBanner={rejectedTaskIds.has(task.id)}
+                onDismissRejected={() => {
+                  setRejectedTaskIds((prev) => {
+                    const next = new Set(prev);
+                    next.delete(task.id);
+                    return next;
+                  });
+                }}
               />
             ))
           )}
@@ -786,8 +955,6 @@ export default function TaskListScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#f5f6fa" },
-
-  // Day selector
   dayRow: {
     flexDirection: "row",
     paddingHorizontal: 16,
@@ -830,23 +997,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#db0614",
     marginTop: 3,
   },
-  pendingDotSelected: {
-    backgroundColor: "#FFFFFF",
-  },
-
-  // Scroll
+  pendingDotSelected: { backgroundColor: "#FFFFFF" },
   scroll: { flex: 1 },
-
-  // Section header
-  sectionHeader: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 4,
-  },
+  sectionHeader: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
   sectionTitle: { fontSize: 20, fontWeight: "800", color: "#0F172A" },
   sectionSub: { fontSize: 13, color: "#64748B", marginTop: 2 },
-
-  // Filter pills
   filterRow: { marginTop: 12 },
   filterContent: { paddingHorizontal: 20, gap: 8 },
   filterPill: {
@@ -874,11 +1029,7 @@ const styles = StyleSheet.create({
   filterCountActive: { backgroundColor: "#1D4ED8" },
   filterCountText: { fontSize: 11, fontWeight: "700", color: "#64748B" },
   filterCountTextActive: { color: "#BFDBFE" },
-
-  // Task list
   taskList: { paddingHorizontal: 20, paddingTop: 16, gap: 12 },
-
-  // Task card
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
@@ -899,11 +1050,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 10,
   },
-  cardPendingLeave: {
+  cardBlocked: {
     borderColor: "#db0614",
     borderLeftWidth: 4,
     shadowColor: "#db0614",
     shadowOpacity: 0.08,
+    shadowRadius: 10,
+  },
+  cardPendingLeave: {
+    borderColor: "#F59E0B",
+    borderLeftWidth: 4,
+    opacity: 0.85,
+    shadowColor: "#F59E0B",
+    shadowOpacity: 0.1,
     shadowRadius: 10,
   },
   cardTopRow: {
@@ -931,8 +1090,20 @@ const styles = StyleSheet.create({
   },
   locationText: { fontSize: 13, color: "#64748B", fontWeight: "500" },
   cardActions: { flexDirection: "row", gap: 10 },
-
-  // Badges
+  lockedBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: "#FEF3C7",
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+  },
+  lockedBtnText: { fontSize: 13, fontWeight: "600", color: "#92400E" },
   badge: {
     flexDirection: "row",
     alignItems: "center",
@@ -952,55 +1123,32 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   tagText: { fontSize: 11, fontWeight: "600" },
-
-  // Pending leave banner (TH1 - trên task card)
-  pendingLeaveBanner: {
+  blockBanner: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "#FEF3C7",
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 7,
     marginBottom: 12,
   },
-  pendingLeaveText: {
+  blockBannerText: { fontSize: 12, fontWeight: "600", flex: 1 },
+  rejectedBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginBottom: 12,
+    backgroundColor: "#D1FAE5",
+  },
+  rejectedBannerText: {
     fontSize: 12,
-    color: "#92400E",
     fontWeight: "600",
     flex: 1,
+    color: "#065F46",
   },
-
-  // Pending leave day notice (TH2 - thay toàn bộ list)
-  pendingLeaveDayNotice: {
-    alignItems: "center",
-    paddingVertical: 48,
-    paddingHorizontal: 24,
-  },
-  pendingLeaveDayIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "#FEE2E2",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  pendingLeaveDayTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#1E293B",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  pendingLeaveDayText: {
-    fontSize: 13,
-    color: "#94A3B8",
-    textAlign: "center",
-    lineHeight: 20,
-  },
-
-  // Empty state
   emptyState: { alignItems: "center", paddingVertical: 48 },
   emptyIconWrap: { marginBottom: 12 },
   emptyTitle: {
@@ -1014,5 +1162,32 @@ const styles = StyleSheet.create({
     color: "#94A3B8",
     textAlign: "center",
     paddingHorizontal: 32,
+  },
+  dayNotice: {
+    alignItems: "center",
+    paddingVertical: 48,
+    paddingHorizontal: 24,
+  },
+  dayNoticeIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#FEE2E2",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  dayNoticeTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1E293B",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  dayNoticeText: {
+    fontSize: 13,
+    color: "#94A3B8",
+    textAlign: "center",
+    lineHeight: 20,
   },
 });

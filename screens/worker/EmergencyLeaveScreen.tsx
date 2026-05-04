@@ -495,6 +495,16 @@ export default function EmergencyLeaveScreen({
       );
       return;
     }
+    if (!isTH1 && fromDateStr && toDateStr) {
+      const from = new Date(fromDateStr);
+      const to = new Date(toDateStr);
+      const totalDays =
+        (to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24) + 1;
+      if (totalDays > 7) {
+        Alert.alert("Ngày không hợp lệ", "Thời gian nghỉ tối đa là 7 ngày.");
+        return;
+      }
+    }
 
     const toUTCZ = (dateStr: string, endOfDay: boolean): string => {
       const [y, m, d] = dateStr.split("-").map(Number);
@@ -807,7 +817,7 @@ export default function EmergencyLeaveScreen({
           loadingLabel="Đang gửi..."
           iconLeft="send"
           style={{ backgroundColor: "#db0614" }}
-          disabled={!isRecorded || submitting}
+          disabled={!isRecorded || submitting || !!submittedStatus}
         />
       </ScrollView>
 

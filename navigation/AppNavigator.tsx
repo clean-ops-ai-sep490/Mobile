@@ -35,6 +35,7 @@ import MapScreen from "@/screens/supervisor/map/MapScreen";
 import SwapRequestDetailScreen from "@/screens/supervisor/swap-task/SwapRequestDetailScreen";
 import SwapRequestListScreen from "@/screens/supervisor/swap-task/SwapRequestListScreen";
 import ListAllRequestsScreen from "@/screens/worker/ListAllRequestsScreen";
+import TaskCalendarScreen from "@/screens/worker/TaskCalendarScreen";
 import WorkerProfileScreen from "@/screens/worker/WorkerProfileScreen";
 
 // ─── Auth Route params ──────────────────────────────────────────────────────
@@ -76,6 +77,7 @@ export type WorkerStackParamList = {
     onResult: (result: any) => void;
   };
   BleTest: undefined;
+  TaskCalendar: undefined;
 };
 
 // ─── Supervisor Route params ──────────────────────────────────────────────────
@@ -213,6 +215,7 @@ function WorkerNavigator() {
         component={TaskExecutionScreen}
       />
       <WorkerStack.Screen name="QRScannerScreen" component={QRScannerScreen} />
+      <WorkerStack.Screen name="TaskCalendar" component={TaskCalendarScreen} />
 
       <WorkerStack.Screen
         name="InspectionCameraScreen"

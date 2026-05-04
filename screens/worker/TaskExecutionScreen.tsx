@@ -464,7 +464,12 @@ export default function TaskExecutionScreen() {
 
       <Header
         title="Thực thi công việc"
-        onBack={() => navigation.goBack()}
+        onBack={() =>
+          navigation.navigate(
+            "Tasks" as never,
+            { refresh: Date.now() } as never,
+          )
+        }
         rightElement={headerRight}
       />
 
