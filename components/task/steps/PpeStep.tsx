@@ -438,9 +438,9 @@ function PpeComponent({ config, state, onChange }: StepPluginProps) {
       {/* SignalR badge */}
       <View style={s.signalRow}>
         <View style={[s.signalDot, isConnected ? s.signalOn : s.signalOff]} />
-        <Text style={s.signalText}>
+        {/* <Text style={s.signalText}>
           {isConnected ? "Đang lắng nghe kết quả..." : "Đang kết nối..."}
-        </Text>
+        </Text> */}
       </View>
 
       {/* Camera modal */}

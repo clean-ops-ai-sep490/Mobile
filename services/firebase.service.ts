@@ -46,7 +46,7 @@ export const setupFirebaseMessaging = async (workerId?: string) => {
 
     // Refresh unread count in app store when new message arrives
     try {
-      useNotificationStore.getState().fetchUnreadCount();
+      useNotificationStore.getState().fetchUnreadCount(workerId);
     } catch (e) {
       // ignore if store not available
     }

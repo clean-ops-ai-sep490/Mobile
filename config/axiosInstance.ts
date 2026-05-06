@@ -2,7 +2,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 
 const axiosInstance = axios.create({
-  baseURL: "http://192.168.1.204:5000/api",
+  baseURL:
+    "https://cleanops-api.proudbush-ae579e6b.southeastasia.azurecontainerapps.io/api",
   timeout: 10000,
 });
 

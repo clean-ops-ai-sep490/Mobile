@@ -1,7 +1,13 @@
-import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
+﻿import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import Mapbox from "@rnmapbox/maps";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import MapboxGL from "@rnmapbox/maps";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -25,27 +31,27 @@ import {
   getStatusText,
 } from "@/utils/gpsUtils";
 
-// Initialize Mapbox
-Mapbox.setAccessToken("RS09ui2yXoYiEzBVQ0CkcL3aeFr3OFgtH9preIphup");
-
-// ─── TYPES ─────────────────────────────────────────────────────────────────
+MapboxGL.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_TOKEN as string);
 
 type Props = NativeStackScreenProps<SupervisorStackParamList, "MapScreen">;
-
 type MapMode = "view" | "adhoc";
-
 interface MapScreenParams {
   mode: MapMode;
   workAreaId?: string;
 }
-
-// ─── COMPONENT ─────────────────────────────────────────────────────────────
+const formatLastSeenTime = (lastSeen: string) =>
+  new Date(lastSeen).toLocaleTimeString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+    timeZone: "UTC",
+  });
 
 export default function MapScreen({ navigation, route }: Props) {
   const { mode = "view", workAreaId } = (route.params as MapScreenParams) || {};
   const { user } = useAuth();
 
-  // Map state
   const [selectedLocation, setSelectedLocation] = useState<MapLocation | null>(
     null,
   );
@@ -53,11 +59,9 @@ export default function MapScreen({ navigation, route }: Props) {
     workAreaId || null,
   );
 
-  // Refs
-  const cameraRef = useRef<Mapbox.Camera>(null);
+  const cameraRef = useRef<MapboxGL.Camera>(null);
   const bottomSheetRef = useRef<BottomSheet>(null);
 
-  // Get work areas for supervisor
   const {
     workAreas,
     getWorkAreasBySupervisor,
@@ -65,23 +69,20 @@ export default function MapScreen({ navigation, route }: Props) {
     error: workAreasError,
   } = useWorkAreaSupervisor();
 
-  // Get workAreaId if not provided
+  // ✅ Chỉ fetch 1 lần khi chưa có workAreaId
   useEffect(() => {
     if (!currentWorkAreaId && user?.userId) {
-      console.log("[MapScreen] Fetching work areas for user:", user.userId);
       getWorkAreasBySupervisor(user.userId);
     }
-  }, [currentWorkAreaId, user?.userId, getWorkAreasBySupervisor]);
+  }, []); // ✅ empty deps — chỉ chạy 1 lần lúc mount
 
-  // Set first work area as default if no workAreaId provided
+  // ✅ Set workArea đầu tiên làm default
   useEffect(() => {
     if (!currentWorkAreaId && workAreas.length > 0) {
-      console.log("[MapScreen] Setting default work area:", workAreas[0]);
       setCurrentWorkAreaId(workAreas[0].workAreaId);
     }
-  }, [workAreas, currentWorkAreaId]);
+  }, [workAreas]); // ✅ chỉ phụ thuộc workAreas
 
-  // GPS tracking
   const {
     workers,
     loading,
@@ -93,30 +94,25 @@ export default function MapScreen({ navigation, route }: Props) {
     refreshWorkers,
   } = useWorkerGPS({
     workAreaId: currentWorkAreaId || undefined,
-    pollingInterval: 8000, // 8 seconds
+    pollingInterval: 8000,
     autoStart: true,
   });
 
-  // Nearest worker logic
   const { nearestWorkers, nearestWorker } = useNearestWorker({
     location: selectedLocation || undefined,
     workers,
   });
 
-  // Bottom sheet snap points
-  const snapPoints = React.useMemo(() => ["25%", "50%", "90%"], []);
+  const snapPoints = useMemo(() => ["25%", "50%", "90%"], []);
 
   // ─── HANDLERS ──────────────────────────────────────────────────────────
 
   const handleMapPress = useCallback(
     (event: any) => {
       if (mode !== "adhoc") return;
-
       const { geometry } = event;
       const [longitude, latitude] = geometry.coordinates;
       setSelectedLocation({ latitude, longitude });
-
-      // Expand bottom sheet to show nearest workers
       bottomSheetRef.current?.snapToIndex(1);
     },
     [mode],
@@ -125,9 +121,7 @@ export default function MapScreen({ navigation, route }: Props) {
   const handleWorkerMarkerPress = useCallback((worker: any) => {
     Alert.alert(
       worker.workerName,
-      `Trạng thái: ${getStatusText(worker.status)}\nLần cuối: ${new Date(
-        worker.lastSeen,
-      ).toLocaleTimeString("vi-VN")}`,
+      `Trạng thái: ${getStatusText(worker.status)}\nLần cuối: ${formatLastSeenTime(worker.lastSeen)}`,
       [{ text: "OK" }],
     );
   }, []);
@@ -135,14 +129,9 @@ export default function MapScreen({ navigation, route }: Props) {
   const handleAssignTask = useCallback(
     (workerId: string, workerName: string) => {
       if (!selectedLocation) return;
-
-      // Navigate to create task with pre-filled data
       navigation.navigate("CreateEmergencyTask", {
         workAreaId: currentWorkAreaId || undefined,
-        preselectedWorker: {
-          id: workerId,
-          name: workerName,
-        },
+        preselectedWorker: { id: workerId, name: workerName },
         location: selectedLocation,
       });
     },
@@ -153,36 +142,41 @@ export default function MapScreen({ navigation, route }: Props) {
     refreshWorkers();
   }, [refreshWorkers]);
 
+  const handleRetryLoadWorkAreas = useCallback(() => {
+    if (user?.userId) getWorkAreasBySupervisor(user.userId);
+  }, [user?.userId, getWorkAreasBySupervisor]);
+
   // ─── RENDER METHODS ────────────────────────────────────────────────────
 
-  const renderHeader = () => (
-    <View style={styles.header}>
-      <TouchableOpacity
-        onPress={() => navigation.goBack()}
-        style={styles.backButton}
-      >
-        <Text style={styles.backIcon}>←</Text>
-      </TouchableOpacity>
-
-      <View style={styles.headerCenter}>
-        <Text style={styles.headerTitle}>
-          {mode === "adhoc" ? "Tạo Task Khẩn Cấp" : "Theo Dõi Nhân Viên"}
-        </Text>
-        <Text style={styles.headerSubtitle}>
-          {totalWorkers} nhân viên • {onlineCount} hoạt động • {offlineCount}{" "}
-          ngoại tuyến
-        </Text>
+  const renderHeader = useCallback(
+    () => (
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          <Text style={styles.backIcon}>←</Text>
+        </TouchableOpacity>
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle}>
+            {mode === "adhoc" ? "Tạo Công Việc Khẩn Cấp" : "Theo Dõi Nhân Viên"}
+          </Text>
+          <Text style={styles.headerSubtitle}>
+            {totalWorkers} nhân viên • {onlineCount} hoạt động • {offlineCount}{" "}
+            ngoại tuyến
+          </Text>
+        </View>
+        <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
+          <Text style={styles.refreshIcon}>↻</Text>
+        </TouchableOpacity>
       </View>
-
-      <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
-        <Text style={styles.refreshIcon}>↻</Text>
-      </TouchableOpacity>
-    </View>
+    ),
+    [mode, totalWorkers, onlineCount, offlineCount, handleRefresh, navigation],
   );
 
-  const renderWorkerMarkers = () => {
+  const renderWorkerMarkers = useCallback(() => {
     return workers.map((worker) => (
-      <Mapbox.PointAnnotation
+      <MapboxGL.PointAnnotation
         key={worker.workerId}
         id={worker.workerId}
         coordinate={[worker.longitude, worker.latitude]}
@@ -196,52 +190,49 @@ export default function MapScreen({ navigation, route }: Props) {
         >
           <Text style={styles.markerText}>👤</Text>
         </View>
-        <Mapbox.Callout title={worker.workerName}>
+        <MapboxGL.Callout title={worker.workerName}>
           <View style={styles.callout}>
             <Text style={styles.calloutTitle}>{worker.workerName}</Text>
             <Text style={styles.calloutText}>
               {getStatusText(worker.status)}
             </Text>
           </View>
-        </Mapbox.Callout>
-      </Mapbox.PointAnnotation>
+        </MapboxGL.Callout>
+      </MapboxGL.PointAnnotation>
     ));
-  };
+  }, [workers, handleWorkerMarkerPress]);
 
-  const renderSelectedLocationMarker = () => {
+  const renderSelectedLocationMarker = useCallback(() => {
     if (!selectedLocation || mode !== "adhoc") return null;
-
     return (
-      <Mapbox.PointAnnotation
+      <MapboxGL.PointAnnotation
         id="selected-location"
         coordinate={[selectedLocation.longitude, selectedLocation.latitude]}
       >
         <View style={[styles.markerContainer, { backgroundColor: "#3B82F6" }]}>
           <Text style={styles.markerText}>📍</Text>
         </View>
-        <Mapbox.Callout title="Vị trí đã chọn">
+        <MapboxGL.Callout title="Vị trí đã chọn">
           <View style={styles.callout}>
             <Text style={styles.calloutTitle}>Vị trí đã chọn</Text>
             <Text style={styles.calloutText}>Tap để tạo task tại đây</Text>
           </View>
-        </Mapbox.Callout>
-      </Mapbox.PointAnnotation>
+        </MapboxGL.Callout>
+      </MapboxGL.PointAnnotation>
     );
-  };
+  }, [selectedLocation, mode]);
 
-  const renderBottomSheetContent = () => {
+  const renderBottomSheetContent = useCallback(() => {
     if (mode === "view") {
       return (
         <BottomSheetView style={styles.bottomSheetContent}>
           <Text style={styles.bottomSheetTitle}>Danh Sách Nhân Viên</Text>
-
           {loading && (
             <View style={styles.loadingContainer}>
               <ActivityIndicator color="#3B82F6" />
               <Text style={styles.loadingText}>Đang tải vị trí...</Text>
             </View>
           )}
-
           {error && (
             <View style={styles.errorContainer}>
               <Text style={styles.errorText}>{error}</Text>
@@ -253,11 +244,9 @@ export default function MapScreen({ navigation, route }: Props) {
               </TouchableOpacity>
             </View>
           )}
-
           {!loading && !error && workers.length === 0 && (
             <Text style={styles.emptyText}>Không có nhân viên nào</Text>
           )}
-
           {workers.map((worker) => (
             <View key={worker.workerId} style={styles.workerItem}>
               <View
@@ -273,7 +262,7 @@ export default function MapScreen({ navigation, route }: Props) {
                 </Text>
               </View>
               <Text style={styles.lastSeen}>
-                {new Date(worker.lastSeen).toLocaleTimeString("vi-VN")}
+                {formatLastSeenTime(worker.lastSeen)}
               </Text>
             </View>
           ))}
@@ -281,7 +270,6 @@ export default function MapScreen({ navigation, route }: Props) {
       );
     }
 
-    // Ad-hoc mode
     return (
       <BottomSheetView style={styles.bottomSheetContent}>
         {!selectedLocation ? (
@@ -294,7 +282,6 @@ export default function MapScreen({ navigation, route }: Props) {
         ) : (
           <View>
             <Text style={styles.bottomSheetTitle}>Nhân Viên Gần Nhất</Text>
-
             {nearestWorkers.length === 0 ? (
               <Text style={styles.emptyText}>Không có nhân viên nào</Text>
             ) : (
@@ -348,7 +335,6 @@ export default function MapScreen({ navigation, route }: Props) {
                 </TouchableOpacity>
               ))
             )}
-
             {nearestWorker && (
               <TouchableOpacity
                 style={styles.quickAssignButton}
@@ -369,11 +355,20 @@ export default function MapScreen({ navigation, route }: Props) {
         )}
       </BottomSheetView>
     );
-  };
+  }, [
+    mode,
+    loading,
+    error,
+    workers,
+    selectedLocation,
+    nearestWorkers,
+    nearestWorker,
+    handleRefresh,
+    handleAssignTask,
+  ]);
 
   // ─── RENDER ────────────────────────────────────────────────────────────
 
-  // Show error if failed to load work areas
   if (workAreasError) {
     return (
       <View style={styles.container}>
@@ -383,9 +378,7 @@ export default function MapScreen({ navigation, route }: Props) {
           <Text style={styles.errorText}>❌ {workAreasError}</Text>
           <TouchableOpacity
             style={styles.retryButton}
-            onPress={() =>
-              user?.userId && getWorkAreasBySupervisor(user.userId)
-            }
+            onPress={handleRetryLoadWorkAreas}
           >
             <Text style={styles.retryText}>Thử lại</Text>
           </TouchableOpacity>
@@ -409,9 +402,7 @@ export default function MapScreen({ navigation, route }: Props) {
           {!workAreasLoading && (
             <TouchableOpacity
               style={[styles.retryButton, { marginTop: 12 }]}
-              onPress={() =>
-                user?.userId && getWorkAreasBySupervisor(user.userId)
-              }
+              onPress={handleRetryLoadWorkAreas}
             >
               <Text style={styles.retryText}>Thử lại</Text>
             </TouchableOpacity>
@@ -424,29 +415,24 @@ export default function MapScreen({ navigation, route }: Props) {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#F5F6FA" />
-
       {renderHeader()}
-
-      <Mapbox.MapView
+      <MapboxGL.MapView
         style={styles.map}
-        styleURL={Mapbox.StyleURL.Street}
+        styleURL={MapboxGL.StyleURL.Street}
         onPress={handleMapPress}
       >
-        <Mapbox.Camera
+        <MapboxGL.Camera
           ref={cameraRef}
           zoomLevel={14}
-          centerCoordinate={[106.6297, 10.8231]} // Ho Chi Minh City
+          centerCoordinate={[106.6297, 10.8231]}
           animationMode="flyTo"
           animationDuration={1000}
         />
-
-        <Mapbox.UserLocation visible={true} />
-
+        <MapboxGL.UserLocation visible={true} />
         {renderWorkerMarkers()}
         {renderSelectedLocationMarker()}
-      </Mapbox.MapView>
+      </MapboxGL.MapView>
 
-      {/* Polling indicator */}
       {isPolling && (
         <View style={styles.pollingIndicator}>
           <View style={styles.pollingDot} />

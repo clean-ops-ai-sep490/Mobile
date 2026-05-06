@@ -88,31 +88,20 @@ export function useCheckPpe(
   useEffect(() => {
     if (!stepExecutionId) return;
 
+    let stopped = false; // ✅ flag để biết cleanup đã chạy chưa
+
     const connection = new signalR.HubConnectionBuilder()
       .withUrl(SIGNALR_URL, {
-        transport: signalR.HttpTransportType.LongPolling,
+        transport:
+          signalR.HttpTransportType.WebSockets |
+          signalR.HttpTransportType.LongPolling,
       })
-      .withAutomaticReconnect()
+      .withAutomaticReconnect([0, 2000, 5000, 10000])
       .configureLogging(signalR.LogLevel.Warning)
       .build();
 
     connectionRef.current = connection;
 
-    const startConnection = async () => {
-      try {
-        await connection.start();
-        setIsConnected(true);
-
-        // Join vào group PPE của step này
-        await connection.invoke("JoinPpeCheck", stepExecutionId);
-        console.log("✅ Joined PPE group:", stepExecutionId);
-      } catch (err) {
-        console.warn("[useCheckPpe] SignalR connect failed:", err);
-        setIsConnected(false);
-      }
-    };
-
-    // Lắng nghe event từ BE
     connection.on("ppe-check-updated", (payload: PpeSignalRPayload) => {
       if (payload.taskStepExecutionId !== stepExecutionId) return;
 
@@ -141,25 +130,71 @@ export function useCheckPpe(
     });
 
     connection.onreconnected(() => {
+      if (stopped) return;
       setIsConnected(true);
-      // Rejoin group sau khi reconnect
       connection.invoke("JoinPpeCheck", stepExecutionId).catch(console.warn);
     });
 
-    connection.onclose(() => setIsConnected(false));
+    connection.onclose(() => {
+      if (stopped) return;
+      setIsConnected(false);
+    });
+
+    // ✅ start() wrapped — nếu stopped trước khi xong thì dừng ngay
+    const startConnection = async () => {
+      try {
+        await connection.start();
+      } catch (err: any) {
+        // Lỗi "stop() was called" là expected khi unmount sớm — bỏ qua
+        if (
+          stopped ||
+          err?.message?.includes("stop()") ||
+          err?.message?.includes("before stop")
+        ) {
+          return;
+        }
+        console.warn("[useCheckPpe] SignalR connect failed:", err);
+        setIsConnected(false);
+        return;
+      }
+
+      // ✅ Kiểm tra lại sau await — có thể unmount trong lúc connecting
+      if (stopped) {
+        connection.stop().catch(() => {});
+        return;
+      }
+
+      setIsConnected(true);
+
+      try {
+        await connection.invoke("JoinPpeCheck", stepExecutionId);
+        console.log("✅ Joined PPE group:", stepExecutionId);
+      } catch (err) {
+        if (!stopped) console.warn("[useCheckPpe] JoinPpeCheck failed:", err);
+      }
+    };
 
     startConnection();
 
     return () => {
-      connection
-        .invoke("LeavePpeCheck", stepExecutionId)
-        .catch(() => {})
-        .finally(() => {
-          connection.stop();
-          setIsConnected(false);
-        });
+      stopped = true; // ✅ Set trước khi stop
+
+      const state = connection.state;
+      if (state === signalR.HubConnectionState.Connected) {
+        connection
+          .invoke("LeavePpeCheck", stepExecutionId)
+          .catch(() => {})
+          .finally(() => connection.stop().catch(() => {}));
+      } else if (
+        state === signalR.HubConnectionState.Connecting ||
+        state === signalR.HubConnectionState.Reconnecting
+      ) {
+        connection.stop().catch(() => {}); // ✅ stop() khi đang connect → trigger lỗi "before stop" nhưng ta đã catch ở trên
+      }
+
+      connectionRef.current = null;
     };
-  }, [stepExecutionId, hubUrl]);
+  }, [stepExecutionId]);
 
   // ─── Gọi API ppe-check ─────────────────────────────────────────────────────
   const requestPpeCheck = async () => {

@@ -4,13 +4,7 @@ import Header from "@/components/common/Header";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -144,6 +138,7 @@ interface Task {
   finishedAt?: string;
   tags: string[];
   dayOffset: number;
+  isAdhoc: boolean;
 }
 
 const STATUS_CONFIG: Record<
@@ -282,7 +277,8 @@ const TaskCard = ({
   onStart,
   onContinue,
   canAct = true,
-  canStart = false,
+  onFinishAdhoc,
+  // canStart = false,
   blockReason = null,
   showRejectedBanner = false,
   onDismissRejected,
@@ -291,7 +287,8 @@ const TaskCard = ({
   onStart?: (id: string) => void;
   onContinue?: (id: string) => void;
   canAct?: boolean;
-  canStart?: boolean;
+  onFinishAdhoc?: (id: string) => void;
+  // canStart?: boolean;
   blockReason?: BlockReason;
   showRejectedBanner?: boolean;
   onDismissRejected?: () => void;
@@ -305,9 +302,7 @@ const TaskCard = ({
   const isLeaveRequestPending = blockReason === "emergency_leave_pending";
 
   const hasActions =
-    canAct &&
-    (isInProgress || (isNotStarted && canStart)) &&
-    !isLeaveRequestPending;
+    canAct && (isInProgress || isNotStarted) && !isLeaveRequestPending;
 
   return (
     <View
@@ -365,15 +360,25 @@ const TaskCard = ({
       {/* Nút bình thường */}
       {hasActions && (
         <View style={styles.cardActions}>
-          {isInProgress && (
-            <AppButton
-              label="Tiếp tục"
-              onPress={() => onContinue?.(task.id)}
-              iconLeft="play"
-              size="md"
-              style={{ flex: 1, marginBottom: 0 }}
-            />
-          )}
+          {isInProgress &&
+            !task.isAdhoc && ( // task thường
+              <AppButton
+                label="Tiếp tục"
+                onPress={() => onContinue?.(task.id)}
+                iconLeft="play"
+                size="md"
+                style={{ flex: 1, marginBottom: 0 }}
+              />
+            )}
+          {isInProgress &&
+            task.isAdhoc && ( // ✅ adhoc đang chạy
+              <AppButton
+                label="Hoàn thành công việc"
+                onPress={() => onFinishAdhoc?.(task.id)}
+                size="md"
+                style={{ flex: 1, marginBottom: 0 }}
+              />
+            )}
           {isNotStarted && (
             <AppButton
               label="Bắt đầu công việc"
@@ -396,6 +401,9 @@ export default function TaskListScreen() {
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [tasks, setTasks] = useState<TaskAssignmentDto[]>([]);
   const [workerId, setWorkerId] = useState<string | null>(null);
+  const [adhocInProgressId, setAdhocInProgressId] = useState<string | null>(
+    null,
+  );
 
   // TH2: chỉ lưu Pending để vẽ chấm đỏ
   // Approved/Rejected → task tự biến mất / chấm tự mất theo server state
@@ -422,6 +430,7 @@ export default function TaskListScreen() {
     startTask,
     loading: hookLoading,
     getTaskAssignmentById,
+    completeTask,
   } = useTaskAssignments();
   const { getTaskScheduleById } = useTaskSchedules();
   const { getListByWorkerId } = useEmergencyLeaveRequest();
@@ -683,6 +692,7 @@ export default function TaskListScreen() {
       endTime,
       tags: [],
       dayOffset: 0,
+      isAdhoc: t.isAdhocTask,
     };
   });
 
@@ -692,13 +702,26 @@ export default function TaskListScreen() {
 
   const remaining = mappedTasks.filter((t) => t.status !== "completed").length;
 
-  const earliestNotStartedId = useMemo(() => {
-    if (selectedDay !== 0) return null;
-    const notStarted = mappedTasks
-      .filter((t) => t.status === "not_started")
-      .sort((a, b) => a.startTime.localeCompare(b.startTime));
-    return notStarted[0]?.id ?? null;
-  }, [mappedTasks, selectedDay]);
+  // const earliestNotStartedId = useMemo(() => {
+  //   if (selectedDay !== 0) return null;
+
+  //   // Nếu có bất kỳ task nào đang in_progress, bị block status,
+  //   // hoặc đang bị lock do emergency_leave/issue/equipment pending
+  //   // → không cho phép bắt đầu task mới nào cả
+  //   const hasBlockingTask = mappedTasks.some((t) => {
+  //     if (t.status === "in_progress") return true;
+  //     if (t.status === "block") return true;
+  //     if (taskBlockMap[t.id]) return true; // emergency_leave_pending / issue / equipment
+  //     return false;
+  //   });
+
+  //   if (hasBlockingTask) return null;
+
+  //   const notStarted = mappedTasks
+  //     .filter((t) => t.status === "not_started")
+  //     .sort((a, b) => a.startTime.localeCompare(b.startTime));
+  //   return notStarted[0]?.id ?? null;
+  // }, [mappedTasks, selectedDay, taskBlockMap]); // thêm taskBlockMap vào deps
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleNavigate = (screen: TabKey) =>
@@ -712,8 +735,20 @@ export default function TaskListScreen() {
       );
       return;
     }
+
     try {
       setLoadingTasks(true);
+
+      // ✅ Lấy chi tiết task để check isAdhocTask chính xác
+      const taskDetail = await getTaskAssignmentById(id);
+      const listTask = tasks.find((t) => t.id === id);
+      const isAdhocTask =
+        taskDetail?.isAdhocTask === true || listTask?.isAdhocTask === true;
+      console.log("[handleStartTask] isAdhocTask:", isAdhocTask, {
+        detail: taskDetail?.isAdhocTask,
+        list: listTask?.isAdhocTask,
+      });
+
       let latitude: number | null = null,
         longitude: number | null = null,
         isConfirmed = true;
@@ -731,7 +766,35 @@ export default function TaskListScreen() {
       try {
         await sendWorkerGps(workerId, latitude, longitude, isConfirmed);
       } catch {}
+
       const res = await startTask(id, workerId);
+
+      // ✅ Adhoc task: never navigate to TaskExecution
+      if (isAdhocTask) {
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === id ? { ...t, status: "InProgress" as any } : t,
+          ),
+        );
+        setAdhocInProgressId(id);
+        return; // ✅ không navigate
+      }
+
+      const hasExecutionSteps =
+        Array.isArray(res?.steps) && (res?.steps?.length ?? 0) > 0;
+
+      // Safety net: only normal task with steps can enter TaskExecution
+      if (!hasExecutionSteps) {
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === id ? { ...t, status: "InProgress" as any } : t,
+          ),
+        );
+        setAdhocInProgressId(id);
+        return;
+      }
+
+      // Task thường có steps → sang TaskExecution
       (navigation as any).navigate("TaskExecution", {
         id,
         steps: res?.steps || [],
@@ -741,6 +804,25 @@ export default function TaskListScreen() {
         "Bắt đầu thất bại",
         e?.message || "Không thể bắt đầu công việc.",
       );
+    } finally {
+      setLoadingTasks(false);
+    }
+  };
+
+  const handleFinishAdhocTask = async (id: string) => {
+    if (!workerId) return;
+    try {
+      setLoadingTasks(true);
+      await completeTask(id, workerId); // ✅ cần import completeTask
+      setAdhocInProgressId(null);
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === id ? { ...t, status: "Completed" as any } : t,
+        ),
+      );
+      Alert.alert("Thành công", "Công việc adhoc đã hoàn thành!");
+    } catch (e: any) {
+      Alert.alert("Lỗi", e?.message || "Không thể hoàn thành công việc.");
     } finally {
       setLoadingTasks(false);
     }
@@ -919,8 +1001,9 @@ export default function TaskListScreen() {
                 task={task}
                 onStart={handleStartTask}
                 onContinue={handleContinue}
+                onFinishAdhoc={handleFinishAdhocTask}
                 canAct={selectedDay === 0}
-                canStart={task.id === earliestNotStartedId}
+                // canStart={task.id === earliestNotStartedId}
                 blockReason={getBlockReasonForTask(task.id)}
                 showRejectedBanner={rejectedTaskIds.has(task.id)}
                 onDismissRejected={() => {

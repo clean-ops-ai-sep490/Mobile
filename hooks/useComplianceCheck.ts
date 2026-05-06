@@ -109,24 +109,27 @@ export function useComplianceCheck() {
   const _teardown = () => {
     _cancelPoll();
     const conn = connectionRef.current;
-    if (conn && conn.state !== HubConnectionState.Disconnected) {
-      console.log(
-        "[useComplianceCheck] _teardown called. activeExecution=",
-        activeExecutionRef.current,
-      );
-      // Rời group trước khi disconnect (phải đọc ref trước khi null nó)
-      if (activeExecutionRef.current) {
-        conn
-          .invoke("LeaveExecution", activeExecutionRef.current)
-          .catch(() => {});
+    if (conn) {
+      const state = conn.state;
+      if (state === HubConnectionState.Connected) {
+        // ✅ Chỉ invoke Leave khi đang Connected
+        if (activeExecutionRef.current) {
+          conn
+            .invoke("LeaveExecution", activeExecutionRef.current)
+            .catch(() => {});
+        }
+        conn.stop().catch(() => {});
+      } else if (
+        state === HubConnectionState.Connecting ||
+        state === HubConnectionState.Reconnecting
+      ) {
+        // ✅ Đang connect → stop() sẽ trigger lỗi "before stop" nhưng đã suppress
+        conn.stop().catch(() => {});
       }
-      conn.stop().catch(() => {});
+      // Disconnected/Disconnecting → không cần làm gì
     }
     connectionRef.current = null;
     activeExecutionRef.current = null;
-    console.log(
-      "[useComplianceCheck] teardown complete. connection cleared, activeExecution cleared",
-    );
   };
 
   /** Áp kết quả terminal: cập nhật state, dừng poll + SignalR */
@@ -224,47 +227,38 @@ export function useComplianceCheck() {
 
   const _connectSignalR = useCallback(
     async (executionId: string) => {
-      // Dừng connection cũ nếu có
       if (connectionRef.current) {
         await connectionRef.current.stop().catch(() => {});
         connectionRef.current = null;
       }
 
-      // Dùng LongPolling để tránh lỗi 'Cannot resolve ws://' trên RN/Expo.
-      // SignalR sẽ negotiate qua HTTP trước rồi tự upgrade lên WebSocket nếu BE hỗ trợ.
+      // ✅ Flag riêng cho SignalR (khác isMountedRef — dùng để cancel khi gọi lại)
+      let signalRStopped = false;
+
       const connection = new HubConnectionBuilder()
         .withUrl(SIGNALR_URL, {
-          transport: HttpTransportType.LongPolling,
+          // ✅ Thử WebSockets trước, fallback LongPolling
+          transport:
+            HttpTransportType.WebSockets | HttpTransportType.LongPolling,
         })
-        .withAutomaticReconnect()
-        .configureLogging(LogLevel.Debug)
+        .withAutomaticReconnect([0, 2000, 5000, 10000])
+        .configureLogging(LogLevel.Warning) // ✅ Bớt noise, dùng Warning thay Debug
         .build();
 
       connectionRef.current = connection;
 
-      // Lắng nghe event "compliance-check-updated" từ BE
-      // BE gửi payload là anonymous object với camelCase fields
       connection.on(
         "compliance-check-updated",
         (payload: SignalRNotification) => {
           if (!isMountedRef.current) return;
 
-          console.log("📡 [SignalR] compliance-check-updated raw:", payload);
+          console.log("📡 [SignalR] compliance-check-updated:", payload);
 
-          // So sánh case-insensitive vì BE Guid có thể lowercase
           const incomingId = payload?.taskStepExecutionId
             ?.toString()
             .toLowerCase();
           const expectedId = executionId?.toLowerCase();
-          if (incomingId !== expectedId) {
-            console.warn(
-              "[SignalR] executionId mismatch, ignoring:",
-              incomingId,
-              "vs",
-              expectedId,
-            );
-            return;
-          }
+          if (incomingId !== expectedId) return;
           if (activeExecutionRef.current?.toLowerCase() !== expectedId) return;
 
           _applyResult({
@@ -280,19 +274,35 @@ export function useComplianceCheck() {
 
       try {
         await connection.start();
-        console.log("📡 [SignalR] Connected →", SIGNALR_URL);
-
-        // BE method: JoinExecution(Guid taskStepExecutionId)
-        // SignalR tự convert string → Guid nếu đúng format "xxxxxxxx-xxxx-..."
-        // Log rõ để confirm join thành công
-        console.log("📡 [SignalR] Invoking JoinExecution with:", executionId);
-        await connection.invoke("JoinExecution", executionId);
-        console.log(
-          "📡 [SignalR] ✓ JoinExecution successful — now listening for compliance-check-updated",
-        );
       } catch (e: any) {
-        console.error("📡 [SignalR] ✗ JoinExecution FAILED:", e?.message ?? e);
-        // Kết nối thất bại → không sao, polling đang chạy như fallback
+        // ✅ Suppress lỗi expected khi unmount sớm hoặc _teardown gọi trước
+        if (
+          !isMountedRef.current ||
+          e?.message?.includes("stop()") ||
+          e?.message?.includes("before stop") ||
+          e?.message?.includes("Unable to connect") // SignalR fail do server → polling lo
+        ) {
+          return;
+        }
+        console.warn("📡 [SignalR] connect failed:", e?.message ?? e);
+        return;
+      }
+
+      // ✅ Guard sau await — có thể unmount trong lúc connecting
+      if (!isMountedRef.current) {
+        connection.stop().catch(() => {});
+        return;
+      }
+
+      console.log("📡 [SignalR] Connected →", SIGNALR_URL);
+
+      try {
+        await connection.invoke("JoinExecution", executionId);
+        console.log("📡 [SignalR] ✓ JoinExecution successful");
+      } catch (e: any) {
+        if (isMountedRef.current) {
+          console.warn("📡 [SignalR] ✗ JoinExecution failed:", e?.message ?? e);
+        }
       }
     },
     [_applyResult],

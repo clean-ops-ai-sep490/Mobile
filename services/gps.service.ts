@@ -27,7 +27,7 @@ const getWorkerGPSByWorkArea = async (
   params?: WorkerGPSParams,
 ): Promise<WorkerGPSResponse> => {
   const response = await axiosInstance.get(
-    `/WorkAreaSupervisors/workareas/${workAreaId}/workers/gps${toQueryString(params)}`,
+    `/WorkAreaSupervisors/workarea/${workAreaId}/workers/gps${toQueryString(params)}`,
   );
   return response.data;
 };

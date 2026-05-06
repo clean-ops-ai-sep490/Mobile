@@ -86,8 +86,8 @@ export default function TaskSwapDetailModal({
     ]);
   };
 
-  console.log("targetWorkerId:", item?.targetWorkerId);
-  console.log("currentWorkerId:", currentWorkerId);
+  // console.log("targetWorkerId:", item?.targetWorkerId);
+  // console.log("currentWorkerId:", currentWorkerId);
 
   const handleCancel = async () => {
     Alert.alert("Hủy yêu cầu?", "", [

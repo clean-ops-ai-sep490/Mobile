@@ -144,6 +144,17 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
 
       if (derivedName && !data.taskName) data.taskName = derivedName;
 
+      // Normalize isAdhocTask across possible response shapes
+      if (typeof data?.isAdhocTask !== "boolean") {
+        const rawIsAdhoc =
+          data?.isAdhocTask ??
+          data?.isAdhoc ??
+          data?.task?.isAdhocTask ??
+          data?.taskAssignment?.isAdhocTask;
+        data.isAdhocTask =
+          rawIsAdhoc === true || rawIsAdhoc === "true" || rawIsAdhoc === 1;
+      }
+
       return data as TaskAssignmentDto;
     } catch (err: any) {
       if (err?.response?.status === 404) {

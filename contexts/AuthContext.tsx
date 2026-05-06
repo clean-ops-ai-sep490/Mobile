@@ -76,7 +76,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (me) {
         const mappedUser = mapUser(me);
 
-        // ✅ Nếu là Worker thì lấy workerId luôn khi restore session
         if (mappedUser.role === "Worker") {
           try {
             const profile = await getWorkerProfile();
@@ -93,12 +92,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         setAppUser(mappedUser);
 
-        // ✅ Refresh unread count đúng cách sau khi restore session
-        try {
-          useNotificationStore.getState().fetchUnreadCount(mappedUser.workerId);
-        } catch (e) {}
-      } else {
-        setAppUser(null);
+        // ✅ Truyền workerId từ mappedUser (đã có sau await getWorkerProfile)
+        useNotificationStore.getState().fetchUnreadCount(mappedUser.workerId); // <-- đây đúng rồi
       }
     } catch {
       setAppUser(null);

@@ -11,17 +11,9 @@ export const sendWorkerGps = async (
   longitude: number | null,
   isConfirmed: boolean,
 ) => {
-  const payload = {
-    workerId,
-    latitude,
-    longitude,
-    isConfirmed,
-  };
-
+  const payload = { workerId, latitude, longitude, isConfirmed };
   console.log("📍 Sending GPS:", payload);
-
   const res = await axiosInstance.post("/WorkerGps", payload);
-
   return res.data;
 };
 
@@ -59,29 +51,39 @@ export const useWorkerGPS = ({
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mountedRef = useRef<boolean>(true);
+  const isPollingRef = useRef<boolean>(false); // ✅ track polling state without causing re-renders
+  const workAreaIdRef = useRef<string | undefined>(workAreaId); // ✅ latest workAreaId without deps
+
+  // Keep workAreaIdRef in sync
+  useEffect(() => {
+    workAreaIdRef.current = workAreaId;
+  }, [workAreaId]);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, []);
 
+  // ✅ No state in deps — uses refs instead
   const fetchWorkers = useCallback(async (): Promise<void> => {
-    if (!workAreaId || !mountedRef.current) return;
+    const currentWorkAreaId = workAreaIdRef.current;
+    if (!currentWorkAreaId || !mountedRef.current) return;
 
     try {
       setError(null);
-      if (!isPolling) setLoading(true);
+      if (!isPollingRef.current) setLoading(true);
 
       const params: WorkerGPSParams = {
         pageNumber: 1,
         pageSize: 100,
-        offlineThresholdMinutes: 10,
+        offlineThresholdMinutes: 5,
       };
 
       const response = await gpsService.getWorkerGPSByWorkArea(
-        workAreaId,
+        currentWorkAreaId,
         params,
       );
 
@@ -97,31 +99,19 @@ export const useWorkerGPS = ({
       setWorkers(workersWithStatus);
     } catch (err: any) {
       if (!mountedRef.current) return;
-
       const errorMessage =
         err.response?.data?.message ||
         err.response?.data?.error ||
         err.message ||
         "Không thể lấy vị trí nhân viên";
-
       setError(errorMessage);
     } finally {
       if (mountedRef.current) setLoading(false);
     }
-  }, [workAreaId, isPolling]);
-
-  const startPolling = useCallback(() => {
-    if (!workAreaId || isPolling) return;
-
-    setIsPolling(true);
-    fetchWorkers();
-
-    intervalRef.current = setInterval(() => {
-      if (mountedRef.current) fetchWorkers();
-    }, pollingInterval);
-  }, [workAreaId, isPolling, fetchWorkers, pollingInterval]);
+  }, []); // ✅ empty deps — all values accessed via refs
 
   const stopPolling = useCallback(() => {
+    isPollingRef.current = false;
     setIsPolling(false);
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
@@ -129,16 +119,32 @@ export const useWorkerGPS = ({
     }
   }, []);
 
+  const startPolling = useCallback(() => {
+    if (!workAreaIdRef.current || isPollingRef.current) return;
+
+    isPollingRef.current = true;
+    setIsPolling(true);
+    fetchWorkers();
+
+    intervalRef.current = setInterval(() => {
+      if (mountedRef.current) fetchWorkers();
+    }, pollingInterval);
+  }, [fetchWorkers, pollingInterval]); // ✅ no isPolling/workAreaId state in deps
+
   const refreshWorkers = useCallback(async (): Promise<void> => {
     await fetchWorkers();
   }, [fetchWorkers]);
 
+  // ✅ Only re-run when workAreaId or autoStart actually changes
   useEffect(() => {
-    if (workAreaId && autoStart) startPolling();
-    else stopPolling();
+    if (workAreaId && autoStart) {
+      startPolling();
+    } else {
+      stopPolling();
+    }
 
     return () => stopPolling();
-  }, [workAreaId, autoStart, startPolling, stopPolling]);
+  }, [workAreaId, autoStart]); // ✅ startPolling/stopPolling intentionally excluded
 
   const totalWorkers = workers.length;
   const onlineCount = workers.filter(

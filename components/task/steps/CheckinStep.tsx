@@ -184,11 +184,11 @@ function CheckinComponent({ config, state, onChange }: StepPluginProps) {
               {/* {state.workareaId && (
                 <Text style={s.successSub}>Area: {state.workareaId}</Text>
               )} */}
-              {state.checkinAt && (
+              {/* {state.checkinAt && (
                 <Text style={s.successSub}>
                   Thời gian: {new Date(state.checkinAt).toLocaleString("vi-VN")}
                 </Text>
-              )}
+              )} */}
             </>
           )}
         </View>

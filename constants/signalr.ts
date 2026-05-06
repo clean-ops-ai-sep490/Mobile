@@ -1,3 +1,3 @@
 export const SIGNALR_URL =
   process.env.EXPO_PUBLIC_SIGNALR_URL ??
-  "http://192.168.1.204:5000/hubs/compliance";
+  "https://cleanops-api.proudbush-ae579e6b.southeastasia.azurecontainerapps.io/hubs/compliance";

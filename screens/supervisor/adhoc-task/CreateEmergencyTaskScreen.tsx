@@ -76,7 +76,7 @@ export default function CreateEmergencyTaskScreen({
           >
             <Text style={styles.closeIcon}>✕</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>Tạo Task Khẩn Cấp</Text>
+          <Text style={styles.title}>Tạo Công Việc Khẩn Cấp</Text>
           <TouchableOpacity onPress={handleReset}>
             <Text style={styles.resetButton}>Reset</Text>
           </TouchableOpacity>
@@ -127,10 +127,10 @@ export default function CreateEmergencyTaskScreen({
 
           {/* Task Name */}
           <View style={styles.section}>
-            <Text style={styles.label}>Tên task *</Text>
+            <Text style={styles.label}>Tên công việc *</Text>
             <TextInput
               style={styles.input}
-              placeholder="Nhập tên task..."
+              placeholder="Nhập tên công việc..."
               placeholderTextColor="#94A3B8"
               value={taskName}
               onChangeText={setTaskName}
@@ -202,7 +202,9 @@ export default function CreateEmergencyTaskScreen({
             {loading ? (
               <ActivityIndicator color="#FFF" />
             ) : (
-              <Text style={styles.createButtonText}>Tạo Task Khẩn Cấp</Text>
+              <Text style={styles.createButtonText}>
+                Tạo Công Việc Khẩn Cấp
+              </Text>
             )}
           </TouchableOpacity>
         </ScrollView>
