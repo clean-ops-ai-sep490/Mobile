@@ -129,7 +129,7 @@ export default function LoginScreen({ onNavigate }: Props) {
       >
         <View style={styles.brandSection}>
           <Image
-            source={require("../../assets/images/logo.png")}
+            source={require("../../assets/images/logo.jpg")}
             style={styles.logoImage}
             resizeMode="contain"
           />
