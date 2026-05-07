@@ -36,6 +36,7 @@ import MapScreen from "@/screens/supervisor/map/MapScreen";
 import ReviewImagePendingScreen from "@/screens/supervisor/reviewImage/ReviewImagePendingScreen";
 import SwapRequestDetailScreen from "@/screens/supervisor/swap-task/SwapRequestDetailScreen";
 import SwapRequestListScreen from "@/screens/supervisor/swap-task/SwapRequestListScreen";
+import WorkareaSupervisorScreen from "@/screens/supervisor/workarea-supervisor/WorkareaSupervisorScreen";
 import ListAllRequestsScreen from "@/screens/worker/ListAllRequestsScreen";
 import TaskCalendarScreen from "@/screens/worker/TaskCalendarScreen";
 import WorkerProfileScreen from "@/screens/worker/WorkerProfileScreen";
@@ -86,6 +87,7 @@ export type WorkerStackParamList = {
 export type SupervisorStackParamList = {
   SupervisorHome: undefined;
   WorkAreaList: undefined;
+  WorkAreaSupervisor: undefined;
   CreateEmergencyTask: {
     workAreaId?: string;
     workAreaName?: string;
@@ -166,8 +168,12 @@ function SupervisorHomeWrapper({ navigation }: SupervisorHomeProps) {
           navigation.navigate("MapScreen", { mode: "view" });
         } else if (screen === "map-adhoc") {
           navigation.navigate("MapScreen", { mode: "adhoc" });
+        } else if (screen === "workers") {
+          navigation.navigate("WorkAreaSupervisor");
         } else if (screen === "profile") {
           navigation.navigate("Profile");
+        } else if (screen === "Home") {
+          navigation.navigate("SupervisorHome");
         } else {
           // Handle other navigation cases
           console.log("Navigate to:", screen);
@@ -258,6 +264,10 @@ function SupervisorNavigator() {
       <SupervisorStack.Screen
         name="WorkAreaList"
         component={WorkAreaListScreen}
+      />
+      <SupervisorStack.Screen
+        name="WorkAreaSupervisor"
+        component={WorkareaSupervisorScreen}
       />
       <SupervisorStack.Screen
         name="CreateEmergencyTask"

@@ -1,4 +1,4 @@
-import AppButton from "@/components/common/AppButton";
+﻿import AppButton from "@/components/common/AppButton";
 import { TabKey } from "@/components/common/BottomTabBar";
 import Header from "@/components/common/Header";
 import { useAuth } from "@/contexts/AuthContext";
@@ -105,7 +105,7 @@ export default function ProfileScreen() {
 
       <Header
         title="Hồ sơ của tôi"
-        onBack={() => handleNavigate("Home")}
+        onBack={() => navigation.goBack()}
         style={{ backgroundColor: "#F5F6FA" }}
       />
 

@@ -1,6 +1,4 @@
-import BottomNavigation from "@/components/bottom-navigation";
-import Header from "@/components/header";
-import { useAuth } from "@/contexts/AuthContext";
+﻿import Header from "@/components/header";
 import { useTaskSwap } from "@/hooks/useTaskSwap";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useRef, useState } from "react";
@@ -24,13 +22,13 @@ interface Props {
   onNavigate?: (screen: string) => void;
 }
 
-// ─── ACTION CARD ──────────────────────────────────────────────────────────
 function ActionCard({
   label,
   desc,
   iconName,
   color,
   badge,
+  fullWidth,
   onPress,
 }: {
   label: string;
@@ -38,11 +36,15 @@ function ActionCard({
   iconName: any;
   color: string;
   badge?: number;
+  fullWidth?: boolean;
   onPress?: () => void;
 }) {
   return (
     <TouchableOpacity
-      style={[styles.actionCard, { width: CARD_WIDTH }]}
+      style={[
+        styles.actionCard,
+        fullWidth ? styles.actionCardFullWidth : { width: CARD_WIDTH },
+      ]}
       onPress={onPress}
       activeOpacity={0.85}
     >
@@ -64,9 +66,7 @@ function ActionCard({
   );
 }
 
-// ─── MAIN SCREEN ──────────────────────────────────────────────────────────
 export default function SupervisorHomeScreen({ onNavigate }: Props) {
-  const { logout, user } = useAuth();
   const { getList } = useTaskSwap();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [pendingSwapCount, setPendingSwapCount] = useState(0);
@@ -100,48 +100,17 @@ export default function SupervisorHomeScreen({ onNavigate }: Props) {
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
-    if (tabId === "SwapRequestList" && pendingSwapCount === 0)
+    if (tabId === "SwapRequestList" && pendingSwapCount === 0) {
       fetchPendingCount();
+    }
     onNavigate?.(tabId);
   };
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-    } catch (e) {
-      console.error("Đăng xuất thất bại:", e);
-    }
-  };
-
-  const navigationTabs = [
-    {
-      icon: <Ionicons name="grid-outline" size={22} />,
-      label: "Tổng quan",
-      id: "dashboard",
-    },
-    {
-      icon: <Ionicons name="people-outline" size={22} />,
-      label: "Nhân viên",
-      id: "workers",
-    },
-    {
-      icon: <Ionicons name="settings-outline" size={22} />,
-      label: "Cài đặt",
-      id: "settings",
-    },
-  ];
-
-  const today = new Date().toLocaleDateString("vi-VN", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
 
   return (
     <View style={styles.root}>
       <StatusBar barStyle="dark-content" backgroundColor="#F0F4FF" />
       <SafeAreaView style={styles.safe}>
-        <Header title="Xin chào" showDate showSettings />
+        <Header title="Xin chào" />
 
         <ScrollView
           style={styles.scroll}
@@ -151,19 +120,18 @@ export default function SupervisorHomeScreen({ onNavigate }: Props) {
           <Animated.View
             style={{ opacity: fade, transform: [{ translateY: slide }] }}
           >
-            {/* ── QUICK ACTIONS ── */}
-            <Text style={styles.sectionLabel}>Thao Tác Nhanh</Text>
+            <Text style={styles.sectionLabel}>Thao tác nhanh</Text>
             <View style={styles.grid}>
               <ActionCard
-                label="Xem Bản Đồ"
+                label="Xem bản đồ"
                 desc="Theo dõi nhân viên"
                 iconName="map-outline"
                 color="#2563EB"
                 onPress={() => handleTabPress("map-view")}
               />
               <ActionCard
-                label="Nhiệm Vụ Đột Xuất"
-                desc="Tạo task khẩn cấp"
+                label="Nhiệm vụ đột xuất"
+                desc="Tạo công việc khẩn cấp"
                 iconName="add-circle-outline"
                 color="#7C3AED"
                 onPress={() => handleTabPress("map-adhoc")}
@@ -171,15 +139,15 @@ export default function SupervisorHomeScreen({ onNavigate }: Props) {
             </View>
             <View style={styles.grid}>
               <ActionCard
-                label="Duyệt Hình Ảnh"
+                label="Duyệt hình ảnh"
                 desc="Xem ảnh chờ duyệt"
                 iconName="images-outline"
                 color="#0891B2"
                 onPress={() => handleTabPress("review")}
               />
               <ActionCard
-                label="Yêu Cầu Đổi Ca"
-                desc="Xem & phê duyệt"
+                label="Yêu cầu đổi ca"
+                desc="Xem và phê duyệt"
                 iconName="swap-horizontal-outline"
                 color="#EA580C"
                 badge={pendingSwapCount}
@@ -188,8 +156,8 @@ export default function SupervisorHomeScreen({ onNavigate }: Props) {
             </View>
             <View style={styles.grid}>
               <ActionCard
-                label="Lịch Sử Đột Xuất"
-                desc="Xem lại các task"
+                label="Lịch sử đột xuất"
+                desc="Xem lại các công việc đột xuất đã tạo"
                 iconName="document-text-outline"
                 color="#16A34A"
                 onPress={() => handleTabPress("adhoc-history")}
@@ -201,23 +169,24 @@ export default function SupervisorHomeScreen({ onNavigate }: Props) {
                 color="#040404"
                 onPress={() => handleTabPress("profile")}
               />
-              {/* Giữ layout 2 cột cân đối */}
-              <View style={{ width: CARD_WIDTH }} />
+            </View>
+            <View style={styles.grid}>
+              <ActionCard
+                label="Xem khu vực và danh sách nhân viên"
+                desc="Xem khu vực và nhân viên trong khu vực"
+                iconName="grid-outline"
+                color="#EF4444"
+                fullWidth
+                onPress={() => handleTabPress("workers")}
+              />
             </View>
           </Animated.View>
         </ScrollView>
-
-        <BottomNavigation
-          tabs={navigationTabs}
-          activeTab={activeTab}
-          onTabPress={handleTabPress}
-        />
       </SafeAreaView>
     </View>
   );
 }
 
-// ─── STYLES ───────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#F0F4FF" },
   safe: { flex: 1 },
@@ -227,48 +196,6 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 32,
   },
-
-  // Greeting
-  greetingBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#FFF",
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 24,
-    shadowColor: "#2563EB",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  greetingLeft: { flex: 1 },
-  greetingDate: {
-    fontSize: 11,
-    color: "#94A3B8",
-    fontWeight: "500",
-    marginBottom: 4,
-    textTransform: "capitalize",
-  },
-  greetingTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#0F172A",
-    marginBottom: 4,
-  },
-  greetingSub: { fontSize: 12, color: "#64748B" },
-  greetingBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: "#EFF6FF",
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: 12,
-  },
-
-  // Section label
   sectionLabel: {
     fontSize: 11,
     fontWeight: "700",
@@ -277,15 +204,11 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     marginBottom: 12,
   },
-
-  // Grid
   grid: {
     flexDirection: "row",
     gap: CARD_GAP,
     marginBottom: CARD_GAP,
   },
-
-  // Action Card
   actionCard: {
     backgroundColor: "#FFF",
     borderRadius: 16,
@@ -295,6 +218,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+  },
+  actionCardFullWidth: {
+    width: "100%",
   },
   actionCardTop: {
     flexDirection: "row",
