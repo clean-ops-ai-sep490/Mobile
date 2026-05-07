@@ -13,7 +13,7 @@ function ChecklistComponent({ config, state, onChange }: StepPluginProps) {
     <View style={s.container}>
       <View style={s.header}>
         <Text style={s.label}>
-          Complete all items — {doneCount}/{items.length}
+          Hoàn thành checklist — {doneCount}/{items.length}
         </Text>
       </View>
 
@@ -110,7 +110,7 @@ const s = StyleSheet.create({
 
 export const ChecklistStepPlugin: StepPlugin = {
   type: "checklist",
-  label: "Checklist",
+  label: "Danh sách kiểm tra",
   detect: (config) => config?.["x-behavior"] === "checklist",
   buildInitialState: (config) =>
     Object.fromEntries((config.items as string[]).map((item) => [item, false])),

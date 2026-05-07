@@ -385,17 +385,18 @@ function PhotoComponent({ config, state, onChange }: StepPluginProps) {
     <View>
       <View style={s.labelRow}>
         <Text style={s.label}>
-          {phase.toUpperCase()} photos (Max {maxPhotos})
+          {phase.toUpperCase()} photos (Tối đa: {maxPhotos})
         </Text>
         {(photos.length > 0 ||
-          (isAfterPhase && complianceStatus === "Failed")) && (
-          <TouchableOpacity
-            style={s.deleteAllBtn}
-            onPress={handleDeleteAllServer}
-          >
-            <Text style={s.deleteAllBtnText}>Xóa tất cả ảnh</Text>
-          </TouchableOpacity>
-        )}
+          (isAfterPhase && complianceStatus === "Failed")) &&
+          (!isAfterPhase || complianceStatus === "Failed") && (
+            <TouchableOpacity
+              style={s.deleteAllBtn}
+              onPress={handleDeleteAllServer}
+            >
+              <Text style={s.deleteAllBtnText}>Xóa tất cả ảnh</Text>
+            </TouchableOpacity>
+          )}
       </View>
 
       {isUploading && (
@@ -520,7 +521,7 @@ const s = StyleSheet.create({
 
 export const PhotoStepPlugin: StepPlugin = {
   type: "photo",
-  label: "Photo Capture",
+  label: "Chụp ảnh",
   detect: (config) => config?.["x-behavior"] === "photo-capture",
   buildInitialState: () => ({ photos: [] }),
   isFulfilled: (state, config) => {

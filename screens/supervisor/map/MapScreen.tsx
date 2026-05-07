@@ -39,6 +39,7 @@ interface MapScreenParams {
   mode: MapMode;
   workAreaId?: string;
 }
+
 const formatLastSeenTime = (lastSeen: string) =>
   new Date(lastSeen).toLocaleTimeString("vi-VN", {
     hour: "2-digit",
@@ -69,19 +70,17 @@ export default function MapScreen({ navigation, route }: Props) {
     error: workAreasError,
   } = useWorkAreaSupervisor();
 
-  // ✅ Chỉ fetch 1 lần khi chưa có workAreaId
   useEffect(() => {
     if (!currentWorkAreaId && user?.userId) {
       getWorkAreasBySupervisor(user.userId);
     }
-  }, []); // ✅ empty deps — chỉ chạy 1 lần lúc mount
+  }, []);
 
-  // ✅ Set workArea đầu tiên làm default
   useEffect(() => {
     if (!currentWorkAreaId && workAreas.length > 0) {
       setCurrentWorkAreaId(workAreas[0].workAreaId);
     }
-  }, [workAreas]); // ✅ chỉ phụ thuộc workAreas
+  }, [workAreas]);
 
   const {
     workers,
@@ -102,6 +101,37 @@ export default function MapScreen({ navigation, route }: Props) {
     location: selectedLocation || undefined,
     workers,
   });
+
+  // ✅ Auto-zoom để fit tất cả worker trên map
+  useEffect(() => {
+    if (workers.length === 0 || !cameraRef.current) return;
+
+    if (workers.length === 1) {
+      // Chỉ 1 worker → zoom thẳng vào vị trí đó
+      cameraRef.current.setCamera({
+        centerCoordinate: [workers[0].longitude, workers[0].latitude],
+        zoomLevel: 16,
+        animationMode: "flyTo",
+        animationDuration: 1000,
+      });
+      return;
+    }
+
+    // Nhiều worker → tính bounding box rồi fitBounds
+    const lngs = workers.map((w) => w.longitude);
+    const lats = workers.map((w) => w.latitude);
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+
+    cameraRef.current.fitBounds(
+      [maxLng, maxLat], // northeast
+      [minLng, minLat], // southwest
+      [100, 80, 300, 80], // padding: top, right, bottom (để tránh bottom sheet), left
+      1200, // animation duration ms
+    );
+  }, [workers]);
 
   const snapPoints = useMemo(() => ["25%", "50%", "90%"], []);
 
@@ -457,10 +487,7 @@ export default function MapScreen({ navigation, route }: Props) {
 const { width, height } = Dimensions.get("window");
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F5F6FA",
-  },
+  container: { flex: 1, backgroundColor: "#F5F6FA" },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -476,37 +503,18 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  backIcon: {
-    fontSize: 20,
-    color: "#64748B",
-  },
-  headerCenter: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#1E293B",
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: "#64748B",
-    marginTop: 2,
-  },
+  backIcon: { fontSize: 20, color: "#64748B" },
+  headerCenter: { flex: 1, marginLeft: 12 },
+  headerTitle: { fontSize: 16, fontWeight: "700", color: "#1E293B" },
+  headerSubtitle: { fontSize: 12, color: "#64748B", marginTop: 2 },
   refreshButton: {
     width: 40,
     height: 40,
     justifyContent: "center",
     alignItems: "center",
   },
-  refreshIcon: {
-    fontSize: 18,
-    color: "#3B82F6",
-  },
-  map: {
-    flex: 1,
-  },
+  refreshIcon: { fontSize: 18, color: "#3B82F6" },
+  map: { flex: 1 },
   markerContainer: {
     width: 36,
     height: 36,
@@ -521,9 +529,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  markerText: {
-    fontSize: 16,
-  },
+  markerText: { fontSize: 16 },
   callout: {
     padding: 8,
     backgroundColor: "#FFF",
@@ -536,10 +542,7 @@ const styles = StyleSheet.create({
     color: "#1E293B",
     marginBottom: 4,
   },
-  calloutText: {
-    fontSize: 12,
-    color: "#64748B",
-  },
+  calloutText: { fontSize: 12, color: "#64748B" },
   pollingIndicator: {
     position: "absolute",
     top: 80,
@@ -563,15 +566,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#10B981",
     marginRight: 6,
   },
-  pollingText: {
-    fontSize: 12,
-    color: "#64748B",
-  },
-  bottomSheetContent: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
+  pollingText: { fontSize: 12, color: "#64748B" },
+  bottomSheetContent: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
   bottomSheetTitle: {
     fontSize: 18,
     fontWeight: "700",
@@ -584,15 +580,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 20,
   },
-  loadingText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: "#64748B",
-  },
-  errorContainer: {
-    alignItems: "center",
-    paddingVertical: 20,
-  },
+  loadingText: { marginLeft: 8, fontSize: 14, color: "#64748B" },
+  errorContainer: { alignItems: "center", paddingVertical: 20 },
   errorText: {
     fontSize: 14,
     color: "#DC2626",
@@ -605,11 +594,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
   },
-  retryText: {
-    color: "#FFF",
-    fontSize: 14,
-    fontWeight: "600",
-  },
+  retryText: { color: "#FFF", fontSize: 14, fontWeight: "600" },
   emptyText: {
     fontSize: 14,
     color: "#64748B",
@@ -623,33 +608,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#F1F5F9",
   },
-  statusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 12,
-  },
-  workerInfo: {
-    flex: 1,
-  },
-  workerName: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#1E293B",
-  },
-  workerStatus: {
-    fontSize: 12,
-    color: "#64748B",
-    marginTop: 2,
-  },
-  lastSeen: {
-    fontSize: 12,
-    color: "#64748B",
-  },
-  instructionContainer: {
-    alignItems: "center",
-    paddingVertical: 32,
-  },
+  statusDot: { width: 12, height: 12, borderRadius: 6, marginRight: 12 },
+  workerInfo: { flex: 1 },
+  workerName: { fontSize: 14, fontWeight: "600", color: "#1E293B" },
+  workerStatus: { fontSize: 12, color: "#64748B", marginTop: 2 },
+  lastSeen: { fontSize: 12, color: "#64748B" },
+  instructionContainer: { alignItems: "center", paddingVertical: 32 },
   instructionTitle: {
     fontSize: 16,
     fontWeight: "600",
@@ -677,38 +641,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#DBEAFE",
   },
-  nearestWorkerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
-  nearestWorkerName: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#1E293B",
-  },
-  nearestWorkerStatus: {
-    fontSize: 12,
-    color: "#64748B",
-    marginTop: 2,
-  },
+  nearestWorkerLeft: { flexDirection: "row", alignItems: "center", flex: 1 },
+  nearestWorkerName: { fontSize: 14, fontWeight: "600", color: "#1E293B" },
+  nearestWorkerStatus: { fontSize: 12, color: "#64748B", marginTop: 2 },
   assignButton: {
     backgroundColor: "#E2E8F0",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
   },
-  assignButtonPrimary: {
-    backgroundColor: "#3B82F6",
-  },
-  assignButtonText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#64748B",
-  },
-  assignButtonTextPrimary: {
-    color: "#FFF",
-  },
+  assignButtonPrimary: { backgroundColor: "#3B82F6" },
+  assignButtonText: { fontSize: 12, fontWeight: "600", color: "#64748B" },
+  assignButtonTextPrimary: { color: "#FFF" },
   quickAssignButton: {
     backgroundColor: "#3B82F6",
     paddingVertical: 16,
@@ -716,9 +660,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 16,
   },
-  quickAssignText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#FFF",
-  },
+  quickAssignText: { fontSize: 16, fontWeight: "700", color: "#FFF" },
 });

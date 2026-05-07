@@ -30,8 +30,10 @@ import { NotificationListScreen } from "@/screens/shared/NotificationListScreen"
 import QRScannerScreen from "@/screens/shared/QRScannerScreen";
 import CreateEmergencyTaskScreen from "@/screens/supervisor/adhoc-task/CreateEmergencyTaskScreen";
 import WorkAreaListScreen from "@/screens/supervisor/adhoc-task/WorkAreaListScreen";
+import AdHocHistoryScreen from "@/screens/supervisor/adhocHistory/AdHocHistoryScreen";
 import SupervisorHomeScreen from "@/screens/supervisor/home/SupervisorHomeScreen";
 import MapScreen from "@/screens/supervisor/map/MapScreen";
+import ReviewImagePendingScreen from "@/screens/supervisor/reviewImage/ReviewImagePendingScreen";
 import SwapRequestDetailScreen from "@/screens/supervisor/swap-task/SwapRequestDetailScreen";
 import SwapRequestListScreen from "@/screens/supervisor/swap-task/SwapRequestListScreen";
 import ListAllRequestsScreen from "@/screens/worker/ListAllRequestsScreen";
@@ -97,7 +99,9 @@ export type SupervisorStackParamList = {
     };
   };
   SwapRequestList: undefined;
+  AdHocHistory: undefined;
   SwapRequestDetail: { requestId: string };
+  ReviewImagePending: undefined;
   MapScreen: {
     mode: "view" | "adhoc";
     workAreaId?: string;
@@ -154,10 +158,16 @@ function SupervisorHomeWrapper({ navigation }: SupervisorHomeProps) {
           navigation.navigate("WorkAreaList");
         } else if (screen === "SwapRequestList") {
           navigation.navigate("SwapRequestList");
+        } else if (screen === "adhoc-history") {
+          navigation.navigate("AdHocHistory");
+        } else if (screen === "review") {
+          navigation.navigate("ReviewImagePending");
         } else if (screen === "map-view") {
           navigation.navigate("MapScreen", { mode: "view" });
         } else if (screen === "map-adhoc") {
           navigation.navigate("MapScreen", { mode: "adhoc" });
+        } else if (screen === "profile") {
+          navigation.navigate("Profile");
         } else {
           // Handle other navigation cases
           console.log("Navigate to:", screen);
@@ -259,8 +269,16 @@ function SupervisorNavigator() {
         component={SwapRequestListScreen}
       />
       <SupervisorStack.Screen
+        name="AdHocHistory"
+        component={AdHocHistoryScreen}
+      />
+      <SupervisorStack.Screen
         name="SwapRequestDetail"
         component={SwapRequestDetailScreen}
+      />
+      <SupervisorStack.Screen
+        name="ReviewImagePending"
+        component={ReviewImagePendingScreen}
       />
       <SupervisorStack.Screen name="Profile" component={ProfileScreen} />
       <SupervisorStack.Screen

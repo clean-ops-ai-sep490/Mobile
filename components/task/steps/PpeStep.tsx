@@ -622,7 +622,7 @@ const banner = StyleSheet.create({
 
 export const PpeStepPlugin: StepPlugin = {
   type: "ppe",
-  label: "PPE Check",
+  label: "Kiểm tra PPE",
   detect: (config) => config?.["x-behavior"] === "ai-ppe-check",
 
   buildInitialState: (config) => ({

@@ -132,7 +132,7 @@ function CheckinComponent({ config, state, onChange }: StepPluginProps) {
     qr: {
       label: "QR Code",
       instruction: "Quét mã QR tại khu vực làm việc",
-      btnLabel: "Mở QR Scanner",
+      btnLabel: "Quét QR",
     },
     ble: {
       label: "Bluetooth",
@@ -231,7 +231,7 @@ const s = StyleSheet.create({
 
 export const CheckinStepPlugin: StepPlugin = {
   type: "checkin",
-  label: "Check-in",
+  label: "Điểm danh",
   detect: (config) => config?.["x-behavior"] === "checkin",
   buildInitialState: () => ({ checkedIn: false }),
   isFulfilled: (state) => !!state.checkedIn,

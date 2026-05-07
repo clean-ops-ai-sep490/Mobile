@@ -26,7 +26,7 @@ export function isStepFulfilled(state: any, config: any): boolean {
 export function getStepLabel(config: any): string {
   const plugin = resolvePlugin(config);
   // console.log("🔹 getStepLabel", config, plugin?.type);
-  return plugin?.label ?? "Custom step";
+  return plugin?.label ?? "Bước tùy chỉnh";
 }
 
 export function serializeStepData(

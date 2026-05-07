@@ -55,6 +55,48 @@ interface InitiateAiCheckResult {
   created: string;
 }
 
+export interface PaginationRequest {
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedResult<T> {
+  pageNumber: number;
+  pageSize: number;
+  totalElements: number;
+  content: T[];
+}
+
+export interface PendingSupervisorCheckDto {
+  complianceCheckId: string;
+  taskStepExecutionId: string;
+  minScore: number;
+  failedImageCount: number;
+  createdAt: string;
+}
+
+export interface ScoringImageDetailDto {
+  imageUrl: string;
+  visualizationUrl?: string;
+  qualityScore: number;
+  verdict: string;
+}
+
+export interface SupervisorCheckDetailDto {
+  complianceCheckId: string;
+  taskStepExecutionId: string;
+  minScore: number;
+  failedImageCount: number;
+  feedback?: string;
+  createdAt: string;
+  images: ScoringImageDetailDto[];
+}
+
+export interface SupervisorReviewRequest {
+  approved: boolean;
+  feedback?: string;
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PENDING_STATUSES: ComplianceStatus[] = [
@@ -383,5 +425,48 @@ export function useComplianceCheck() {
     [_poll, _connectSignalR],
   );
 
-  return { isChecking, status, result, error, initiateCheck, reset };
+  const getPendingSupervisorChecks = useCallback(
+    async (params?: PaginationRequest) => {
+      const { data } = await axiosInstance.get<
+        PaginatedResult<PendingSupervisorCheckDto>
+      >("/ComplianceChecks/pending-supervisor", {
+        params,
+      });
+      return data;
+    },
+    [],
+  );
+
+  const getSupervisorCheckDetail = useCallback(
+    async (complianceCheckId: string) => {
+      const { data } = await axiosInstance.get<SupervisorCheckDetailDto>(
+        `/ComplianceChecks/${complianceCheckId}`,
+      );
+      return data;
+    },
+    [],
+  );
+
+  const submitSupervisorReview = useCallback(
+    async (complianceCheckId: string, payload: SupervisorReviewRequest) => {
+      await axiosInstance.post(
+        `/ComplianceChecks/${complianceCheckId}/review`,
+        payload,
+      );
+      return true;
+    },
+    [],
+  );
+
+  return {
+    isChecking,
+    status,
+    result,
+    error,
+    initiateCheck,
+    reset,
+    getPendingSupervisorChecks,
+    getSupervisorCheckDetail,
+    submitSupervisorReview,
+  };
 }

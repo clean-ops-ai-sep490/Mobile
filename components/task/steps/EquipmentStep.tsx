@@ -109,7 +109,7 @@ const s = StyleSheet.create({
 
 export const EquipmentStepPlugin: StepPlugin = {
   type: "equipment",
-  label: "Equipment Check",
+  label: "Kiểm tra thiết bị",
   detect: (config) => config?.["x-behavior"] === "equipment-check",
   buildInitialState: (config) =>
     Object.fromEntries(

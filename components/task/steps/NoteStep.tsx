@@ -7,20 +7,20 @@ function NoteComponent({ state, onChange }: StepPluginProps) {
   return (
     <View style={s.container}>
       <View style={s.header}>
-        <Text style={s.label}>Add a completion note</Text>
+        <Text style={s.label}>Thêm ghi chú</Text>
       </View>
 
       <TextInput
         style={s.input}
         multiline
         numberOfLines={4}
-        placeholder="Enter your observations, issues, or notes..."
+        placeholder="Nhập ghi chú hoàn thành công việc..."
         placeholderTextColor="#94A3B8"
         value={state.note ?? ""}
         onChangeText={(text) => onChange({ note: text })}
       />
 
-      <Text style={s.count}>{(state.note ?? "").trim().length} chars</Text>
+      <Text style={s.count}>{(state.note ?? "").trim().length} kí tự</Text>
     </View>
   );
 }
@@ -65,7 +65,7 @@ const s = StyleSheet.create({
 
 export const NoteStepPlugin: StepPlugin = {
   type: "note",
-  label: "Completion Note",
+  label: "Ghi chú hoàn thành",
   detect: (config) => config?.["x-behavior"] === "finish",
   buildInitialState: () => ({ note: "" }),
   isFulfilled: (state) => (state.note ?? "").trim().length > 0,

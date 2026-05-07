@@ -182,7 +182,7 @@ export default function TaskExecutionScreen() {
 
           return {
             id: s.id,
-            name: schema?.title || `Step ${s.stepOrder}`,
+            name: s.name || `Bước ${s.stepOrder}`,
             stepOrder: s.stepOrder,
             config,
             status:

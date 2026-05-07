@@ -1,10 +1,8 @@
 import BottomNavigation from "@/components/bottom-navigation";
-import ActivityItem from "@/components/cards/activity-item";
-import KPICard from "@/components/cards/kpi-card";
-import QuickActionButton from "@/components/cards/quick-action-button";
 import Header from "@/components/header";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTaskSwap } from "@/hooks/useTaskSwap";
+import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -19,29 +17,71 @@ import {
 } from "react-native";
 
 const { width } = Dimensions.get("window");
+const CARD_GAP = 12;
+const CARD_WIDTH = (width - 32 - CARD_GAP) / 2;
 
 interface Props {
   onNavigate?: (screen: string) => void;
 }
 
-const CARD_GAP = 12;
+// ─── ACTION CARD ──────────────────────────────────────────────────────────
+function ActionCard({
+  label,
+  desc,
+  iconName,
+  color,
+  badge,
+  onPress,
+}: {
+  label: string;
+  desc: string;
+  iconName: any;
+  color: string;
+  badge?: number;
+  onPress?: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.actionCard, { width: CARD_WIDTH }]}
+      onPress={onPress}
+      activeOpacity={0.85}
+    >
+      <View style={styles.actionCardTop}>
+        <View
+          style={[styles.actionIconWrap, { backgroundColor: color + "15" }]}
+        >
+          <Ionicons name={iconName} size={22} color={color} />
+        </View>
+        {!!badge && badge > 0 && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{badge > 99 ? "99+" : badge}</Text>
+          </View>
+        )}
+      </View>
+      <Text style={styles.actionLabel}>{label}</Text>
+      <Text style={styles.actionDesc}>{desc}</Text>
+    </TouchableOpacity>
+  );
+}
 
+// ─── MAIN SCREEN ──────────────────────────────────────────────────────────
 export default function SupervisorHomeScreen({ onNavigate }: Props) {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const { getList } = useTaskSwap();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [pendingSwapCount, setPendingSwapCount] = useState(0);
-  const headerFade = useRef(new Animated.Value(0)).current;
-  const headerSlide = useRef(new Animated.Value(-16)).current;
+
+  const fade = useRef(new Animated.Value(0)).current;
+  const slide = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(headerFade, {
+      Animated.timing(fade, {
         toValue: 1,
         duration: 500,
         useNativeDriver: true,
       }),
-      Animated.timing(headerSlide, {
+      Animated.timing(slide, {
         toValue: 0,
         duration: 500,
         useNativeDriver: true,
@@ -49,208 +89,124 @@ export default function SupervisorHomeScreen({ onNavigate }: Props) {
     ]).start();
   }, []);
 
-  useEffect(() => {
-    const fetchPendingCount = async () => {
-      try {
-        // Chỉ fetch khi user đã tương tác với dashboard
-        // hoặc sau một khoảng delay nhỏ để không block UI
-        setTimeout(async () => {
-          const result = await getList({ status: "PendingManagerApproval" });
-          setPendingSwapCount(result.totalElements);
-        }, 1000); // Delay 1 giây
-      } catch (error) {
-        console.error("Failed to fetch pending swap count:", error);
-      }
-    };
-    fetchPendingCount();
-  }, [getList]);
-
-  const handleTabPress = (tabId: string) => {
-    setActiveTab(tabId);
-
-    // Chỉ fetch pending count khi user click vào SwapRequestList
-    if (tabId === "SwapRequestList" && pendingSwapCount === 0) {
-      fetchPendingCount();
-    }
-
-    if (onNavigate) {
-      onNavigate(tabId);
-    }
-  };
-
   const fetchPendingCount = async () => {
     try {
       const result = await getList({ status: "PendingManagerApproval" });
       setPendingSwapCount(result.totalElements);
     } catch (error) {
-      console.error("Failed to fetch pending swap count:", error);
+      console.error("Không thể tải số lượng yêu cầu đổi ca:", error);
     }
+  };
+
+  const handleTabPress = (tabId: string) => {
+    setActiveTab(tabId);
+    if (tabId === "SwapRequestList" && pendingSwapCount === 0)
+      fetchPendingCount();
+    onNavigate?.(tabId);
   };
 
   const handleLogout = async () => {
     try {
       await logout();
     } catch (e) {
-      console.error("Logout failed:", e);
+      console.error("Đăng xuất thất bại:", e);
     }
   };
 
   const navigationTabs = [
-    { icon: "📊", label: "Dashboard", id: "dashboard" },
-    { icon: "👥", label: "Workers", id: "workers" },
-    { icon: "📈", label: "Reports", id: "reports" },
-    { icon: "⚙️", label: "Settings", id: "settings" },
+    {
+      icon: <Ionicons name="grid-outline" size={22} />,
+      label: "Tổng quan",
+      id: "dashboard",
+    },
+    {
+      icon: <Ionicons name="people-outline" size={22} />,
+      label: "Nhân viên",
+      id: "workers",
+    },
+    {
+      icon: <Ionicons name="settings-outline" size={22} />,
+      label: "Cài đặt",
+      id: "settings",
+    },
   ];
+
+  const today = new Date().toLocaleDateString("vi-VN", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F5F6FA" />
+      <StatusBar barStyle="dark-content" backgroundColor="#F0F4FF" />
       <SafeAreaView style={styles.safe}>
-        <Header
-          title="Dashboard"
-          showDate
-          showSettings
-          onSettingsPress={handleLogout}
-        />
+        <Header title="Xin chào" showDate showSettings />
 
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* KPI Grid */}
           <Animated.View
-            style={{
-              opacity: headerFade,
-              transform: [{ translateY: headerSlide }],
-            }}
+            style={{ opacity: fade, transform: [{ translateY: slide }] }}
           >
-            <Text style={styles.sectionLabel}>Key Metrics</Text>
-            <View style={styles.kpiGrid}>
-              <KPICard
-                label="Pending Review"
-                value="12"
-                subtext="+2 today"
-                icon="📋"
-                color="#F59E0B"
-                onPress={() => handleTabPress("review")}
-              />
-              <KPICard
-                label="On Duty"
-                value="24/30"
-                subtext="80% capacity"
-                icon="👥"
-                color="#3B82F6"
-                onPress={() => handleTabPress("workers")}
-              />
-            </View>
-            <View style={styles.kpiGrid}>
-              <KPICard
-                label="Active Issues"
-                value="3"
-                subtext="-1 from yesterday"
-                icon="⚠️"
-                color="#EF4444"
-                onPress={() => handleTabPress("issues")}
-              />
-              <KPICard
-                label="Completion"
-                value="87%"
-                subtext="Ahead of schedule"
-                icon="✅"
-                color="#10B981"
-                onPress={() => handleTabPress("reports")}
-              />
-            </View>
-          </Animated.View>
-
-          {/* Quick Actions */}
-          <Animated.View
-            style={{
-              opacity: headerFade,
-              transform: [{ translateY: headerSlide }],
-            }}
-          >
-            <Text style={styles.sectionLabel}>Quick Actions</Text>
-            <View style={styles.quickGrid}>
-              <QuickActionButton
-                icon="🗺️"
+            {/* ── QUICK ACTIONS ── */}
+            <Text style={styles.sectionLabel}>Thao Tác Nhanh</Text>
+            <View style={styles.grid}>
+              <ActionCard
                 label="Xem Bản Đồ"
+                desc="Theo dõi nhân viên"
+                iconName="map-outline"
+                color="#2563EB"
                 onPress={() => handleTabPress("map-view")}
               />
-              <QuickActionButton
-                icon="➕"
-                label="Ad-hoc Task"
+              <ActionCard
+                label="Nhiệm Vụ Đột Xuất"
+                desc="Tạo task khẩn cấp"
+                iconName="add-circle-outline"
+                color="#7C3AED"
                 onPress={() => handleTabPress("map-adhoc")}
               />
             </View>
-            <View style={styles.quickGrid}>
-              <QuickActionButton
-                icon="�"
-                label="Review Tasks"
+            <View style={styles.grid}>
+              <ActionCard
+                label="Duyệt Hình Ảnh"
+                desc="Xem ảnh chờ duyệt"
+                iconName="images-outline"
+                color="#0891B2"
                 onPress={() => handleTabPress("review")}
               />
-              <QuickActionButton
-                icon="🔄"
-                label="Swap Requests"
+              <ActionCard
+                label="Yêu Cầu Đổi Ca"
+                desc="Xem & phê duyệt"
+                iconName="swap-horizontal-outline"
+                color="#EA580C"
                 badge={pendingSwapCount}
                 onPress={() => handleTabPress("SwapRequestList")}
               />
             </View>
-          </Animated.View>
-
-          {/* Recent Activity */}
-          <Animated.View
-            style={{
-              opacity: headerFade,
-              transform: [{ translateY: headerSlide }],
-            }}
-          >
-            <View style={styles.activityHeader}>
-              <Text style={styles.sectionLabel}>Recent Activity</Text>
-              <TouchableOpacity onPress={() => handleTabPress("activity")}>
-                <Text style={styles.seeAll}>See All</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.activityCard}>
-              <ActivityItem
-                icon="📍"
-                name="Marco Ross"
-                action="checked in at Main Lobby"
-                time="2 mins ago"
+            <View style={styles.grid}>
+              <ActionCard
+                label="Lịch Sử Đột Xuất"
+                desc="Xem lại các task"
+                iconName="document-text-outline"
+                color="#16A34A"
+                onPress={() => handleTabPress("adhoc-history")}
               />
-              <ActivityItem
-                icon="✅"
-                name="Janice Smith"
-                action="completed Suite 405 Deep Clean"
-                time="15 mins ago"
+              <ActionCard
+                label="Hồ sơ"
+                desc="Xem hồ sơ cá nhân"
+                iconName="person-outline"
+                color="#040404"
+                onPress={() => handleTabPress("profile")}
               />
-              <ActivityItem
-                icon="⚠️"
-                name="Urgent Alert"
-                action="Spill reported in North Stairwell"
-                time="45 mins ago"
-              />
-              <ActivityItem
-                icon="📍"
-                name="David Chen"
-                action="checked in at East Wing"
-                time="1 hour ago"
-              />
-              <ActivityItem
-                icon="✅"
-                name="Sarah Johnson"
-                action="completed Conference Room B"
-                time="2 hours ago"
-              />
+              {/* Giữ layout 2 cột cân đối */}
+              <View style={{ width: CARD_WIDTH }} />
             </View>
           </Animated.View>
-
-          {/* Spacer for tab bar */}
-          <View style={{ height: 20 }} />
         </ScrollView>
 
-        {/* Bottom Navigation */}
         <BottomNavigation
           tabs={navigationTabs}
           activeTab={activeTab}
@@ -261,56 +217,120 @@ export default function SupervisorHomeScreen({ onNavigate }: Props) {
   );
 }
 
+// ─── STYLES ───────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#F5F6FA" },
+  root: { flex: 1, backgroundColor: "#F0F4FF" },
   safe: { flex: 1 },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 16 },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 32,
+  },
 
+  // Greeting
+  greetingBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FFF",
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 24,
+    shadowColor: "#2563EB",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  greetingLeft: { flex: 1 },
+  greetingDate: {
+    fontSize: 11,
+    color: "#94A3B8",
+    fontWeight: "500",
+    marginBottom: 4,
+    textTransform: "capitalize",
+  },
+  greetingTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 4,
+  },
+  greetingSub: { fontSize: 12, color: "#64748B" },
+  greetingBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: "#EFF6FF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 12,
+  },
+
+  // Section label
   sectionLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "700",
     color: "#94A3B8",
     textTransform: "uppercase",
-    letterSpacing: 1,
+    letterSpacing: 1.2,
     marginBottom: 12,
   },
 
-  // KPI Grid
-  kpiGrid: {
+  // Grid
+  grid: {
     flexDirection: "row",
     gap: CARD_GAP,
     marginBottom: CARD_GAP,
   },
 
-  // Quick Actions Grid
-  quickGrid: {
-    flexDirection: "row",
-    gap: CARD_GAP,
-    marginBottom: CARD_GAP,
-  },
-
-  // Activity
-  activityHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  seeAll: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#2563EB",
-  },
-  activityCard: {
+  // Action Card
+  actionCard: {
     backgroundColor: "#FFF",
     borderRadius: 16,
-    overflow: "hidden",
+    padding: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
-    marginBottom: 20,
+  },
+  actionCardTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  actionIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  badge: {
+    backgroundColor: "#EF4444",
+    borderRadius: 999,
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 5,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  badgeText: {
+    color: "#FFF",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  actionLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#0F172A",
+    marginBottom: 3,
+  },
+  actionDesc: {
+    fontSize: 11,
+    color: "#94A3B8",
   },
 });

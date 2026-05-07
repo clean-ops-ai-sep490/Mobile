@@ -75,10 +75,10 @@ export default function ProfileScreen() {
   const avatarColor = AVATAR_COLORS[user?.role ?? "Worker"];
 
   const handleLogout = () => {
-    Alert.alert("Log Out", "Are you sure you want to log out?", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert("Đăng xuất", "Bạn có chắc chắn muốn đăng xuất?", [
+      { text: "Hủy", style: "cancel" },
       {
-        text: "Log Out",
+        text: "Đăng xuất",
         style: "destructive",
         onPress: async () => {
           try {
@@ -88,8 +88,8 @@ export default function ProfileScreen() {
           } catch (error) {
             console.error("Logout error:", error);
             Alert.alert(
-              "Error",
-              "Something went wrong while logging out. Please try again.",
+              "Lỗi",
+              "Đã xảy ra lỗi khi đăng xuất. Vui lòng thử lại.",
             );
           } finally {
             setSubmitting(false);

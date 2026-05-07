@@ -16,10 +16,11 @@ export interface StartTaskDto {
 }
 
 export interface TaskStepSnapshotDto {
-  id: string; // TaskStepExecution ID
+  id: string;
   sopStepId: string;
   stepOrder: number;
-  status: string; // "InProgress" | "NotStarted" | "Completed"
+  name: string;
+  status: string;
   configSnapshot: {
     detail: any;
     schema: any;
@@ -33,7 +34,9 @@ export interface TaskAssignmentDto {
   taskScheduleId: string;
   taskName: string;
   assigneeId: string;
+  assigneeName?: string; // ✅ thêm mới
   originalAssigneeId: string;
+  originalAssigneeName?: string; // ✅ thêm mới
   status: TaskAssignmentStatus;
   scheduledStartAt: string;
   scheduledEndAt: string;
@@ -77,12 +80,10 @@ export interface StartTaskRequest {
   workerId: string;
 }
 
-// Hook for Task Assignments
 export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Get paginated task assignments with filters
   const getTaskAssignments = async (
     filter?: TaskAssignmentFilter,
     pagination?: PaginationRequest,
@@ -108,7 +109,6 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
         params.sortDescending = pagination.sortDescending;
 
       const response = await axiosInstance.get(baseUrl, { params });
-      // console.log("[TaskList] getTaskAssignments response:", response.data);
       return response.data;
     } catch (err: any) {
       const message =
@@ -120,7 +120,6 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
     }
   };
 
-  // Get task assignment by ID
   const getTaskAssignmentById = async (
     id: string,
   ): Promise<TaskAssignmentDto | null> => {
@@ -130,10 +129,7 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
     try {
       const response = await axiosInstance.get(`${baseUrl}/${id}`);
       const data: any = response.data;
-      // Log to help debug why `taskName` might be missing / where it's located
-      // console.log("[useTaskAssignments] getTaskAssignmentById response:", data);
 
-      // Normalize common shapes so callers can reliably read `taskName`
       const derivedName =
         data?.taskName ||
         data?.nameAdhocTask ||
@@ -144,7 +140,6 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
 
       if (derivedName && !data.taskName) data.taskName = derivedName;
 
-      // Normalize isAdhocTask across possible response shapes
       if (typeof data?.isAdhocTask !== "boolean") {
         const rawIsAdhoc =
           data?.isAdhocTask ??
@@ -193,7 +188,6 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
     }
   };
 
-  // Update task assignment
   const updateTaskAssignment = async (
     id: string,
     dto: TaskAssignmentDto,
@@ -218,7 +212,6 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
     }
   };
 
-  // Update task assignment status
   const updateTaskAssignmentStatus = async (
     id: string,
     status: TaskAssignmentStatus,
@@ -243,7 +236,6 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
     }
   };
 
-  // Delete task assignment
   const deleteTaskAssignment = async (id: string): Promise<boolean> => {
     setLoading(true);
     setError(null);
@@ -287,6 +279,35 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
     }
   };
 
+  const getAdhocTasksBySupervisor = async (
+    pagination?: PaginationRequest,
+  ): Promise<PaginatedResult<TaskAssignmentDto> | null> => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const params: Record<string, any> = {};
+
+      if (pagination?.pageNumber) params.pageNumber = pagination.pageNumber;
+      if (pagination?.pageSize) params.pageSize = pagination.pageSize;
+      if (pagination?.sortBy) params.sortBy = pagination.sortBy;
+      if (pagination?.sortDescending !== undefined)
+        params.sortDescending = pagination.sortDescending;
+
+      const response = await axiosInstance.get(`${baseUrl}/adhoc/supervisor`, {
+        params,
+      });
+      return response.data;
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.message || err?.message || "Đã xảy ra lỗi";
+      setError(message);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     loading,
     error,
@@ -297,5 +318,6 @@ export const useTaskAssignments = (baseUrl: string = "/TaskAssignments") => {
     updateTaskAssignmentStatus,
     deleteTaskAssignment,
     completeTask,
+    getAdhocTasksBySupervisor,
   };
 };
