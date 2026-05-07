@@ -269,6 +269,7 @@ const TaskCard = ({
   onStart,
   onContinue,
   canAct = true,
+  canStart = false,
   onFinishAdhoc,
   blockReason = null,
   showRejectedBanner = false,
@@ -278,6 +279,7 @@ const TaskCard = ({
   onStart?: (id: string) => void;
   onContinue?: (id: string) => void;
   canAct?: boolean;
+  canStart?: boolean;
   onFinishAdhoc?: (id: string) => void;
   blockReason?: BlockReason;
   showRejectedBanner?: boolean;
@@ -289,7 +291,9 @@ const TaskCard = ({
   const isBlock = task.status === "block";
   const isLeaveRequestPending = blockReason === "emergency_leave_pending";
   const hasActions =
-    canAct && (isInProgress || isNotStarted) && !isLeaveRequestPending;
+    canAct &&
+    (isInProgress || (isNotStarted && canStart)) &&
+    !isLeaveRequestPending;
 
   return (
     <View
@@ -673,26 +677,26 @@ export default function TaskListScreen() {
   );
 
   const remaining = mappedTasks.filter((t) => t.status !== "completed").length;
-  // const earliestNotStartedId = useMemo(() => {
-  //   if (selectedDay !== 0) return null;
+  const earliestNotStartedId = useMemo(() => {
+    if (selectedDay !== 0) return null;
 
-  //   // Nếu có bất kỳ task nào đang in_progress, bị block status,
-  //   // hoặc đang bị lock do emergency_leave/issue/equipment pending
-  //   // → không cho phép bắt đầu task mới nào cả
-  //   const hasBlockingTask = mappedTasks.some((t) => {
-  //     if (t.status === "in_progress") return true;
-  //     if (t.status === "block") return true;
-  //     if (taskBlockMap[t.id]) return true; // emergency_leave_pending / issue / equipment
-  //     return false;
-  //   });
+    // Nếu có bất kỳ task nào đang in_progress, bị block status,
+    // hoặc đang bị lock do emergency_leave/issue/equipment pending
+    // → không cho phép bắt đầu task mới nào cả
+    const hasBlockingTask = mappedTasks.some((t) => {
+      if (t.status === "in_progress") return true;
+      if (t.status === "block") return true;
+      if (taskBlockMap[t.id]) return true; // emergency_leave_pending / issue / equipment
+      return false;
+    });
 
-  //   if (hasBlockingTask) return null;
+    if (hasBlockingTask) return null;
 
-  //   const notStarted = mappedTasks
-  //     .filter((t) => t.status === "not_started")
-  //     .sort((a, b) => a.startTime.localeCompare(b.startTime));
-  //   return notStarted[0]?.id ?? null;
-  // }, [mappedTasks, selectedDay, taskBlockMap]); // thêm taskBlockMap vào deps
+    const notStarted = mappedTasks
+      .filter((t) => t.status === "not_started")
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+    return notStarted[0]?.id ?? null;
+  }, [mappedTasks, selectedDay, taskBlockMap]); // thêm taskBlockMap vào deps
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleNavigate = (screen: TabKey) =>
@@ -966,6 +970,7 @@ export default function TaskListScreen() {
                 onContinue={handleContinue}
                 onFinishAdhoc={handleFinishAdhocTask}
                 canAct={selectedDay === 0}
+                canStart={task.id === earliestNotStartedId}
                 blockReason={getBlockReasonForTask(task.id)}
                 showRejectedBanner={rejectedTaskIds.has(task.id)}
                 onDismissRejected={() => {
