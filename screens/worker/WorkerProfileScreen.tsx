@@ -1,6 +1,8 @@
 import AppButton from "@/components/common/AppButton";
 import Header from "@/components/common/Header";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWorkerCertification } from "@/hooks/useWorkerCertification";
+import { useWorkerSkill } from "@/hooks/useWorkerSkill";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import React, { useEffect, useState } from "react";
@@ -92,6 +94,8 @@ export default function WorkerProfileScreen() {
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [editFullName, setEditFullName] = useState("");
   const [editAddress, setEditAddress] = useState("");
+  const { skills } = useWorkerSkill(worker?.id);
+  const { certifications } = useWorkerCertification(worker?.id);
 
   const loadProfile = async () => {
     try {
@@ -223,18 +227,54 @@ export default function WorkerProfileScreen() {
                   label="Địa chỉ"
                   value={worker?.displayAddress ?? "—"}
                 />
-                <View style={styles.infoDivider} />
-                <InfoRow
-                  icon="hammer-outline"
-                  label="Kỹ năng"
-                  value={worker?.totalSkills ?? 0}
-                />
-                <View style={styles.infoDivider} />
-                <InfoRow
-                  icon="ribbon-outline"
-                  label="Chứng chỉ"
-                  value={worker?.totalCertifications ?? 0}
-                />
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>KỸ NĂNG</Text>
+              <View style={styles.infoCard}>
+                {skills.length === 0 ? (
+                  <View style={styles.listEmptyWrap}>
+                    <Text style={styles.listEmptyText}>Chưa có kỹ năng</Text>
+                  </View>
+                ) : (
+                  skills.map((skill, index) => (
+                    <View key={skill.skillId}>
+                      <InfoRow
+                        icon="hammer-outline"
+                        label={skill.name}
+                        value={`${skill.category} • ${skill.skillLevel}`}
+                      />
+                      {index < skills.length - 1 && (
+                        <View style={styles.infoDivider} />
+                      )}
+                    </View>
+                  ))
+                )}
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>CHỨNG CHỈ</Text>
+              <View style={styles.infoCard}>
+                {certifications.length === 0 ? (
+                  <View style={styles.listEmptyWrap}>
+                    <Text style={styles.listEmptyText}>Chưa có chứng chỉ</Text>
+                  </View>
+                ) : (
+                  certifications.map((certification, index) => (
+                    <View key={certification.certificationId}>
+                      <InfoRow
+                        icon="ribbon-outline"
+                        label={certification.name}
+                        value={`${certification.category} • ${certification.issuingOrganization} • Hết hạn: ${certification.expiredAt ? new Date(certification.expiredAt).toLocaleDateString("vi-VN") : "—"}`}
+                      />
+                      {index < certifications.length - 1 && (
+                        <View style={styles.infoDivider} />
+                      )}
+                    </View>
+                  ))
+                )}
               </View>
             </View>
           </View>
@@ -432,6 +472,15 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   infoDivider: { height: 1, backgroundColor: "#E2E8F0", marginHorizontal: 16 },
+  listEmptyWrap: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  listEmptyText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#94A3B8",
+  },
 
   // Bottom Button Container
   bottomButtonContainer: {
