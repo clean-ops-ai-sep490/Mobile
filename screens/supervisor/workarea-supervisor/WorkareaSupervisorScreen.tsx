@@ -2,17 +2,18 @@
 import { useWorkAreaSupervisor } from "@/hooks/useWorkAreaSupervisor";
 import { SupervisorStackParamList } from "@/navigation/AppNavigator";
 import { WorkAreaSupervisor } from "@/types/workAreaSupervisor.types";
+import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 type Props = NativeStackScreenProps<
@@ -147,9 +148,28 @@ export default function WorkareaSupervisorScreen({ navigation }: Props) {
                   </View>
                 ) : (
                   workers.map((worker) => (
-                    <View key={worker.id} style={styles.workerCard}>
-                      <Text style={styles.workerName}>{worker.workerName}</Text>
-                    </View>
+                    <TouchableOpacity
+                      key={worker.id}
+                      style={styles.workerCard}
+                      activeOpacity={0.75}
+                      onPress={() =>
+                        navigation.navigate("WorkerCalendar", {
+                          workerId: worker.workerId,
+                          workerName: worker.workerName,
+                        })
+                      }
+                    >
+                      <View style={styles.workerCardInner}>
+                        <Text style={styles.workerName}>
+                          {worker.workerName}
+                        </Text>
+                        <Ionicons
+                          name="calendar-outline"
+                          size={18}
+                          color="#2563EB"
+                        />
+                      </View>
+                    </TouchableOpacity>
                   ))
                 )}
               </>
@@ -257,6 +277,11 @@ const styles = StyleSheet.create({
   workerId: {
     fontSize: 13,
     color: "#475569",
+  },
+  workerCardInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   loadingContainer: {
     flex: 1,

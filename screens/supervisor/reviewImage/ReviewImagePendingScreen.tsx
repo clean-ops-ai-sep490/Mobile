@@ -2,26 +2,26 @@ import AppButton from "@/components/common/AppButton";
 import Header from "@/components/common/Header";
 import ConfirmationBottomSheet from "@/components/forms/confirmation-bottom-sheet";
 import {
-    PendingSupervisorCheckDto,
-    SupervisorCheckDetailDto,
-    useComplianceCheck,
+  PendingSupervisorCheckDto,
+  SupervisorCheckDetailDto,
+  useComplianceCheck,
 } from "@/hooks/useComplianceCheck";
 import { useNavigation } from "@react-navigation/native";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Image,
-    Modal,
-    RefreshControl,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    useWindowDimensions,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  Modal,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from "react-native";
 
 const PAGE_SIZE = 20;
@@ -262,9 +262,6 @@ export default function ReviewImagePendingScreen() {
                   style={[styles.checkCard, active && styles.checkCardActive]}
                   onPress={() => setSelectedId(item.complianceCheckId)}
                 >
-                  <Text style={styles.cardId} numberOfLines={1}>
-                    #{item.complianceCheckId}
-                  </Text>
                   <Text style={styles.cardMeta}>
                     Điểm thấp nhất: {item.minScore.toFixed(2)} | Ảnh lỗi:{" "}
                     {item.failedImageCount}
@@ -295,12 +292,6 @@ export default function ReviewImagePendingScreen() {
               <ScrollView style={styles.detailScroll}>
                 <View style={styles.detailCard}>
                   <Text style={styles.detailTitle}>Thông tin kiểm tra AI</Text>
-                  <Text style={styles.detailLine}>
-                    Mã kiểm tra: {detail.complianceCheckId}
-                  </Text>
-                  <Text style={styles.detailLine}>
-                    Mã bước thực hiện: {detail.taskStepExecutionId}
-                  </Text>
                   <Text style={styles.detailLine}>
                     Điểm thấp nhất: {detail.minScore.toFixed(2)}
                   </Text>

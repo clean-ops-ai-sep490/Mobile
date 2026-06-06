@@ -18,10 +18,33 @@ interface WorkerSkillApiItem {
 interface UseWorkerSkillReturn {
   skills: WorkerSkillItem[];
   skillNames: string[];
+  categories: string[];
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
+  getSkillsByCategory: (category: string) => Promise<WorkerSkillItem[]>;
 }
+
+export const mapSkillLevel = (level: string): string => {
+  const map: Record<string, string> = {
+    Beginner: "Cơ bản",
+    Intermediate: "Trung cấp",
+    Advanced: "Nâng cao",
+  };
+  return map[level] || level || "Không có";
+};
+
+export const mapSkillCategory = (category: string): string => {
+  const map: Record<string, string> = {
+    Chemical: "Hóa chất",
+    Cleaning: "Vệ sinh",
+    Equipment: "Thiết bị",
+    Maintenance: "Bảo trì",
+    Safety: "An toàn",
+    SoftSkill: "Kỹ năng mềm",
+  };
+  return map[category] || category;
+};
 
 export const useWorkerSkill = (
   workerId?: string | null,
@@ -73,11 +96,56 @@ export const useWorkerSkill = (
     [skills],
   );
 
+  const categories = useMemo(
+    () =>
+      Array.from(new Set(skills.map((item) => item.category).filter(Boolean))),
+    [skills],
+  );
+
+  const getSkillsByCategory = useCallback(
+    async (category: string): Promise<WorkerSkillItem[]> => {
+      if (!category.trim()) return [];
+
+      const response = await axiosInstance.get<
+        {
+          id?: string;
+          name?: string;
+          category?: string;
+          description?: string;
+        }[]
+      >("/Skills/by-category", {
+        params: { category },
+      });
+
+      const byCategory = (response.data ?? [])
+        .map((item) => ({
+          skillId: item.id ?? "",
+          name: (item.name ?? "").trim(),
+          category: (item.category ?? "").trim(),
+          skillLevel: "",
+        }))
+        .filter((item) => item.skillId && item.name);
+
+      const workerSkillIdSet = new Set(skills.map((item) => item.skillId));
+      return byCategory
+        .map((item) => {
+          const workerItem = skills.find((x) => x.skillId === item.skillId);
+          return workerItem
+            ? { ...item, skillLevel: workerItem.skillLevel }
+            : item;
+        })
+        .filter((item) => workerSkillIdSet.has(item.skillId));
+    },
+    [skills],
+  );
+
   return {
     skills,
     skillNames,
+    categories,
     loading,
     error,
     refresh: fetchWorkerSkills,
+    getSkillsByCategory,
   };
 };

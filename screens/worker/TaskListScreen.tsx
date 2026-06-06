@@ -15,6 +15,7 @@ import {
   ActivityIndicator,
   Alert,
   AppState,
+  Modal,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -398,6 +399,7 @@ export default function TaskListScreen() {
   const [rejectedTaskIds, setRejectedTaskIds] = useState<Set<string>>(
     new Set(),
   );
+  const [actionLoading, setActionLoading] = useState(false);
 
   const prevBlockMapRef = useRef<TaskBlockMap>({});
 
@@ -563,7 +565,7 @@ export default function TaskListScreen() {
   }, [workerId]);
 
   useEffect(() => {
-    const interval = setInterval(syncBlockReasons, 15_000);
+    const interval = setInterval(syncBlockReasons, 30_000);
     return () => clearInterval(interval);
   }, [syncBlockReasons]);
 
@@ -712,7 +714,7 @@ export default function TaskListScreen() {
     }
 
     try {
-      setLoadingTasks(true);
+      setActionLoading(true);
 
       const taskDetail = await getTaskAssignmentById(id);
       const listTask = tasks.find((t) => t.id === id);
@@ -772,7 +774,7 @@ export default function TaskListScreen() {
         e?.message || "Không thể bắt đầu công việc.",
       );
     } finally {
-      setLoadingTasks(false);
+      setActionLoading(false);
     }
   };
 
@@ -804,7 +806,7 @@ export default function TaskListScreen() {
       return;
     }
     try {
-      setLoadingTasks(true);
+      setActionLoading(true);
       const task = await getTaskAssignmentById(taskId);
       if (!task) throw new Error("Task not found");
       const { schedule, steps } = await getTaskScheduleById(
@@ -822,7 +824,7 @@ export default function TaskListScreen() {
         e?.message || "Không thể tiếp tục công việc.",
       );
     } finally {
-      setLoadingTasks(false);
+      setActionLoading(false);
     }
   };
 
@@ -836,6 +838,14 @@ export default function TaskListScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <Modal visible={actionLoading} transparent animationType="fade">
+        <View style={styles.overlayBackdrop}>
+          <View style={styles.overlayBox}>
+            <ActivityIndicator size="large" color="#2563EB" />
+            <Text style={styles.overlayText}>Đang xử lý…</Text>
+          </View>
+        </View>
+      </Modal>
       <StatusBar barStyle="dark-content" backgroundColor="#f5f6fa" />
       <Header
         title="Công việc của tôi"
@@ -949,7 +959,7 @@ export default function TaskListScreen() {
 
         {/* ── Task list ── */}
         <View style={styles.taskList}>
-          {loadingTasks || hookLoading ? (
+          {(loadingTasks || hookLoading) && !actionLoading ? (
             <ActivityIndicator size="large" color="#2563EB" />
           ) : visibleTasks.length === 0 ? (
             <View style={styles.emptyState}>
@@ -1005,6 +1015,30 @@ export default function TaskListScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#f5f6fa" },
+  overlayBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  overlayBox: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    paddingVertical: 32,
+    paddingHorizontal: 40,
+    alignItems: "center",
+    gap: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  overlayText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#1E293B",
+  },
   dayRow: {
     flexDirection: "row",
     paddingHorizontal: 16,

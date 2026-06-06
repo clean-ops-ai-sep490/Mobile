@@ -22,12 +22,14 @@ interface IssueReportModalProps {
   visible: boolean;
   onClose: () => void;
   taskAssignmentId: string;
+  onSuccess?: () => void;
 }
 
 export default function IssueReportModal({
   visible,
   onClose,
   taskAssignmentId,
+  onSuccess,
 }: IssueReportModalProps) {
   const { getWorkerProfile } = useAuth();
   const { create } = useIssueReport();
@@ -85,7 +87,13 @@ export default function IssueReportModal({
       });
 
       Alert.alert("Thành công", "Báo cáo sự cố đã được gửi thành công.", [
-        { text: "OK", onPress: handleClose },
+        {
+          text: "OK",
+          onPress: () => {
+            handleClose();
+            onSuccess?.();
+          },
+        },
       ]);
     } catch (err: any) {
       Alert.alert(

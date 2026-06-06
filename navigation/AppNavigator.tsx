@@ -37,6 +37,7 @@ import ReviewImagePendingScreen from "@/screens/supervisor/reviewImage/ReviewIma
 import SwapRequestDetailScreen from "@/screens/supervisor/swap-task/SwapRequestDetailScreen";
 import SwapRequestListScreen from "@/screens/supervisor/swap-task/SwapRequestListScreen";
 import WorkareaSupervisorScreen from "@/screens/supervisor/workarea-supervisor/WorkareaSupervisorScreen";
+import WorkerCalendarScreen from "@/screens/supervisor/workarea-supervisor/WorkerCalendarScreen";
 import ListAllRequestsScreen from "@/screens/worker/ListAllRequestsScreen";
 import TaskCalendarScreen from "@/screens/worker/TaskCalendarScreen";
 import WorkerProfileScreen from "@/screens/worker/WorkerProfileScreen";
@@ -110,6 +111,7 @@ export type SupervisorStackParamList = {
   };
   Profile: undefined;
   Notifications: undefined;
+  WorkerCalendar: { workerId: string; workerName: string };
 };
 
 // ─── Combined Route params ────────────────────────────────────────────────────
@@ -294,6 +296,10 @@ function SupervisorNavigator() {
       <SupervisorStack.Screen
         name="Notifications"
         component={NotificationListScreen}
+      />
+      <SupervisorStack.Screen
+        name="WorkerCalendar"
+        component={WorkerCalendarScreen}
       />
     </SupervisorStack.Navigator>
   );

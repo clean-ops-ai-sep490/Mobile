@@ -30,6 +30,7 @@ interface Props {
   onClose: () => void;
   taskAssignmentId: string;
   requiredEquipment?: EquipmentItem[];
+  onSuccess?: () => void;
 }
 
 export default function EquipmentRequestModal({
@@ -37,6 +38,7 @@ export default function EquipmentRequestModal({
   onClose,
   taskAssignmentId,
   requiredEquipment = [],
+  onSuccess,
 }: Props) {
   const { submitting, createEquipmentRequest } = useEquipment();
 
@@ -121,7 +123,13 @@ export default function EquipmentRequestModal({
       });
 
       Alert.alert("Thành công", "Đã gửi yêu cầu.", [
-        { text: "OK", onPress: onClose },
+        {
+          text: "OK",
+          onPress: () => {
+            onClose();
+            onSuccess?.();
+          },
+        },
       ]);
     } catch (e: any) {
       const msg =

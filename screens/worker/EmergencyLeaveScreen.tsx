@@ -557,7 +557,16 @@ export default function EmergencyLeaveScreen({
             onPress: () => {
               onSubmitSuccess?.(result.id);
               onClose?.();
-              navigation.goBack();
+              if (isTH1) {
+                // Đang trong task → về thẳng TaskList và trigger refresh
+                navigation.navigate(
+                  "Tasks" as never,
+                  { refresh: Date.now() } as never,
+                );
+              } else {
+                // Xin nghỉ từ ngoài → goBack bình thường
+                navigation.goBack();
+              }
             },
           },
         ],

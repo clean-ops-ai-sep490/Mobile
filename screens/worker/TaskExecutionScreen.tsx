@@ -591,12 +591,24 @@ export default function TaskExecutionScreen() {
         visible={issueModalVisible}
         onClose={() => setIssueModalVisible(false)}
         taskAssignmentId={taskAssignmentId}
+        onSuccess={() => {
+          navigation.navigate(
+            "Tasks" as never,
+            { refresh: Date.now() } as never,
+          );
+        }}
       />
       <EquipmentRequestModal
         visible={equipmentModalVisible}
         onClose={() => setEquipmentModalVisible(false)}
         taskAssignmentId={taskAssignmentId}
         requiredEquipment={requiredEquipment}
+        onSuccess={() => {
+          navigation.navigate(
+            "Tasks" as never,
+            { refresh: Date.now() } as never,
+          );
+        }}
       />
     </SafeAreaView>
   );
